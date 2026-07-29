@@ -74,10 +74,10 @@ export function PassportMatrix({
       <table className="min-w-full border-collapse text-center text-sm">
         <thead>
           <tr className="bg-gray-50">
-            <th className="sticky left-0 z-20 w-12 min-w-12 border-b border-r border-gray-200 bg-gray-50 px-2 py-2 text-center font-medium text-gray-600">
-              座
+            <th className="sticky left-0 z-20 w-16 min-w-16 border-b border-r border-gray-200 bg-gray-50 px-2 py-2 text-center font-medium text-gray-600">
+              座號
             </th>
-            <th className="sticky left-12 z-20 w-24 min-w-24 border-b border-r border-gray-200 bg-gray-50 px-2 py-2 text-center font-medium text-gray-600">
+            <th className="sticky left-16 z-20 w-24 min-w-24 border-b border-r border-gray-200 bg-gray-50 px-2 py-2 text-center font-medium text-gray-600">
               姓名
             </th>
             {weeks.map((week) => {
@@ -115,10 +115,10 @@ export function PassportMatrix({
         <tbody>
           {students.map((student) => (
             <tr key={student.studentId} className="hover:bg-gray-50/80">
-              <td className="sticky left-0 z-10 w-12 min-w-12 border-b border-r border-gray-100 bg-white px-2 py-1 text-center text-gray-500">
+              <td className="sticky left-0 z-10 w-16 min-w-16 border-b border-r border-gray-100 bg-white px-2 py-1 text-center text-gray-500">
                 {student.seatNumber}
               </td>
-              <td className="sticky left-12 z-10 w-24 min-w-24 border-b border-r border-gray-100 bg-white px-2 py-1 text-center font-medium text-gray-900 whitespace-nowrap">
+              <td className="sticky left-16 z-10 w-24 min-w-24 border-b border-r border-gray-100 bg-white px-2 py-1 text-center font-medium text-gray-900 whitespace-nowrap">
                 {student.name}
               </td>
               {student.cells.map((cell) => {
@@ -140,7 +140,7 @@ export function PassportMatrix({
                       onClick={() =>
                         onToggle(student.studentId, cell.week, cell.status)
                       }
-                      className="flex h-9 w-9 items-center justify-center transition-colors hover:bg-gray-100 disabled:opacity-50"
+                      className="flex h-9 w-full items-center justify-center transition-colors hover:bg-gray-100 disabled:opacity-50"
                     >
                       <span
                         className={cn(
