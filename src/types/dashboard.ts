@@ -23,7 +23,11 @@ export type DashboardData = {
     chinese: PassportDashboardCard;
     english: PassportDashboardCard;
   };
-  homeworkSummary: { completed: number; total: number } | null;
+  homeworkSummary: {
+    completed: number;
+    total: number;
+    hasItems: boolean;
+  } | null;
   remainingStudents: {
     chinese: { name: string; note?: string }[];
     english: { name: string; note?: string }[];

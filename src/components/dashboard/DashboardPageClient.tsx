@@ -99,7 +99,17 @@ export function DashboardPageClient() {
           title="英語完成率"
           passport={data?.passportSummary.english}
         />
-        <ProgressCard title="作業完成率" pendingLabel="待 Sprint 5" />
+        <ProgressCard
+          title="作業完成率"
+          subtitle={
+            data?.homeworkSummary?.hasItems
+              ? "今日全交人數"
+              : "今日尚未建立作業"
+          }
+          completed={data?.homeworkSummary?.completed}
+          total={data?.homeworkSummary?.total}
+          pendingLabel="—"
+        />
         <RemainingCard
           chinese={data?.remainingStudents.chinese ?? []}
           english={data?.remainingStudents.english ?? []}

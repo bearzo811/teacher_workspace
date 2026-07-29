@@ -24,15 +24,12 @@ export function RemainingCard({
         <div>
           <p className="font-medium text-gray-800">作業</p>
           {homework.length === 0 ? (
-            <p className="mt-1 text-gray-400">（Sprint 5 接線）</p>
+            <p className="mt-1 text-gray-400">全部交齊／尚未建立</p>
           ) : (
             <ul className="mt-1 space-y-1 text-gray-700">
               {homework.map((item) => (
                 <li key={`${item.name}-${item.missing.join(",")}`}>
                   {item.name}
-                  {item.missing.length > 0
-                    ? `｜${item.missing.join("、")}`
-                    : ""}
                 </li>
               ))}
             </ul>

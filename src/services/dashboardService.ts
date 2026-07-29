@@ -5,6 +5,7 @@ import {
   getPassportDashboardSummary,
   getPassportSummary,
 } from "@/services/passportService";
+import { getHomeworkDashboardSummary } from "@/services/homeworkService";
 import { getClassSettings } from "@/services/classSettingsService";
 import type {
   DashboardData,
@@ -41,18 +42,26 @@ function toCard(
 export async function getDashboardData(): Promise<DashboardData> {
   const settings = await getClassSettings();
   const week = settings.currentWeek;
+  const today = todayDateString();
 
-  const [chineseCard, englishCard, chineseWeek, englishWeek, taskRows] =
-    await Promise.all([
-      getPassportDashboardSummary("Chinese"),
-      getPassportDashboardSummary("English"),
-      getPassportSummary("Chinese", week),
-      getPassportSummary("English", week),
-      db
-        .select()
-        .from(dailyTaskCompletions)
-        .where(eq(dailyTaskCompletions.taskDate, todayDateString())),
-    ]);
+  const [
+    chineseCard,
+    englishCard,
+    chineseWeek,
+    englishWeek,
+    homeworkSummary,
+    taskRows,
+  ] = await Promise.all([
+    getPassportDashboardSummary("Chinese"),
+    getPassportDashboardSummary("English"),
+    getPassportSummary("Chinese", week),
+    getPassportSummary("English", week),
+    getHomeworkDashboardSummary(today),
+    db
+      .select()
+      .from(dailyTaskCompletions)
+      .where(eq(dailyTaskCompletions.taskDate, today)),
+  ]);
 
   const taskMap = new Map(
     taskRows.map((row) => [row.taskKey, row.completed] as const),
@@ -82,11 +91,15 @@ export async function getDashboardData(): Promise<DashboardData> {
       chinese: toCard(chineseCard),
       english: toCard(englishCard),
     },
-    homeworkSummary: null,
+    homeworkSummary: {
+      completed: homeworkSummary.completed,
+      total: homeworkSummary.total,
+      hasItems: homeworkSummary.hasItems,
+    },
     remainingStudents: {
       chinese: buildRemaining(chineseWeek),
       english: buildRemaining(englishWeek),
-      homework: [],
+      homework: homeworkSummary.hasItems ? homeworkSummary.missing : [],
     },
   };
 }
