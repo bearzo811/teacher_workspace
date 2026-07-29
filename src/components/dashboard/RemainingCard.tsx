@@ -1,16 +1,59 @@
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 
-/** Data Widget shell — remaining lists from DashboardService only */
-export function RemainingCard() {
+type RemainingCardProps = {
+  chinese: string[];
+  english: string[];
+  homework: { name: string; missing: string[] }[];
+};
+
+/** Data Widget — lists from DashboardService only */
+export function RemainingCard({
+  chinese,
+  english,
+  homework,
+}: RemainingCardProps) {
   return (
     <Card>
       <CardTitle>未完成</CardTitle>
-      <CardDescription>資料型 Widget（待接 DashboardService）</CardDescription>
-      <div className="mt-4 space-y-3 text-sm text-gray-500">
-        <p>國語：—</p>
-        <p>英語：—</p>
-        <p>作業：—</p>
+      <CardDescription>依目前週／今日作業</CardDescription>
+      <div className="mt-4 space-y-4 text-sm">
+        <RemainingBlock title="國語" names={chinese} />
+        <RemainingBlock title="英語" names={english} />
+        <div>
+          <p className="font-medium text-gray-800">作業</p>
+          {homework.length === 0 ? (
+            <p className="mt-1 text-gray-400">（Sprint 5 接線）</p>
+          ) : (
+            <ul className="mt-1 space-y-1 text-gray-700">
+              {homework.map((item) => (
+                <li key={`${item.name}-${item.missing.join(",")}`}>
+                  {item.name}
+                  {item.missing.length > 0
+                    ? `｜${item.missing.join("、")}`
+                    : ""}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </Card>
+  );
+}
+
+function RemainingBlock({ title, names }: { title: string; names: string[] }) {
+  return (
+    <div>
+      <p className="font-medium text-gray-800">{title}</p>
+      {names.length === 0 ? (
+        <p className="mt-1 text-gray-400">全部完成</p>
+      ) : (
+        <ul className="mt-1 space-y-1 text-gray-700">
+          {names.map((name) => (
+            <li key={`${title}-${name}`}>{name}</li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
