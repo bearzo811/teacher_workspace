@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  getPassportMatrix,
   getPassportWeekView,
   upsertPassportCompletion,
   type PassportType,
@@ -29,7 +30,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "week 必須是整數" }, { status: 400 });
     }
 
-    const data = await getPassportWeekView(type, week);
+    // With week → single-week view (Dashboard summary helpers)
+    // Without week → full matrix (passport pages)
+    const data =
+      week !== undefined
+        ? await getPassportWeekView(type, week)
+        : await getPassportMatrix(type);
+
     return NextResponse.json({ data });
   } catch (error) {
     const message = error instanceof Error ? error.message : "讀取護照失敗";

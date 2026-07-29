@@ -35,6 +35,31 @@ export type PassportSummary = {
   remainingNames: string[];
 };
 
+export type PassportMatrixCell = {
+  week: number;
+  completed: boolean;
+};
+
+export type PassportMatrixStudent = {
+  studentId: string;
+  name: string;
+  seatNumber: number;
+  cells: PassportMatrixCell[];
+  completedCount: number;
+};
+
+export type PassportMatrixView = {
+  type: PassportType;
+  currentWeek: number;
+  startWeek: number;
+  endWeek: number;
+  weeks: number[];
+  weekTotals: { week: number; completed: number; total: number }[];
+  students: PassportMatrixStudent[];
+  overallCompleted: number;
+  overallTotal: number;
+};
+
 function weekBounds(type: PassportType, settings: Awaited<ReturnType<typeof getClassSettings>>) {
   if (type === "Chinese") {
     return {
@@ -46,6 +71,13 @@ function weekBounds(type: PassportType, settings: Awaited<ReturnType<typeof getC
     startWeek: settings.englishStartWeek,
     endWeek: settings.englishEndWeek,
   };
+}
+
+function buildWeekList(startWeek: number, endWeek: number) {
+  return Array.from(
+    { length: endWeek - startWeek + 1 },
+    (_, index) => startWeek + index,
+  );
 }
 
 export async function getPassportWeekView(
@@ -114,6 +146,88 @@ export async function getPassportSummary(
     remainingNames: view.students
       .filter((s) => !s.completed)
       .map((s) => s.name),
+  };
+}
+
+/** Full students × weeks matrix for one-glance passport checking */
+export async function getPassportMatrix(
+  type: PassportType,
+): Promise<PassportMatrixView> {
+  const settings = await getClassSettings();
+  const { startWeek, endWeek } = weekBounds(type, settings);
+  const weeks = buildWeekList(startWeek, endWeek);
+
+  const activeStudents = await db
+    .select({
+      studentId: students.id,
+      name: students.name,
+      seatNumber: students.seatNumber,
+    })
+    .from(students)
+    .where(eq(students.isActive, true))
+    .orderBy(asc(students.seatNumber));
+
+  const records = await db
+    .select({
+      studentId: passportRecords.studentId,
+      week: passportRecords.week,
+      completed: passportRecords.completed,
+    })
+    .from(passportRecords)
+    .where(
+      and(
+        eq(passportRecords.type, type),
+        eq(passportRecords.completed, true),
+      ),
+    );
+
+  const completedSet = new Set(
+    records.map((row) => `${row.studentId}:${row.week}`),
+  );
+
+  const matrixStudents: PassportMatrixStudent[] = activeStudents.map(
+    (student) => {
+      const cells = weeks.map((week) => ({
+        week,
+        completed: completedSet.has(`${student.studentId}:${week}`),
+      }));
+      return {
+        studentId: student.studentId,
+        name: student.name,
+        seatNumber: student.seatNumber,
+        cells,
+        completedCount: cells.filter((cell) => cell.completed).length,
+      };
+    },
+  );
+
+  const weekTotals = weeks.map((week) => {
+    const completed = matrixStudents.filter((student) =>
+      student.cells.some((cell) => cell.week === week && cell.completed),
+    ).length;
+    return {
+      week,
+      completed,
+      total: matrixStudents.length,
+    };
+  });
+
+  const overallCompleted = matrixStudents.reduce(
+    (sum, student) => sum + student.completedCount,
+    0,
+  );
+  const overallTotal = matrixStudents.length * weeks.length;
+
+  return {
+    type,
+    currentWeek: settings.currentWeek,
+    startWeek,
+    endWeek,
+    weeks,
+    weekTotals,
+    students: matrixStudents,
+    overallCompleted,
+    overallTotal,
   };
 }
 
