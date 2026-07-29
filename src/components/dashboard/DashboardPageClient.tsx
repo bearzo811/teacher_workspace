@@ -93,20 +93,13 @@ export function DashboardPageClient() {
         />
         <ProgressCard
           title="國語完成率"
-          week={data?.passportSummary.chinese.week}
-          completed={data?.passportSummary.chinese.completed}
-          total={data?.passportSummary.chinese.total}
+          passport={data?.passportSummary.chinese}
         />
         <ProgressCard
           title="英語完成率"
-          week={data?.passportSummary.english.week}
-          completed={data?.passportSummary.english.completed}
-          total={data?.passportSummary.english.total}
+          passport={data?.passportSummary.english}
         />
-        <ProgressCard
-          title="作業完成率"
-          pendingLabel="待 Sprint 5"
-        />
+        <ProgressCard title="作業完成率" pendingLabel="待 Sprint 5" />
         <RemainingCard
           chinese={data?.remainingStudents.chinese ?? []}
           english={data?.remainingStudents.english ?? []}

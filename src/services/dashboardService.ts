@@ -1,20 +1,38 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { dailyTaskCompletions } from "@/db/schema";
-import { getPassportSummary } from "@/services/passportService";
+import {
+  getPassportDashboardSummary,
+  getPassportSummary,
+} from "@/services/passportService";
 import { getClassSettings } from "@/services/classSettingsService";
 import type {
   DashboardData,
   DashboardTodayTask,
+  PassportDashboardCard,
 } from "@/types/dashboard";
 
 export type { DashboardData, DashboardTodayTask };
+
 function todayDateString() {
   const now = new Date();
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+function toCard(
+  summary: Awaited<ReturnType<typeof getPassportDashboardSummary>>,
+): PassportDashboardCard {
+  return {
+    week: summary.week,
+    weekCompleted: summary.weekCompleted,
+    weekTotal: summary.weekTotal,
+    overallCompleted: summary.overallCompleted,
+    overallTotal: summary.overallTotal,
+    owedStudents: summary.owedStudents,
+  };
 }
 
 /**
@@ -24,14 +42,17 @@ export async function getDashboardData(): Promise<DashboardData> {
   const settings = await getClassSettings();
   const week = settings.currentWeek;
 
-  const [chinese, english, taskRows] = await Promise.all([
-    getPassportSummary("Chinese", week),
-    getPassportSummary("English", week),
-    db
-      .select()
-      .from(dailyTaskCompletions)
-      .where(eq(dailyTaskCompletions.taskDate, todayDateString())),
-  ]);
+  const [chineseCard, englishCard, chineseWeek, englishWeek, taskRows] =
+    await Promise.all([
+      getPassportDashboardSummary("Chinese"),
+      getPassportDashboardSummary("English"),
+      getPassportSummary("Chinese", week),
+      getPassportSummary("English", week),
+      db
+        .select()
+        .from(dailyTaskCompletions)
+        .where(eq(dailyTaskCompletions.taskDate, todayDateString())),
+    ]);
 
   const taskMap = new Map(
     taskRows.map((row) => [row.taskKey, row.completed] as const),
@@ -58,21 +79,13 @@ export async function getDashboardData(): Promise<DashboardData> {
   return {
     todayTasks,
     passportSummary: {
-      chinese: {
-        week: chinese.week,
-        completed: chinese.completed,
-        total: chinese.total,
-      },
-      english: {
-        week: english.week,
-        completed: english.completed,
-        total: english.total,
-      },
+      chinese: toCard(chineseCard),
+      english: toCard(englishCard),
     },
     homeworkSummary: null,
     remainingStudents: {
-      chinese: buildRemaining(chinese),
-      english: buildRemaining(english),
+      chinese: buildRemaining(chineseWeek),
+      english: buildRemaining(englishWeek),
       homework: [],
     },
   };

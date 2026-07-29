@@ -39,6 +39,23 @@ export type PassportSummary = {
   missingParentNames: string[];
 };
 
+export type PassportOwedStudent = {
+  name: string;
+  seatNumber: number;
+  /** e.g. "W3,W5" or "W4缺家長" */
+  detail: string;
+};
+
+export type PassportDashboardSummary = {
+  week: number;
+  weekCompleted: number;
+  weekTotal: number;
+  overallCompleted: number;
+  overallTotal: number;
+  /** Students with any non-completed cell from startWeek through currentWeek */
+  owedStudents: PassportOwedStudent[];
+};
+
 export type PassportMatrixCell = {
   week: number;
   status: PassportStatus;
@@ -183,6 +200,52 @@ export async function getPassportSummary(
     missingParentNames: view.students
       .filter((s) => s.status === "missing_parent")
       .map((s) => s.name),
+  };
+}
+
+/** Dashboard card: 本週＋全部完成率，以及至目前週為止有欠的學生 */
+export async function getPassportDashboardSummary(
+  type: PassportType,
+): Promise<PassportDashboardSummary> {
+  const matrix = await getPassportMatrix(type);
+  const currentWeek = matrix.currentWeek;
+  const weekTotalRow = matrix.weekTotals.find((item) => item.week === currentWeek);
+  const weekCompleted = weekTotalRow?.completed ?? 0;
+  const weekTotal = weekTotalRow?.total ?? matrix.students.length;
+
+  const owedStudents: PassportOwedStudent[] = [];
+
+  for (const student of matrix.students) {
+    const owedCells = student.cells.filter(
+      (cell) =>
+        cell.week >= matrix.startWeek &&
+        cell.week <= currentWeek &&
+        cell.status !== "completed",
+    );
+    if (owedCells.length === 0) continue;
+
+    const detail = owedCells
+      .map((cell) =>
+        cell.status === "missing_parent"
+          ? `W${cell.week}缺家長`
+          : `W${cell.week}`,
+      )
+      .join("、");
+
+    owedStudents.push({
+      name: student.name,
+      seatNumber: student.seatNumber,
+      detail,
+    });
+  }
+
+  return {
+    week: currentWeek,
+    weekCompleted,
+    weekTotal,
+    overallCompleted: matrix.overallCompleted,
+    overallTotal: matrix.overallTotal,
+    owedStudents,
   };
 }
 

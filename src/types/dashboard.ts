@@ -4,11 +4,24 @@ export type DashboardTodayTask = {
   completed: boolean;
 };
 
+export type PassportDashboardCard = {
+  week: number;
+  weekCompleted: number;
+  weekTotal: number;
+  overallCompleted: number;
+  overallTotal: number;
+  owedStudents: {
+    name: string;
+    seatNumber: number;
+    detail: string;
+  }[];
+};
+
 export type DashboardData = {
   todayTasks: DashboardTodayTask[];
   passportSummary: {
-    chinese: { week: number; completed: number; total: number };
-    english: { week: number; completed: number; total: number };
+    chinese: PassportDashboardCard;
+    english: PassportDashboardCard;
   };
   homeworkSummary: { completed: number; total: number } | null;
   remainingStudents: {
