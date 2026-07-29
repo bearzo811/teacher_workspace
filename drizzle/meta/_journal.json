@@ -15,6 +15,13 @@
       "when": 1785315600000,
       "tag": "0001_passport_status",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785317000000,
+      "tag": "0002_contact_book_days",
+      "breakpoints": true
     }
   ]
 }

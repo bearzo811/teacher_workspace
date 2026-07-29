@@ -128,6 +128,18 @@ export const dailyTaskCompletions = pgTable(
   ],
 );
 
+/** 聯絡簿當日叮嚀（作業項目同步寫入 homework） */
+export const contactBookDays = pgTable(
+  "contact_book_days",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    date: date("date").notNull(),
+    note: text("note").notNull().default(""),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex("contact_book_days_date_uidx").on(table.date)],
+);
+
 export type Student = typeof students.$inferSelect;
 export type NewStudent = typeof students.$inferInsert;
 export type PassportRecord = typeof passportRecords.$inferSelect;
@@ -135,3 +147,4 @@ export type Homework = typeof homework.$inferSelect;
 export type HomeworkRecord = typeof homeworkRecords.$inferSelect;
 export type ClassSettings = typeof classSettings.$inferSelect;
 export type DailyTaskCompletion = typeof dailyTaskCompletions.$inferSelect;
+export type ContactBookDay = typeof contactBookDays.$inferSelect;

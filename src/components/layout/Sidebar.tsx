@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BookOpen,
+  ClipboardList,
   Home,
   Languages,
   NotebookPen,
@@ -14,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: Home },
+  { href: "/contact-book", label: "聯絡簿", icon: ClipboardList },
   { href: "/chinese", label: "國語護照", icon: BookOpen },
   { href: "/english", label: "英語護照", icon: Languages },
   { href: "/homework", label: "作業管理", icon: NotebookPen },

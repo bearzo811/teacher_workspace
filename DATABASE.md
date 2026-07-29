@@ -34,6 +34,7 @@ npm run db:push
 | `homework_records` | 學生作業完成 |
 | `class_settings` | 班級／目前週／護照起迄週 |
 | `daily_task_completions` | 今日工作勾選（Domain Data） |
+| `contact_book_days` | 聯絡簿當日叮嚀；作業項目同步寫入 `homework` |
 
 Schema 原始碼：`src/db/schema.ts`  
 Client：`src/db/index.ts`（僅 server／API／Service 使用）
