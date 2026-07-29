@@ -174,10 +174,8 @@ PassportPage
 
 ```text
 HomeworkPage
-├── HomeworkCreator      # 模板勾選 + 自由新增
-├── HomeworkList
-├── HomeworkChecklist
-└── HomeworkSummary
+├── HomeworkChecklist    # 打勾檢查（建立作業改由聯絡簿）
+└── MissingList          # 缺交名單
 ```
 
 ### Students
