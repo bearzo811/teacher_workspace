@@ -12,6 +12,13 @@ import {
 
 export const passportTypeEnum = pgEnum("passport_type", ["Chinese", "English"]);
 
+/** 護照格子三態 */
+export const passportStatusEnum = pgEnum("passport_status", [
+  "not_started",
+  "missing_parent",
+  "completed",
+]);
+
 export const dailyTaskKeyEnum = pgEnum("daily_task_key", [
   "chinese_passport",
   "english_passport",
@@ -47,7 +54,7 @@ export const passportRecords = pgTable(
       .references(() => students.id),
     type: passportTypeEnum("type").notNull(),
     week: integer("week").notNull(),
-    completed: boolean("completed").notNull().default(false),
+    status: passportStatusEnum("status").notNull().default("not_started"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     ...timestamps,
   },

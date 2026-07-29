@@ -29,7 +29,7 @@ npm run db:push
 | Table | 說明 |
 |-------|------|
 | `students` | 學生；軟刪除 `is_active`；排序用 `seat_number` |
-| `passport_records` | 國語／英語護照（`type`） |
+| `passport_records` | 國語／英語護照（`type`）；格子狀態 `status`：`not_started`／`missing_parent`／`completed` |
 | `homework` | 作業（title + date） |
 | `homework_records` | 學生作業完成 |
 | `class_settings` | 班級／目前週／護照起迄週 |

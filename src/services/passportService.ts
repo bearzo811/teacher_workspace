@@ -6,6 +6,7 @@ import {
   type PassportRecord,
 } from "@/db/schema";
 import { getClassSettings } from "@/services/classSettingsService";
+import type { PassportStatus } from "@/types/passport";
 
 export type PassportType = "Chinese" | "English";
 
@@ -13,7 +14,7 @@ export type PassportStudentRow = {
   studentId: string;
   name: string;
   seatNumber: number;
-  completed: boolean;
+  status: PassportStatus;
   recordId: string | null;
 };
 
@@ -24,6 +25,8 @@ export type PassportWeekView = {
   startWeek: number;
   endWeek: number;
   completedCount: number;
+  missingParentCount: number;
+  notStartedCount: number;
   totalCount: number;
   students: PassportStudentRow[];
 };
@@ -33,11 +36,12 @@ export type PassportSummary = {
   completed: number;
   total: number;
   remainingNames: string[];
+  missingParentNames: string[];
 };
 
 export type PassportMatrixCell = {
   week: number;
-  completed: boolean;
+  status: PassportStatus;
 };
 
 export type PassportMatrixStudent = {
@@ -54,13 +58,22 @@ export type PassportMatrixView = {
   startWeek: number;
   endWeek: number;
   weeks: number[];
-  weekTotals: { week: number; completed: number; total: number }[];
+  weekTotals: {
+    week: number;
+    completed: number;
+    missingParent: number;
+    notStarted: number;
+    total: number;
+  }[];
   students: PassportMatrixStudent[];
   overallCompleted: number;
   overallTotal: number;
 };
 
-function weekBounds(type: PassportType, settings: Awaited<ReturnType<typeof getClassSettings>>) {
+function weekBounds(
+  type: PassportType,
+  settings: Awaited<ReturnType<typeof getClassSettings>>,
+) {
   if (type === "Chinese") {
     return {
       startWeek: settings.chineseStartWeek,
@@ -80,6 +93,17 @@ function buildWeekList(startWeek: number, endWeek: number) {
   );
 }
 
+function asStatus(value: string | null | undefined): PassportStatus {
+  if (
+    value === "not_started" ||
+    value === "missing_parent" ||
+    value === "completed"
+  ) {
+    return value;
+  }
+  return "not_started";
+}
+
 export async function getPassportWeekView(
   type: PassportType,
   week?: number,
@@ -97,7 +121,7 @@ export async function getPassportWeekView(
       studentId: students.id,
       name: students.name,
       seatNumber: students.seatNumber,
-      completed: passportRecords.completed,
+      status: passportRecords.status,
       recordId: passportRecords.id,
     })
     .from(students)
@@ -116,11 +140,19 @@ export async function getPassportWeekView(
     studentId: row.studentId,
     name: row.name,
     seatNumber: row.seatNumber,
-    completed: row.completed ?? false,
+    status: asStatus(row.status),
     recordId: row.recordId,
   }));
 
-  const completedCount = studentsView.filter((s) => s.completed).length;
+  const completedCount = studentsView.filter(
+    (s) => s.status === "completed",
+  ).length;
+  const missingParentCount = studentsView.filter(
+    (s) => s.status === "missing_parent",
+  ).length;
+  const notStartedCount = studentsView.filter(
+    (s) => s.status === "not_started",
+  ).length;
 
   return {
     type,
@@ -129,6 +161,8 @@ export async function getPassportWeekView(
     startWeek,
     endWeek,
     completedCount,
+    missingParentCount,
+    notStartedCount,
     totalCount: studentsView.length,
     students: studentsView,
   };
@@ -144,7 +178,10 @@ export async function getPassportSummary(
     completed: view.completedCount,
     total: view.totalCount,
     remainingNames: view.students
-      .filter((s) => !s.completed)
+      .filter((s) => s.status !== "completed")
+      .map((s) => s.name),
+    missingParentNames: view.students
+      .filter((s) => s.status === "missing_parent")
       .map((s) => s.name),
   };
 }
@@ -171,43 +208,46 @@ export async function getPassportMatrix(
     .select({
       studentId: passportRecords.studentId,
       week: passportRecords.week,
-      completed: passportRecords.completed,
+      status: passportRecords.status,
     })
     .from(passportRecords)
-    .where(
-      and(
-        eq(passportRecords.type, type),
-        eq(passportRecords.completed, true),
-      ),
-    );
+    .where(eq(passportRecords.type, type));
 
-  const completedSet = new Set(
-    records.map((row) => `${row.studentId}:${row.week}`),
+  const statusMap = new Map(
+    records.map((row) => [
+      `${row.studentId}:${row.week}`,
+      asStatus(row.status),
+    ]),
   );
 
   const matrixStudents: PassportMatrixStudent[] = activeStudents.map(
     (student) => {
       const cells = weeks.map((week) => ({
         week,
-        completed: completedSet.has(`${student.studentId}:${week}`),
+        status: statusMap.get(`${student.studentId}:${week}`) ?? "not_started",
       }));
       return {
         studentId: student.studentId,
         name: student.name,
         seatNumber: student.seatNumber,
         cells,
-        completedCount: cells.filter((cell) => cell.completed).length,
+        completedCount: cells.filter((cell) => cell.status === "completed")
+          .length,
       };
     },
   );
 
   const weekTotals = weeks.map((week) => {
-    const completed = matrixStudents.filter((student) =>
-      student.cells.some((cell) => cell.week === week && cell.completed),
-    ).length;
+    const statuses = matrixStudents.map(
+      (student) =>
+        student.cells.find((cell) => cell.week === week)?.status ??
+        "not_started",
+    );
     return {
       week,
-      completed,
+      completed: statuses.filter((s) => s === "completed").length,
+      missingParent: statuses.filter((s) => s === "missing_parent").length,
+      notStarted: statuses.filter((s) => s === "not_started").length,
       total: matrixStudents.length,
     };
   });
@@ -231,11 +271,11 @@ export async function getPassportMatrix(
   };
 }
 
-export async function upsertPassportCompletion(input: {
+export async function upsertPassportStatus(input: {
   studentId: string;
   type: PassportType;
   week: number;
-  completed: boolean;
+  status: PassportStatus;
 }): Promise<PassportRecord> {
   const settings = await getClassSettings();
   const { startWeek, endWeek } = weekBounds(input.type, settings);
@@ -254,7 +294,7 @@ export async function upsertPassportCompletion(input: {
     throw new Error("找不到學生");
   }
 
-  const completedAt = input.completed ? new Date() : null;
+  const completedAt = input.status === "completed" ? new Date() : null;
 
   const existing = await db
     .select()
@@ -272,7 +312,7 @@ export async function upsertPassportCompletion(input: {
     const rows = await db
       .update(passportRecords)
       .set({
-        completed: input.completed,
+        status: input.status,
         completedAt,
       })
       .where(eq(passportRecords.id, existing[0].id))
@@ -286,10 +326,25 @@ export async function upsertPassportCompletion(input: {
       studentId: input.studentId,
       type: input.type,
       week: input.week,
-      completed: input.completed,
+      status: input.status,
       completedAt,
     })
     .returning();
 
   return rows[0];
+}
+
+/** @deprecated use upsertPassportStatus */
+export async function upsertPassportCompletion(input: {
+  studentId: string;
+  type: PassportType;
+  week: number;
+  completed: boolean;
+}): Promise<PassportRecord> {
+  return upsertPassportStatus({
+    studentId: input.studentId,
+    type: input.type,
+    week: input.week,
+    status: input.completed ? "completed" : "not_started",
+  });
 }

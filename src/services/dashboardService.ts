@@ -71,11 +71,22 @@ export async function getDashboardData(): Promise<DashboardData> {
     },
     homeworkSummary: null,
     remainingStudents: {
-      chinese: chinese.remainingNames,
-      english: english.remainingNames,
+      chinese: buildRemaining(chinese),
+      english: buildRemaining(english),
       homework: [],
     },
   };
+}
+
+function buildRemaining(summary: {
+  remainingNames: string[];
+  missingParentNames: string[];
+}) {
+  const missing = new Set(summary.missingParentNames);
+  return summary.remainingNames.map((name) => ({
+    name,
+    note: missing.has(name) ? "缺家長" : undefined,
+  }));
 }
 
 export async function upsertDailyTaskCompletion(input: {

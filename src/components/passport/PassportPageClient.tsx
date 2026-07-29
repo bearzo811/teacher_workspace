@@ -6,6 +6,11 @@ import {
   type MatrixStudent,
 } from "@/components/passport/PassportMatrix";
 import { ProgressBar } from "@/components/passport/ProgressBar";
+import {
+  nextPassportStatus,
+  PASSPORT_STATUS_LABEL,
+  type PassportStatus,
+} from "@/types/passport";
 
 type PassportType = "Chinese" | "English";
 
@@ -15,7 +20,13 @@ type PassportMatrixView = {
   startWeek: number;
   endWeek: number;
   weeks: number[];
-  weekTotals: { week: number; completed: number; total: number }[];
+  weekTotals: {
+    week: number;
+    completed: number;
+    missingParent: number;
+    notStarted: number;
+    total: number;
+  }[];
   students: MatrixStudent[];
   overallCompleted: number;
   overallTotal: number;
@@ -59,31 +70,39 @@ export function PassportPageClient({ type, title }: PassportPageClientProps) {
     void load();
   }, [load]);
 
-  function applyLocalToggle(
+  function applyLocalStatus(
     studentId: string,
     week: number,
-    completed: boolean,
+    status: PassportStatus,
   ) {
     setView((prev) => {
       if (!prev) return prev;
       const students = prev.students.map((student) => {
         if (student.studentId !== studentId) return student;
         const cells = student.cells.map((cell) =>
-          cell.week === week ? { ...cell, completed } : cell,
+          cell.week === week ? { ...cell, status } : cell,
         );
         return {
           ...student,
           cells,
-          completedCount: cells.filter((cell) => cell.completed).length,
+          completedCount: cells.filter((cell) => cell.status === "completed")
+            .length,
         };
       });
-      const weekTotals = prev.weeks.map((w) => ({
-        week: w,
-        completed: students.filter((student) =>
-          student.cells.some((cell) => cell.week === w && cell.completed),
-        ).length,
-        total: students.length,
-      }));
+      const weekTotals = prev.weeks.map((w) => {
+        const statuses = students.map(
+          (student) =>
+            student.cells.find((cell) => cell.week === w)?.status ??
+            "not_started",
+        );
+        return {
+          week: w,
+          completed: statuses.filter((s) => s === "completed").length,
+          missingParent: statuses.filter((s) => s === "missing_parent").length,
+          notStarted: statuses.filter((s) => s === "not_started").length,
+          total: students.length,
+        };
+      });
       const overallCompleted = students.reduce(
         (sum, student) => sum + student.completedCount,
         0,
@@ -101,12 +120,13 @@ export function PassportPageClient({ type, title }: PassportPageClientProps) {
   async function handleToggle(
     studentId: string,
     week: number,
-    nextCompleted: boolean,
+    current: PassportStatus,
   ) {
+    const next = nextPassportStatus(current);
     const key = `${studentId}:${week}`;
     setBusyKey(key);
     setError(null);
-    applyLocalToggle(studentId, week, nextCompleted);
+    applyLocalStatus(studentId, week, next);
     try {
       const response = await fetch("/api/passport", {
         method: "PATCH",
@@ -115,7 +135,7 @@ export function PassportPageClient({ type, title }: PassportPageClientProps) {
           studentId,
           type,
           week,
-          completed: nextCompleted,
+          status: next,
         }),
       });
       const json = (await response.json()) as { error?: string };
@@ -123,7 +143,7 @@ export function PassportPageClient({ type, title }: PassportPageClientProps) {
         throw new Error(json.error ?? "更新失敗");
       }
     } catch (err) {
-      applyLocalToggle(studentId, week, !nextCompleted);
+      applyLocalStatus(studentId, week, current);
       setError(err instanceof Error ? err.message : "更新失敗");
     } finally {
       setBusyKey(null);
@@ -161,6 +181,25 @@ export function PassportPageClient({ type, title }: PassportPageClientProps) {
         ) : null}
       </header>
 
+      <div className="flex flex-wrap gap-4 text-xs text-gray-600">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="flex h-5 w-5 items-center justify-center rounded border border-gray-300 bg-white" />
+          {PASSPORT_STATUS_LABEL.not_started}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="flex h-5 w-5 items-center justify-center rounded border border-red-500 bg-red-50 text-[10px] font-medium text-red-600">
+            缺
+          </span>
+          {PASSPORT_STATUS_LABEL.missing_parent}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="flex h-5 w-5 items-center justify-center rounded border border-green-600 bg-green-600 text-[10px] text-white">
+            ✓
+          </span>
+          {PASSPORT_STATUS_LABEL.completed}
+        </span>
+      </div>
+
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       {loading && !view ? (
         <p className="text-sm text-gray-400">載入中…</p>
@@ -178,15 +217,15 @@ export function PassportPageClient({ type, title }: PassportPageClientProps) {
             weekTotals={view.weekTotals}
             students={view.students}
             busyKey={busyKey}
-            onToggle={(studentId, week, nextCompleted) => {
-              void handleToggle(studentId, week, nextCompleted);
+            onToggle={(studentId, week, current) => {
+              void handleToggle(studentId, week, current);
             }}
             onSetCurrentWeek={(week) => {
               void handleSetCurrentWeek(week);
             }}
           />
           <p className="text-xs text-gray-400">
-            點格子＝切換完成。點週次標題＝設為目前週。藍色欄＝目前週。左側姓名固定可橫向捲動。
+            點格子輪轉：未開始 → 缺家長 → 已完成 → 未開始。點週次標題＝設為目前週。
           </p>
         </>
       ) : null}

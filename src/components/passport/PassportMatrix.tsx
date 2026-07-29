@@ -1,24 +1,56 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import {
+  PASSPORT_STATUS_LABEL,
+  type PassportStatus,
+} from "@/types/passport";
 
 export type MatrixStudent = {
   studentId: string;
   name: string;
   seatNumber: number;
-  cells: { week: number; completed: boolean }[];
+  cells: { week: number; status: PassportStatus }[];
   completedCount: number;
 };
 
 type PassportMatrixProps = {
   weeks: number[];
   currentWeek: number;
-  weekTotals: { week: number; completed: number; total: number }[];
+  weekTotals: {
+    week: number;
+    completed: number;
+    missingParent: number;
+    notStarted: number;
+    total: number;
+  }[];
   students: MatrixStudent[];
   busyKey?: string | null;
-  onToggle: (studentId: string, week: number, nextCompleted: boolean) => void;
+  onToggle: (studentId: string, week: number, current: PassportStatus) => void;
   onSetCurrentWeek?: (week: number) => void;
 };
+
+function cellClass(status: PassportStatus) {
+  switch (status) {
+    case "completed":
+      return "border-green-600 bg-green-600 text-white";
+    case "missing_parent":
+      return "border-red-500 bg-red-50 text-red-600";
+    default:
+      return "border-gray-300 bg-white text-gray-400";
+  }
+}
+
+function cellMark(status: PassportStatus) {
+  switch (status) {
+    case "completed":
+      return "✓";
+    case "missing_parent":
+      return "缺";
+    default:
+      return "";
+  }
+}
 
 export function PassportMatrix({
   weeks,
@@ -76,7 +108,7 @@ export function PassportMatrix({
               );
             })}
             <th className="border-b border-l border-gray-200 px-2 py-2 text-center font-medium text-gray-600">
-              合計
+              完成
             </th>
           </tr>
         </thead>
@@ -104,26 +136,19 @@ export function PassportMatrix({
                     <button
                       type="button"
                       disabled={busy}
-                      title={`第 ${cell.week} 週｜${student.name}`}
+                      title={`第 ${cell.week} 週｜${student.name}｜${PASSPORT_STATUS_LABEL[cell.status]}（點一下切換）`}
                       onClick={() =>
-                        onToggle(student.studentId, cell.week, !cell.completed)
+                        onToggle(student.studentId, cell.week, cell.status)
                       }
-                      className={cn(
-                        "flex h-9 w-9 items-center justify-center transition-colors disabled:opacity-50",
-                        cell.completed
-                          ? "text-green-600 hover:bg-green-50"
-                          : "text-gray-300 hover:bg-gray-100 hover:text-gray-400",
-                      )}
+                      className="flex h-9 w-9 items-center justify-center transition-colors hover:bg-gray-100 disabled:opacity-50"
                     >
                       <span
                         className={cn(
-                          "flex h-5 w-5 items-center justify-center rounded border text-xs",
-                          cell.completed
-                            ? "border-green-600 bg-green-600 text-white"
-                            : "border-gray-300 bg-white",
+                          "flex h-5 w-5 items-center justify-center rounded border text-[10px] font-medium",
+                          cellClass(cell.status),
                         )}
                       >
-                        {cell.completed ? "✓" : ""}
+                        {cellMark(cell.status)}
                       </span>
                     </button>
                   </td>

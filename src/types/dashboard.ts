@@ -12,8 +12,8 @@ export type DashboardData = {
   };
   homeworkSummary: { completed: number; total: number } | null;
   remainingStudents: {
-    chinese: string[];
-    english: string[];
+    chinese: { name: string; note?: string }[];
+    english: { name: string; note?: string }[];
     homework: { name: string; missing: string[] }[];
   };
 };

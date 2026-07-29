@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import {
   getPassportMatrix,
   getPassportWeekView,
-  upsertPassportCompletion,
+  upsertPassportStatus,
   type PassportType,
 } from "@/services/passportService";
+import { isPassportStatus } from "@/types/passport";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +31,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "week 必須是整數" }, { status: 400 });
     }
 
-    // With week → single-week view (Dashboard summary helpers)
-    // Without week → full matrix (passport pages)
     const data =
       week !== undefined
         ? await getPassportWeekView(type, week)
@@ -51,7 +50,7 @@ export async function PATCH(request: Request) {
       studentId?: string;
       type?: string;
       week?: number;
-      completed?: boolean;
+      status?: string;
     };
 
     const type = parseType(body.type ?? null);
@@ -59,22 +58,22 @@ export async function PATCH(request: Request) {
       !body.studentId ||
       !type ||
       typeof body.week !== "number" ||
-      typeof body.completed !== "boolean"
+      !isPassportStatus(body.status)
     ) {
       return NextResponse.json(
         {
           error:
-            "請提供 studentId、type（Chinese|English）、week（數字）、completed（布林）",
+            "請提供 studentId、type（Chinese|English）、week（數字）、status（not_started|missing_parent|completed）",
         },
         { status: 400 },
       );
     }
 
-    const data = await upsertPassportCompletion({
+    const data = await upsertPassportStatus({
       studentId: body.studentId,
       type,
       week: body.week,
-      completed: body.completed,
+      status: body.status,
     });
     return NextResponse.json({ data });
   } catch (error) {
