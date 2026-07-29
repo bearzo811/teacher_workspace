@@ -5,9 +5,5 @@ export type DailyTaskKey =
   | "english_passport"
   | "homework";
 
-export type Student = {
-  id: string;
-  name: string;
-  seatNumber: number;
-  isActive: boolean;
-};
+/** Prefer Drizzle inferred types from `@/db/schema` in server code. */
+export type { Student } from "@/db/schema";
