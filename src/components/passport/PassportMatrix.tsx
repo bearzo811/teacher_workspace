@@ -71,13 +71,13 @@ export function PassportMatrix({
 
   return (
     <div className="overflow-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-      <table className="min-w-full border-collapse text-sm">
+      <table className="min-w-full border-collapse text-center text-sm">
         <thead>
           <tr className="bg-gray-50">
-            <th className="sticky left-0 z-20 w-12 min-w-12 border-b border-r border-gray-200 bg-gray-50 px-2 py-2 text-left font-medium text-gray-600">
+            <th className="sticky left-0 z-20 w-12 min-w-12 border-b border-r border-gray-200 bg-gray-50 px-2 py-2 text-center font-medium text-gray-600">
               座
             </th>
-            <th className="sticky left-12 z-20 w-24 min-w-24 border-b border-r border-gray-200 bg-gray-50 px-2 py-2 text-left font-medium text-gray-600">
+            <th className="sticky left-12 z-20 w-24 min-w-24 border-b border-r border-gray-200 bg-gray-50 px-2 py-2 text-center font-medium text-gray-600">
               姓名
             </th>
             {weeks.map((week) => {
@@ -118,7 +118,7 @@ export function PassportMatrix({
               <td className="sticky left-0 z-10 w-12 min-w-12 border-b border-r border-gray-100 bg-white px-2 py-1 text-center text-gray-500">
                 {student.seatNumber}
               </td>
-              <td className="sticky left-12 z-10 w-24 min-w-24 border-b border-r border-gray-100 bg-white px-2 py-1 font-medium text-gray-900 whitespace-nowrap">
+              <td className="sticky left-12 z-10 w-24 min-w-24 border-b border-r border-gray-100 bg-white px-2 py-1 text-center font-medium text-gray-900 whitespace-nowrap">
                 {student.name}
               </td>
               {student.cells.map((cell) => {
