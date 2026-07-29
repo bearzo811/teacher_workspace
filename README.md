@@ -10,23 +10,28 @@
 | [TDD.md](./TDD.md) | 技術設計 |
 | [TDD_ERRATA.md](./TDD_ERRATA.md) | 架構決策紀錄 |
 | [PROJECT_RULES.md](./PROJECT_RULES.md) | 開發硬規範 |
+| [DATABASE.md](./DATABASE.md) | Supabase + Drizzle schema |
 | [AI_COLLABORATION.md](./AI_COLLABORATION.md) | AI 協作方式 |
 
 ## Stack
 
 Next.js 15 · React 19 · TypeScript · Tailwind CSS · Zustand · Lucide  
-（Supabase + Drizzle 於後續 Sprint 接入）
+Drizzle ORM · Supabase PostgreSQL（方案 C）
 
 ## Develop
 
 ```bash
 npm install
+cp .env.example .env.local   # 填入 Supabase DATABASE_URL
+npm run db:generate && npm run db:migrate
 npm run dev
 ```
 
 開啟 [http://localhost:3000](http://localhost:3000)
 
+DB 細節見 [DATABASE.md](./DATABASE.md)。
+
 ## 現況
 
 Sprint 1 骨架：Layout、Sidebar、Dashboard Widget 殼、各路由佔位。  
-尚無 DB／Auth／業務邏輯。
+Drizzle schema 已就緒；待填 `DATABASE_URL` 後 migrate。尚無 Auth／業務 CRUD。
