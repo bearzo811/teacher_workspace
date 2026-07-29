@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { HomeworkChecklist } from "@/components/homework/HomeworkChecklist";
-import { HomeworkCreator } from "@/components/homework/HomeworkCreator";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ProgressBar } from "@/components/passport/ProgressBar";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type HomeworkDayView = {
   date: string;
@@ -149,18 +151,26 @@ export function HomeworkPageClient() {
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">作業管理</h1>
           <p className="mt-1 text-sm text-gray-500">
-            模板：國習／數習／生字／英文，也可自訂
+            作業請在「聯絡簿」建立並同步；這裡負責打勾檢查
           </p>
         </div>
-        <label className="text-sm text-gray-600">
-          日期
-          <input
-            type="date"
-            value={date}
-            onChange={(event) => setDate(event.target.value)}
-            className="ml-2 h-10 rounded-lg border border-gray-200 px-3 text-sm outline-none ring-blue-500 focus:ring-2"
-          />
-        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/contact-book"
+            className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
+          >
+            去聯絡簿
+          </Link>
+          <label className="text-sm text-gray-600">
+            日期
+            <input
+              type="date"
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+              className="ml-2 h-10 rounded-lg border border-gray-200 px-3 text-sm outline-none ring-blue-500 focus:ring-2"
+            />
+          </label>
+        </div>
       </header>
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
@@ -176,33 +186,23 @@ export function HomeworkPageClient() {
           />
 
           <div className="grid gap-4 lg:grid-cols-[1fr_240px]">
-            <div className="flex flex-col gap-4">
-              <HomeworkCreator
-                date={date}
-                existingTitles={view.items.map((item) => item.title)}
-                pending={loading}
-                onCreated={() => {
-                  void load(date);
-                }}
-              />
-              <HomeworkChecklist
-                items={view.items}
-                students={view.students}
-                busyKey={busyKey}
-                onToggle={(studentId, homeworkId, nextCompleted) => {
-                  void handleToggle(studentId, homeworkId, nextCompleted);
-                }}
-                onDeleteItem={(homeworkId) => {
-                  void handleDeleteItem(homeworkId);
-                }}
-              />
-            </div>
+            <HomeworkChecklist
+              items={view.items}
+              students={view.students}
+              busyKey={busyKey}
+              onToggle={(studentId, homeworkId, nextCompleted) => {
+                void handleToggle(studentId, homeworkId, nextCompleted);
+              }}
+              onDeleteItem={(homeworkId) => {
+                void handleDeleteItem(homeworkId);
+              }}
+            />
 
             <Card>
               <CardTitle>缺交</CardTitle>
               <CardDescription>
                 {view.items.length === 0
-                  ? "尚未建立作業"
+                  ? "請先到聯絡簿建立作業"
                   : `${view.completedStudentCount} / ${view.totalStudentCount} 全交`}
               </CardDescription>
               {view.items.length === 0 ? (
