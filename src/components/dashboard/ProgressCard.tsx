@@ -57,11 +57,7 @@ export function ProgressCard({
           <ul className="mt-1 max-h-36 space-y-1 overflow-y-auto text-sm text-gray-700">
             {passport.owedStudents.map((student) => (
               <li key={`${student.seatNumber}-${student.name}`}>
-                <span className="text-gray-500">{student.seatNumber}</span>{" "}
                 {student.name}
-                <span className="ml-1 text-xs text-red-600">
-                  {student.detail}
-                </span>
               </li>
             ))}
           </ul>
