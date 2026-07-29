@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  getStudentById,
+  getStudentDetail,
   softDeleteStudent,
   updateStudent,
 } from "@/services/studentService";
@@ -14,8 +14,8 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const data = await getStudentById(id);
-    if (!data || !data.isActive) {
+    const data = await getStudentDetail(id);
+    if (!data) {
       return NextResponse.json({ error: "找不到學生" }, { status: 404 });
     }
     return NextResponse.json({ data });

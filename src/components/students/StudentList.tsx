@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -40,14 +41,17 @@ export function StudentList({
               key={student.id}
               className="flex items-center justify-between gap-3 px-5 py-3"
             >
-              <div className="min-w-0">
+              <Link
+                href={`/students/${student.id}`}
+                className="min-w-0 flex-1 rounded-lg px-1 py-1 hover:bg-gray-50"
+              >
                 <p className="text-sm font-medium text-gray-900">
-                  <span className="mr-2 inline-block w-8 text-gray-500">
+                  <span className="mr-2 inline-block w-8 text-center text-gray-500">
                     {student.seatNumber}
                   </span>
                   {student.name}
                 </p>
-              </div>
+              </Link>
               <div className="flex shrink-0 gap-2">
                 <Button
                   variant="secondary"

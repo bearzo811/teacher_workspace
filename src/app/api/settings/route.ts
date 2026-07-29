@@ -35,6 +35,20 @@ export async function PATCH(request: Request) {
     ) {
       return NextResponse.json({ error: "目前週數無效" }, { status: 400 });
     }
+    if (body.grade !== undefined && !Number.isInteger(body.grade)) {
+      return NextResponse.json({ error: "年級須為整數" }, { status: 400 });
+    }
+    for (const key of [
+      "chineseStartWeek",
+      "chineseEndWeek",
+      "englishStartWeek",
+      "englishEndWeek",
+    ] as const) {
+      const value = body[key];
+      if (value !== undefined && (!Number.isInteger(value) || value < 1)) {
+        return NextResponse.json({ error: `${key} 無效` }, { status: 400 });
+      }
+    }
 
     const data = await updateClassSettings(body);
     return NextResponse.json({ data });

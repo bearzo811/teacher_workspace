@@ -1,12 +1,23 @@
 import { and, asc, eq, ilike } from "drizzle-orm";
 import { db } from "@/db";
-import { students, type NewStudent, type Student } from "@/db/schema";
+import {
+  homework,
+  homeworkRecords,
+  passportRecords,
+  students,
+  type NewStudent,
+  type Student,
+} from "@/db/schema";
+import { getClassSettings } from "@/services/classSettingsService";
+import type { PassportStatus } from "@/types/passport";
+import type { StudentDetail } from "@/types/student";
 
 export type StudentInput = {
   name: string;
   seatNumber: number;
 };
 
+export type { StudentDetail };
 function normalizeName(name: string) {
   return name.trim();
 }
@@ -127,4 +138,107 @@ export async function softDeleteStudent(id: string): Promise<Student> {
     .returning();
 
   return rows[0];
+}
+
+function asStatus(value: string | null | undefined): PassportStatus {
+  if (
+    value === "not_started" ||
+    value === "missing_parent" ||
+    value === "completed"
+  ) {
+    return value;
+  }
+  return "not_started";
+}
+
+function buildWeekList(startWeek: number, endWeek: number) {
+  return Array.from(
+    { length: endWeek - startWeek + 1 },
+    (_, index) => startWeek + index,
+  );
+}
+
+async function countPassportCompleted(
+  studentId: string,
+  type: "Chinese" | "English",
+  startWeek: number,
+  endWeek: number,
+) {
+  const weeks = buildWeekList(startWeek, endWeek);
+  const records = await db
+    .select({
+      week: passportRecords.week,
+      status: passportRecords.status,
+    })
+    .from(passportRecords)
+    .where(
+      and(
+        eq(passportRecords.studentId, studentId),
+        eq(passportRecords.type, type),
+      ),
+    );
+
+  const map = new Map(
+    records.map((row) => [row.week, asStatus(row.status)] as const),
+  );
+  const completed = weeks.filter(
+    (week) => map.get(week) === "completed",
+  ).length;
+
+  return { completed, total: weeks.length };
+}
+
+export async function getStudentDetail(
+  id: string,
+): Promise<StudentDetail | null> {
+  const student = await getStudentById(id);
+  if (!student || !student.isActive) {
+    return null;
+  }
+
+  const settings = await getClassSettings();
+  const [chinese, english, allHomework, completedHomework] = await Promise.all([
+    countPassportCompleted(
+      id,
+      "Chinese",
+      settings.chineseStartWeek,
+      settings.chineseEndWeek,
+    ),
+    countPassportCompleted(
+      id,
+      "English",
+      settings.englishStartWeek,
+      settings.englishEndWeek,
+    ),
+    db.select({ id: homework.id }).from(homework),
+    db
+      .select({ id: homeworkRecords.id })
+      .from(homeworkRecords)
+      .where(
+        and(
+          eq(homeworkRecords.studentId, id),
+          eq(homeworkRecords.completed, true),
+        ),
+      ),
+  ]);
+
+  const homeworkTotal = allHomework.length;
+  const homeworkCompleted = completedHomework.length;
+  const percent =
+    homeworkTotal === 0
+      ? 100
+      : Math.round((homeworkCompleted / homeworkTotal) * 100);
+
+  return {
+    id: student.id,
+    name: student.name,
+    seatNumber: student.seatNumber,
+    chinese,
+    english,
+    homework: {
+      completed: homeworkCompleted,
+      total: homeworkTotal,
+      percent,
+    },
+  };
 }

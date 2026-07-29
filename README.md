@@ -33,5 +33,4 @@ DB 細節見 [DATABASE.md](./DATABASE.md)。
 
 ## 現況
 
-Sprint 1 骨架：Layout、Sidebar、Dashboard Widget 殼、各路由佔位。  
-Drizzle schema 已就緒；待填 `DATABASE_URL` 後 migrate。尚無 Auth／業務 CRUD。
+MVP 功能已齊：Dashboard、國語／英語護照總表（三態）、作業管理、學生 CRUD／詳細統計、系統設定。
