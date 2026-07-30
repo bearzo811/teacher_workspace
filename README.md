@@ -11,6 +11,7 @@
 | [TDD_ERRATA.md](./TDD_ERRATA.md) | 架構決策紀錄 |
 | [PROJECT_RULES.md](./PROJECT_RULES.md) | 開發硬規範 |
 | [DATABASE.md](./DATABASE.md) | Supabase + Drizzle schema |
+| [docs/architecture/](./docs/architecture/) | Architecture Review（Inventory／Self Review／Proposal／Gate） |
 | [AI_COLLABORATION.md](./AI_COLLABORATION.md) | AI 協作方式 |
 
 ## Stack
@@ -33,4 +34,6 @@ DB 細節見 [DATABASE.md](./DATABASE.md)。
 
 ## 現況
 
-MVP 功能已齊：Dashboard、國語／英語護照總表（三態）、作業管理、學生 CRUD／詳細統計、系統設定。
+MVP 功能已齊：Dashboard、國語／英語護照總表（三態）、作業管理、學生 CRUD／詳細統計、系統設定、聯絡簿、**教室大屏**（`/display`）。
+
+教室大屏：聯絡簿／作業繳交／本週護照；可開座號自助打勾。

@@ -30,11 +30,11 @@ npm run db:push
 |-------|------|
 | `students` | 學生；軟刪除 `is_active`；排序用 `seat_number` |
 | `passport_records` | 國語／英語護照（`type`）；格子狀態 `status`：`not_started`／`missing_parent`／`completed` |
-| `homework` | 作業（title + date） |
+| `homework` | 作業：`date`＝繳交日、`contact_book_date`＝聯絡簿日期 |
 | `homework_records` | 學生作業完成 |
-| `class_settings` | 班級／目前週／護照起迄週 |
+| `class_settings` | 班級／目前週／護照起迄週／大屏開關與 token |
 | `daily_task_completions` | 今日工作勾選（Domain Data） |
-| `contact_book_days` | 聯絡簿當日叮嚀；作業項目同步寫入 `homework` |
+| `contact_book_days` | 聯絡簿當日叮嚀；作業項目以 `contact_book_date` 同步寫入 `homework` |
 
 Schema 原始碼：`src/db/schema.ts`  
 Client：`src/db/index.ts`（僅 server／API／Service 使用）

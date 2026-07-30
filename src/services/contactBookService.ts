@@ -1,6 +1,7 @@
 import { asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { contactBookDays, homework, homeworkRecords } from "@/db/schema";
+import { nextSchoolDay } from "@/lib/dates";
 import { getClassSettings } from "@/services/classSettingsService";
 import { HOMEWORK_TEMPLATES } from "@/types/homework";
 
@@ -8,9 +9,10 @@ export { HOMEWORK_TEMPLATES };
 
 export type ContactBookView = {
   date: string;
+  dueDate: string;
   note: string;
   titles: string[];
-  items: { id: string; title: string }[];
+  items: { id: string; title: string; dueDate: string }[];
   className: string;
   schoolYear: string;
 };
@@ -33,6 +35,7 @@ function normalizeTitles(titles: string[]) {
 
 export async function getContactBook(date: string): Promise<ContactBookView> {
   const day = normalizeDate(date);
+  const dueDate = nextSchoolDay(day);
   const [settings, noteRow, items] = await Promise.all([
     getClassSettings(),
     db
@@ -43,15 +46,20 @@ export async function getContactBook(date: string): Promise<ContactBookView> {
     db
       .select()
       .from(homework)
-      .where(eq(homework.date, day))
+      .where(eq(homework.contactBookDate, day))
       .orderBy(asc(homework.createdAt)),
   ]);
 
   return {
     date: day,
+    dueDate: items[0]?.date ?? dueDate,
     note: noteRow[0]?.note ?? "",
     titles: items.map((item) => item.title),
-    items: items.map((item) => ({ id: item.id, title: item.title })),
+    items: items.map((item) => ({
+      id: item.id,
+      title: item.title,
+      dueDate: item.date,
+    })),
     className: settings.className,
     schoolYear: settings.schoolYear,
   };
@@ -60,7 +68,8 @@ export async function getContactBook(date: string): Promise<ContactBookView> {
 /**
  * Save contact book for a date:
  * - upsert note
- * - reconcile homework titles for that date (add / keep / delete)
+ * - reconcile homework by contactBookDate (titles sync)
+ * - homework.date = next school day (due date)
  */
 export async function saveContactBook(input: {
   date: string;
@@ -68,6 +77,7 @@ export async function saveContactBook(input: {
   titles: string[];
 }): Promise<ContactBookView> {
   const day = normalizeDate(input.date);
+  const dueDate = nextSchoolDay(day);
   const desired = normalizeTitles(input.titles);
   const note = (input.note ?? "").trim();
 
@@ -89,7 +99,7 @@ export async function saveContactBook(input: {
   const existingItems = await db
     .select()
     .from(homework)
-    .where(eq(homework.date, day))
+    .where(eq(homework.contactBookDate, day))
     .orderBy(asc(homework.createdAt));
 
   const existingByTitle = new Map(
@@ -106,12 +116,23 @@ export async function saveContactBook(input: {
     await db.delete(homework).where(inArray(homework.id, ids));
   }
 
+  for (const item of existingItems) {
+    if (!desiredSet.has(item.title)) continue;
+    if (item.date !== dueDate || item.contactBookDate !== day) {
+      await db
+        .update(homework)
+        .set({ date: dueDate, contactBookDate: day })
+        .where(eq(homework.id, item.id));
+    }
+  }
+
   const toInsert = desired.filter((title) => !existingByTitle.has(title));
   if (toInsert.length > 0) {
     await db.insert(homework).values(
       toInsert.map((title) => ({
         title,
-        date: day,
+        date: dueDate,
+        contactBookDate: day,
       })),
     );
   }
@@ -120,10 +141,14 @@ export async function saveContactBook(input: {
   const byTitle = new Map(view.items.map((item) => [item.title, item] as const));
   const orderedItems = desired
     .map((title) => byTitle.get(title))
-    .filter((item): item is { id: string; title: string } => Boolean(item));
+    .filter(
+      (item): item is { id: string; title: string; dueDate: string } =>
+        Boolean(item),
+    );
 
   return {
     ...view,
+    dueDate,
     titles: desired,
     items: orderedItems,
   };

@@ -70,7 +70,10 @@ export const passportRecords = pgTable(
 export const homework = pgTable("homework", {
   id: uuid("id").defaultRandom().primaryKey(),
   title: text("title").notNull(),
+  /** 繳交日 */
   date: date("date").notNull(),
+  /** 聯絡簿上寫的那一天（可與繳交日不同） */
+  contactBookDate: date("contact_book_date"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -107,6 +110,22 @@ export const classSettings = pgTable("class_settings", {
   chineseEndWeek: integer("chinese_end_week").notNull().default(17),
   englishStartWeek: integer("english_start_week").notNull().default(3),
   englishEndWeek: integer("english_end_week").notNull().default(17),
+  /** 大屏：允許學生自助打勾作業 */
+  allowDisplayHomeworkToggle: boolean("allow_display_homework_toggle")
+    .notNull()
+    .default(false),
+  /** 大屏：允許學生自助點護照（僅本週） */
+  allowDisplayPassportToggle: boolean("allow_display_passport_toggle")
+    .notNull()
+    .default(false),
+  /** 大屏：面板自動輪播 */
+  displayCarouselEnabled: boolean("display_carousel_enabled")
+    .notNull()
+    .default(false),
+  /** 大屏存取 token（空字串＝不驗證） */
+  displayToken: text("display_token").notNull().default(""),
+  /** 大屏輪詢秒數 */
+  displayRefreshSeconds: integer("display_refresh_seconds").notNull().default(20),
   ...timestamps,
 });
 

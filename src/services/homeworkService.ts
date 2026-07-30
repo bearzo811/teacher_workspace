@@ -192,7 +192,13 @@ export async function createHomeworkItems(input: {
 
   const rows = await db
     .insert(homework)
-    .values(toInsert.map((title) => ({ title, date: day })))
+    .values(
+      toInsert.map((title) => ({
+        title,
+        date: day,
+        contactBookDate: day,
+      })),
+    )
     .returning();
 
   return rows;

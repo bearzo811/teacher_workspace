@@ -3,29 +3,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import {
+  formatDateInput,
+  formatDisplayDate,
+  nextSchoolDay,
+  todayDateString,
+} from "@/lib/dates";
 import { HOMEWORK_TEMPLATES } from "@/types/homework";
-
-function formatDateInput(date: Date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function tomorrowDateString() {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  return formatDateInput(date);
-}
-
-function formatDisplayDate(dateStr: string) {
-  const date = new Date(`${dateStr}T00:00:00`);
-  const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
-  return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}（${weekdays[date.getDay()]}）`;
-}
 
 type ContactBookData = {
   date: string;
+  dueDate: string;
   note: string;
   titles: string[];
   className: string;
@@ -33,9 +21,10 @@ type ContactBookData = {
 };
 
 export function ContactBookPageClient() {
-  const [date, setDate] = useState(tomorrowDateString);
+  const [date, setDate] = useState(todayDateString);
   const [titles, setTitles] = useState<string[]>([]);
   const [note, setNote] = useState("");
+  const [dueDate, setDueDate] = useState(() => nextSchoolDay(todayDateString()));
   const [meta, setMeta] = useState({ className: "", schoolYear: "" });
   const [customTitle, setCustomTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +50,7 @@ export function ContactBookPageClient() {
       const data = json.data!;
       setTitles(data.titles);
       setNote(data.note);
+      setDueDate(data.dueDate);
       setMeta({ className: data.className, schoolYear: data.schoolYear });
     } catch (err) {
       setError(err instanceof Error ? err.message : "讀取失敗");
@@ -72,6 +62,8 @@ export function ContactBookPageClient() {
   useEffect(() => {
     void load(date);
   }, [date, load]);
+
+  const previewDueDate = dueDate || nextSchoolDay(date);
 
   const availableTemplates = useMemo(
     () => HOMEWORK_TEMPLATES.filter((title) => !titles.includes(title)),
@@ -107,7 +99,10 @@ export function ContactBookPageClient() {
       }
       setTitles(json.data!.titles);
       setNote(json.data!.note);
-      setMessage("已儲存，並同步到該日作業管理");
+      setDueDate(json.data!.dueDate);
+      setMessage(
+        `已儲存；作業將於繳交日 ${formatDisplayDate(json.data!.dueDate)} 出現在作業管理`,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "儲存失敗");
     } finally {
@@ -125,18 +120,23 @@ export function ContactBookPageClient() {
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">聯絡簿</h1>
           <p className="mt-1 text-sm text-gray-500">
-            編輯後儲存，會同步寫入該日作業（可改、會跟著改）
+            寫當天回家作業；系統會同步到下一個上課日的作業繳交表
           </p>
         </div>
-        <label className="text-sm text-gray-600">
-          對象日期
-          <input
-            type="date"
-            value={date}
-            onChange={(event) => setDate(event.target.value)}
-            className="ml-2 h-10 rounded-lg border border-gray-200 px-3 text-sm outline-none ring-blue-500 focus:ring-2"
-          />
-        </label>
+        <div className="flex flex-col items-start gap-1 sm:items-end">
+          <label className="text-sm text-gray-600">
+            聯絡簿日期
+            <input
+              type="date"
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+              className="ml-2 h-10 rounded-lg border border-gray-200 px-3 text-sm outline-none ring-blue-500 focus:ring-2"
+            />
+          </label>
+          <p className="text-xs text-amber-700">
+            繳交日：{formatDisplayDate(previewDueDate)}
+          </p>
+        </div>
       </header>
 
       {error ? (
@@ -245,7 +245,17 @@ export function ContactBookPageClient() {
             <Button
               variant="ghost"
               onClick={() => {
-                setDate(tomorrowDateString());
+                setDate(todayDateString());
+              }}
+            >
+              設為今天
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                const d = new Date();
+                d.setDate(d.getDate() + 1);
+                setDate(formatDateInput(d));
               }}
             >
               設為明天
@@ -262,6 +272,9 @@ export function ContactBookPageClient() {
               </p>
               <p className="mt-2 text-center text-sm text-gray-600">
                 {formatDisplayDate(date)}
+              </p>
+              <p className="mt-1 text-center text-xs text-amber-700">
+                繳交日：{formatDisplayDate(previewDueDate)}
               </p>
 
               <div className="mt-6">

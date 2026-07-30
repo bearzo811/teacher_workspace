@@ -13,6 +13,11 @@ type SettingsForm = {
   chineseEndWeek: string;
   englishStartWeek: string;
   englishEndWeek: string;
+  allowDisplayHomeworkToggle: boolean;
+  allowDisplayPassportToggle: boolean;
+  displayCarouselEnabled: boolean;
+  displayToken: string;
+  displayRefreshSeconds: string;
 };
 
 const emptyForm: SettingsForm = {
@@ -24,6 +29,11 @@ const emptyForm: SettingsForm = {
   chineseEndWeek: "",
   englishStartWeek: "",
   englishEndWeek: "",
+  allowDisplayHomeworkToggle: false,
+  allowDisplayPassportToggle: false,
+  displayCarouselEnabled: false,
+  displayToken: "",
+  displayRefreshSeconds: "20",
 };
 
 export function SettingsPageClient() {
@@ -52,6 +62,11 @@ export function SettingsPageClient() {
           chineseEndWeek: number;
           englishStartWeek: number;
           englishEndWeek: number;
+          allowDisplayHomeworkToggle: boolean;
+          allowDisplayPassportToggle: boolean;
+          displayCarouselEnabled: boolean;
+          displayToken: string;
+          displayRefreshSeconds: number;
         };
         error?: string;
       };
@@ -77,6 +92,11 @@ export function SettingsPageClient() {
         chineseEndWeek: String(data.chineseEndWeek),
         englishStartWeek: String(data.englishStartWeek),
         englishEndWeek: String(data.englishEndWeek),
+        allowDisplayHomeworkToggle: data.allowDisplayHomeworkToggle,
+        allowDisplayPassportToggle: data.allowDisplayPassportToggle,
+        displayCarouselEnabled: data.displayCarouselEnabled,
+        displayToken: data.displayToken ?? "",
+        displayRefreshSeconds: String(data.displayRefreshSeconds ?? 20),
       });
       setActiveCount(studentsJson.data?.length ?? 0);
     } catch (err) {
@@ -90,7 +110,10 @@ export function SettingsPageClient() {
     void load();
   }, [load]);
 
-  function updateField(key: keyof SettingsForm, value: string) {
+  function updateField<K extends keyof SettingsForm>(
+    key: K,
+    value: SettingsForm[K],
+  ) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -105,6 +128,7 @@ export function SettingsPageClient() {
       const chineseEndWeek = Number(form.chineseEndWeek);
       const englishStartWeek = Number(form.englishStartWeek);
       const englishEndWeek = Number(form.englishEndWeek);
+      const displayRefreshSeconds = Number(form.displayRefreshSeconds);
 
       if (
         !form.schoolYear.trim() ||
@@ -114,12 +138,16 @@ export function SettingsPageClient() {
         !Number.isInteger(chineseStartWeek) ||
         !Number.isInteger(chineseEndWeek) ||
         !Number.isInteger(englishStartWeek) ||
-        !Number.isInteger(englishEndWeek)
+        !Number.isInteger(englishEndWeek) ||
+        !Number.isInteger(displayRefreshSeconds)
       ) {
         throw new Error("請檢查欄位，數字須為整數");
       }
       if (chineseStartWeek > chineseEndWeek || englishStartWeek > englishEndWeek) {
         throw new Error("起週不可大於迄週");
+      }
+      if (displayRefreshSeconds < 5) {
+        throw new Error("大屏刷新秒數至少 5 秒");
       }
 
       const response = await fetch("/api/settings", {
@@ -134,6 +162,11 @@ export function SettingsPageClient() {
           chineseEndWeek,
           englishStartWeek,
           englishEndWeek,
+          allowDisplayHomeworkToggle: form.allowDisplayHomeworkToggle,
+          allowDisplayPassportToggle: form.allowDisplayPassportToggle,
+          displayCarouselEnabled: form.displayCarouselEnabled,
+          displayToken: form.displayToken.trim(),
+          displayRefreshSeconds,
         }),
       });
       const json = (await response.json()) as { error?: string };
@@ -149,12 +182,19 @@ export function SettingsPageClient() {
     }
   }
 
+  const displayHref = form.displayToken.trim()
+    ? `/display?token=${encodeURIComponent(form.displayToken.trim())}`
+    : "/display";
+  const displayLabel = form.displayToken.trim()
+    ? `/display?token=${form.displayToken.trim()}`
+    : "/display";
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <header>
         <h1 className="text-2xl font-semibold text-gray-900">系統設定</h1>
         <p className="mt-1 text-sm text-gray-500">
-          班級資料、目前週數、護照起迄週
+          班級資料、目前週數、護照起迄週、教室大屏
         </p>
       </header>
 
@@ -232,6 +272,53 @@ export function SettingsPageClient() {
         </div>
       </Card>
 
+      <Card>
+        <CardTitle>教室大屏</CardTitle>
+        <CardDescription>
+          教室電腦開{" "}
+          <a
+            href={displayHref}
+            target="_blank"
+            rel="noreferrer"
+            className="text-blue-600 underline"
+          >
+            {displayLabel}
+          </a>
+        </CardDescription>
+        <div className="mt-4 space-y-3">
+          <Toggle
+            label="允許大屏自助打勾作業"
+            checked={form.allowDisplayHomeworkToggle}
+            onChange={(value) =>
+              updateField("allowDisplayHomeworkToggle", value)
+            }
+          />
+          <Toggle
+            label="允許大屏自助點護照（僅本週）"
+            checked={form.allowDisplayPassportToggle}
+            onChange={(value) =>
+              updateField("allowDisplayPassportToggle", value)
+            }
+          />
+          <Toggle
+            label="面板自動輪播（每 60 秒）"
+            checked={form.displayCarouselEnabled}
+            onChange={(value) => updateField("displayCarouselEnabled", value)}
+          />
+          <Field
+            label="刷新秒數（≥5，近即時同步用較小值）"
+            type="number"
+            value={form.displayRefreshSeconds}
+            onChange={(value) => updateField("displayRefreshSeconds", value)}
+          />
+          <Field
+            label="存取碼（空白＝不驗證；有填則網址需 ?token=）"
+            value={form.displayToken}
+            onChange={(value) => updateField("displayToken", value)}
+          />
+        </div>
+      </Card>
+
       <div>
         <Button
           disabled={loading || saving}
@@ -268,6 +355,28 @@ function Field({
         onChange={(event) => onChange(event.target.value)}
         className="h-10 rounded-lg border border-gray-200 px-3 outline-none ring-blue-500 focus:ring-2"
       />
+    </label>
+  );
+}
+
+function Toggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center gap-3 text-sm text-gray-700">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="h-4 w-4 rounded border-gray-300"
+      />
+      {label}
     </label>
   );
 }

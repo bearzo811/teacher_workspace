@@ -11,6 +11,11 @@ const DEFAULT_SETTINGS = {
   chineseEndWeek: 17,
   englishStartWeek: 3,
   englishEndWeek: 17,
+  allowDisplayHomeworkToggle: false,
+  allowDisplayPassportToggle: false,
+  displayCarouselEnabled: false,
+  displayToken: "",
+  displayRefreshSeconds: 20,
 } as const;
 
 /** MVP: single row. Create defaults if missing. */
@@ -36,6 +41,11 @@ export type ClassSettingsUpdate = Partial<{
   chineseEndWeek: number;
   englishStartWeek: number;
   englishEndWeek: number;
+  allowDisplayHomeworkToggle: boolean;
+  allowDisplayPassportToggle: boolean;
+  displayCarouselEnabled: boolean;
+  displayToken: string;
+  displayRefreshSeconds: number;
 }>;
 
 export async function updateClassSettings(

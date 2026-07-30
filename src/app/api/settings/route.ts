@@ -27,6 +27,11 @@ export async function PATCH(request: Request) {
       chineseEndWeek?: number;
       englishStartWeek?: number;
       englishEndWeek?: number;
+      allowDisplayHomeworkToggle?: boolean;
+      allowDisplayPassportToggle?: boolean;
+      displayCarouselEnabled?: boolean;
+      displayToken?: string;
+      displayRefreshSeconds?: number;
     };
 
     if (
@@ -48,6 +53,16 @@ export async function PATCH(request: Request) {
       if (value !== undefined && (!Number.isInteger(value) || value < 1)) {
         return NextResponse.json({ error: `${key} 無效` }, { status: 400 });
       }
+    }
+    if (
+      body.displayRefreshSeconds !== undefined &&
+      (!Number.isInteger(body.displayRefreshSeconds) ||
+        body.displayRefreshSeconds < 5)
+    ) {
+      return NextResponse.json(
+        { error: "大屏刷新秒數至少 5 秒" },
+        { status: 400 },
+      );
     }
 
     const data = await updateClassSettings(body);

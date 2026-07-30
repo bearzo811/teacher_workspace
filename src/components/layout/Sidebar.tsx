@@ -7,6 +7,7 @@ import {
   ClipboardList,
   Home,
   Languages,
+  Monitor,
   NotebookPen,
   Settings,
   Users,
@@ -52,6 +53,15 @@ export function Sidebar() {
             </Link>
           );
         })}
+        <a
+          href="/display"
+          target="_blank"
+          rel="noreferrer"
+          className="mt-2 flex items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+        >
+          <Monitor className="h-4 w-4 shrink-0" />
+          教室大屏
+        </a>
       </nav>
     </aside>
   );
