@@ -1,8 +1,10 @@
-# PRD｜Teacher Workspace（MVP v1.0）
+# PRD｜Teacher Workspace（MVP v1.0 → Blueprint v1）
 
-**Version:** 1.0  
-**Status:** Locked（含 2026-07-29 決策；細節見 `TDD.md` / `TDD_ERRATA.md`）  
+**Version:** 1.0（實作基準）＋ **Product Blueprint v1 Locked 2026-07-30**  
+**Status:** 產品藍圖已鎖定，見 [`docs/PRODUCT_BLUEPRINT_V1.md`](./docs/PRODUCT_BLUEPRINT_V1.md)  
 **Product:** Teacher Workspace（導師工作台）
+
+> **實作與 IA 以 Blueprint v1 為準。** 下文 Module 1「Dashboard 三勾選」為歷史 MVP 描述，已被 **Today 工作狀態儀表板** 取代；遷移完成前兩套並存於文件，程式應逐步對齊 Blueprint。
 
 ---
 
@@ -55,18 +57,21 @@ MVP：單一教師、單一班級、自用工具（無登入）。
 
 ## 四、資訊架構
 
+**現行目標 IA（Blueprint v1）：**
+
 ```text
 Teacher Workspace
-
-├── Dashboard
+├── Today                 # 唯一高頻工作入口（狀態儀表板）
 ├── 聯絡簿
-├── 國語護照
-├── 英語護照
-├── 作業管理
-├── 學生中心
-├── 系統設定
-└── 教室大屏（/display）
+├── 作業                  # 完整管理＋歷史；Today 深鏈今日
+├── 護照（國語／英語）
+├── 每日任務              # 打掃／刷牙等
+├── 學生中心              # 低頻
+├── 系統設定              # 低頻
+└── 教室大屏 /display
 ```
+
+歷史 MVP IA（Dashboard 平鋪）見舊版；遷移期 Sidebar 可漸進調整。
 
 ---
 
@@ -231,15 +236,15 @@ Teacher Workspace
 
 ## 九、未來版本（Backlog）— 不納入 MVP
 
-### V1.1
+### V1.1（部分已升格進 Blueprint v1）
 
+* ~~打掃管理~~ → 納入 Blueprint「每日任務」
 * 補登模式
 * 快速打勾模式
-* 完成率 100% 時「建議完成」今日工作
 
 ### V1.2
 
-* 打掃管理、學用品、行為紀錄、家長聯絡紀錄
+* 學用品、行為紀錄、家長聯絡紀錄
 
 ### V2.0
 
@@ -256,3 +261,5 @@ Teacher Workspace
 |------|------|
 | 2026-07-29 | PRD v1.0 鎖定；Auth／手動週／手動今日工作／作業混合建立／Upsert／軟刪除／座號排序 |
 | 2026-07-29 | 今日工作勾選採 `daily_task_completions`（正式 Domain Data，不用 localStorage） |
+| 2026-07-29 | 聯絡簿主導作業建立；可選日、預設明天→後改預設今天＋繳交日＝下個上課日 |
+| 2026-07-30 | **Product Blueprint v1 鎖定**：Today Hybrid 狀態儀表板；大屏護照學生僅未開始→完成；作業獨立 nav＋深鏈；每日任務域；點擊預算硬規則 → `docs/PRODUCT_BLUEPRINT_V1.md` |

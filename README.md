@@ -12,6 +12,7 @@
 | [PROJECT_RULES.md](./PROJECT_RULES.md) | 開發硬規範 |
 | [DATABASE.md](./DATABASE.md) | Supabase + Drizzle schema |
 | [docs/architecture/](./docs/architecture/) | Architecture Review（Inventory／Self Review／Proposal／Gate） |
+| [docs/PRODUCT_BLUEPRINT_V1.md](./docs/PRODUCT_BLUEPRINT_V1.md) | **v1 正式產品藍圖（Today／大屏／每日任務）** |
 | [AI_COLLABORATION.md](./AI_COLLABORATION.md) | AI 協作方式 |
 
 ## Stack
