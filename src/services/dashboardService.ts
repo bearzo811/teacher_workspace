@@ -41,7 +41,7 @@ function toCard(
  */
 export async function getDashboardData(): Promise<DashboardData> {
   const settings = await getClassSettings();
-  const week = settings.currentWeek;
+  const week = settings.schoolWeek.week;
   const today = todayDateString();
 
   const [

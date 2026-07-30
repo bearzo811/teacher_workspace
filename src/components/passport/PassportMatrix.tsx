@@ -27,7 +27,6 @@ type PassportMatrixProps = {
   students: MatrixStudent[];
   busyKey?: string | null;
   onToggle: (studentId: string, week: number, current: PassportStatus) => void;
-  onSetCurrentWeek?: (week: number) => void;
 };
 
 function cellClass(status: PassportStatus) {
@@ -59,7 +58,6 @@ export function PassportMatrix({
   students,
   busyKey,
   onToggle,
-  onSetCurrentWeek,
 }: PassportMatrixProps) {
   if (students.length === 0) {
     return (
@@ -91,19 +89,14 @@ export function PassportMatrix({
                     isCurrent ? "bg-blue-50 text-blue-700" : "text-gray-600",
                   )}
                 >
-                  <button
-                    type="button"
-                    title={`設第 ${week} 週為目前週`}
-                    onClick={() => onSetCurrentWeek?.(week)}
-                    className="w-full rounded px-1 py-1 hover:bg-blue-100/70"
-                  >
+                  <div className="w-full rounded px-1 py-1">
                     <div className="text-xs">W{week}</div>
                     {total ? (
                       <div className="text-[10px] font-normal text-gray-500">
                         {total.completed}/{total.total}
                       </div>
                     ) : null}
-                  </button>
+                  </div>
                 </th>
               );
             })}

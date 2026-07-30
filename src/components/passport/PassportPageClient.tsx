@@ -17,6 +17,7 @@ type PassportType = "Chinese" | "English";
 type PassportMatrixView = {
   type: PassportType;
   currentWeek: number;
+  weekLabel: string;
   startWeek: number;
   endWeek: number;
   weeks: number[];
@@ -150,33 +151,14 @@ export function PassportPageClient({ type, title }: PassportPageClientProps) {
     }
   }
 
-  async function handleSetCurrentWeek(week: number) {
-    if (!view || week === view.currentWeek) return;
-    setError(null);
-    try {
-      const response = await fetch("/api/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentWeek: week }),
-      });
-      const json = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(json.error ?? "更新目前週失敗");
-      }
-      setView((prev) => (prev ? { ...prev, currentWeek: week } : prev));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "更新目前週失敗");
-    }
-  }
-
   return (
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-6">
       <header>
         <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>
         {view ? (
           <p className="mt-1 text-sm text-gray-500">
-            第 {view.startWeek}～{view.endWeek} 週總表｜目前週：第{" "}
-            {view.currentWeek} 週｜{view.students.length} 位學生
+            第 {view.startWeek}～{view.endWeek} 週總表｜目前：
+            {view.weekLabel}｜{view.students.length} 位學生
           </p>
         ) : null}
       </header>
@@ -220,12 +202,9 @@ export function PassportPageClient({ type, title }: PassportPageClientProps) {
             onToggle={(studentId, week, current) => {
               void handleToggle(studentId, week, current);
             }}
-            onSetCurrentWeek={(week) => {
-              void handleSetCurrentWeek(week);
-            }}
           />
           <p className="text-xs text-gray-400">
-            點格子輪轉：未開始 → 缺家長 → 已完成 → 未開始。點週次標題＝設為目前週。
+            點格子輪轉：未開始 → 缺家長 → 已完成 → 未開始。目前週由設定「第一週開啟日」自動推算。
           </p>
         </>
       ) : null}

@@ -12,7 +12,14 @@ import { todayDateString } from "@/lib/dates";
 
 type HomeworkDayView = {
   date: string;
-  items: { id: string; title: string; date: string }[];
+  items: {
+    id: string;
+    bookId: string;
+    bookName: string;
+    pageLabel: string;
+    title: string;
+    date: string;
+  }[];
   students: {
     studentId: string;
     name: string;
@@ -25,40 +32,78 @@ type HomeworkDayView = {
   totalStudentCount: number;
 };
 
+type BookProgress = {
+  bookId: string;
+  bookName: string;
+  assignmentCount: number;
+  completedPercent: number;
+  assignments: {
+    id: string;
+    pageLabel: string;
+    date: string;
+    title: string;
+  }[];
+  students: {
+    studentId: string;
+    name: string;
+    seatNumber: number;
+    completedCount: number;
+    totalCount: number;
+    completedPercent: number;
+    cells: { homeworkId: string; completed: boolean }[];
+  }[];
+};
+
 export function HomeworkPageClient() {
   const searchParams = useSearchParams();
   const queryDate = searchParams.get("date");
   const [date, setDate] = useState(() => queryDate || todayDateString());
   const [view, setView] = useState<HomeworkDayView | null>(null);
+  const [bookProgress, setBookProgress] = useState<BookProgress[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [expandedBookId, setExpandedBookId] = useState<string | null>(null);
 
   useEffect(() => {
     if (queryDate) setDate(queryDate);
   }, [queryDate]);
 
-  const load = useCallback(async (selectedDate: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(
-        `/api/homework?date=${encodeURIComponent(selectedDate)}`,
-      );
-      const json = (await response.json()) as {
-        data?: HomeworkDayView;
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(json.error ?? "讀取作業失敗");
-      }
-      setView(json.data ?? null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "讀取作業失敗");
-    } finally {
-      setLoading(false);
-    }
+  const loadProgress = useCallback(async () => {
+    const response = await fetch("/api/homework?progress=1");
+    const json = (await response.json()) as {
+      data?: BookProgress[];
+      error?: string;
+    };
+    if (!response.ok) throw new Error(json.error ?? "讀取簿本進度失敗");
+    setBookProgress(json.data ?? []);
   }, []);
+
+  const load = useCallback(
+    async (selectedDate: string) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [response] = await Promise.all([
+          fetch(`/api/homework?date=${encodeURIComponent(selectedDate)}`),
+          loadProgress(),
+        ]);
+        const json = (await response.json()) as {
+          data?: HomeworkDayView;
+          error?: string;
+        };
+        if (!response.ok) {
+          throw new Error(json.error ?? "讀取作業失敗");
+        }
+        setView(json.data ?? null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "讀取作業失敗");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loadProgress],
+  );
 
   useEffect(() => {
     void load(date);
@@ -94,6 +139,82 @@ export function HomeworkPageClient() {
     });
   }
 
+  function applyBookMatrixToggle(
+    bookId: string,
+    studentId: string,
+    homeworkId: string,
+    completed: boolean,
+  ) {
+    setBookProgress((prev) =>
+      prev.map((book) => {
+        if (book.bookId !== bookId) return book;
+        const students = book.students.map((student) => {
+          if (student.studentId !== studentId) return student;
+          const cells = student.cells.map((cell) =>
+            cell.homeworkId === homeworkId ? { ...cell, completed } : cell,
+          );
+          const completedCount = cells.filter((cell) => cell.completed).length;
+          const totalCount = cells.length;
+          return {
+            ...student,
+            cells,
+            completedCount,
+            totalCount,
+            completedPercent:
+              totalCount === 0
+                ? 0
+                : Math.round((completedCount / totalCount) * 100),
+          };
+        });
+        const completedCells = students.reduce(
+          (sum, student) => sum + student.completedCount,
+          0,
+        );
+        const totalCells = book.assignmentCount * students.length;
+        const completedPercent =
+          totalCells === 0
+            ? 0
+            : Math.round((completedCells / totalCells) * 100);
+        return { ...book, students, completedPercent };
+      }),
+    );
+  }
+
+  async function handleBookMatrixToggle(
+    bookId: string,
+    studentId: string,
+    homeworkId: string,
+    nextCompleted: boolean,
+  ) {
+    const key = `book:${studentId}:${homeworkId}`;
+    setBusyKey(key);
+    setError(null);
+    applyBookMatrixToggle(bookId, studentId, homeworkId, nextCompleted);
+    // 若剛好是今日作業表同一格，同步本地今日表
+    applyLocalToggle(studentId, homeworkId, nextCompleted);
+    try {
+      const response = await fetch("/api/homework-record", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentId,
+          homeworkId,
+          completed: nextCompleted,
+        }),
+      });
+      const json = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(json.error ?? "更新失敗");
+      }
+    } catch (err) {
+      applyBookMatrixToggle(bookId, studentId, homeworkId, !nextCompleted);
+      applyLocalToggle(studentId, homeworkId, !nextCompleted);
+      setError(err instanceof Error ? err.message : "更新失敗");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   async function handleToggle(
     studentId: string,
     homeworkId: string,
@@ -117,6 +238,7 @@ export function HomeworkPageClient() {
       if (!response.ok) {
         throw new Error(json.error ?? "更新失敗");
       }
+      void loadProgress();
     } catch (err) {
       applyLocalToggle(studentId, homeworkId, !nextCompleted);
       setError(err instanceof Error ? err.message : "更新失敗");
@@ -151,7 +273,7 @@ export function HomeworkPageClient() {
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">作業管理</h1>
           <p className="mt-1 text-sm text-gray-500">
-            作業請在「聯絡簿」建立並同步；這裡負責打勾檢查
+            作業＝簿本＋頁數；聯絡簿建立，這裡打勾。簿本進度以「份數」計算。
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -176,6 +298,147 @@ export function HomeworkPageClient() {
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       {loading && !view ? (
         <p className="text-sm text-gray-400">載入中…</p>
+      ) : null}
+
+      {bookProgress.length > 0 ? (
+        <Card>
+          <CardTitle>簿本進度</CardTitle>
+          <CardDescription>
+            點簿本展開矩陣（橫＝指派作業、縱＝學生）；進度以份數計算
+          </CardDescription>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {bookProgress.map((book) => {
+              const expanded = expandedBookId === book.bookId;
+              return (
+                <button
+                  key={book.bookId}
+                  type="button"
+                  onClick={() =>
+                    setExpandedBookId((prev) =>
+                      prev === book.bookId ? null : book.bookId,
+                    )
+                  }
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-left transition",
+                    expanded
+                      ? "border-blue-400 bg-blue-50"
+                      : "border-gray-200 bg-white hover:bg-gray-50",
+                  )}
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="font-medium text-gray-900">
+                      {book.bookName}
+                      <span className="ml-2 text-xs font-normal text-gray-500">
+                        {expanded ? "收合" : "展開"}
+                      </span>
+                    </p>
+                    <p className="text-sm text-blue-700">
+                      {book.completedPercent}%
+                    </p>
+                  </div>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    已指派 {book.assignmentCount} 份
+                  </p>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
+                    <div
+                      className="h-full rounded-full bg-blue-500"
+                      style={{ width: `${book.completedPercent}%` }}
+                    />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {expandedBookId
+            ? (() => {
+                const book = bookProgress.find(
+                  (item) => item.bookId === expandedBookId,
+                );
+                if (!book) return null;
+                if (book.assignments.length === 0) {
+                  return (
+                    <p className="mt-4 text-sm text-gray-400">
+                      「{book.bookName}」尚無指派作業
+                    </p>
+                  );
+                }
+                return (
+                  <div className="mt-4 overflow-auto rounded-xl border border-gray-200">
+                    <table className="min-w-full border-collapse text-center text-sm">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="sticky left-0 z-10 border-b border-r border-gray-200 bg-gray-50 px-2 py-2">
+                            座號
+                          </th>
+                          <th className="sticky left-12 z-10 border-b border-r border-gray-200 bg-gray-50 px-2 py-2 text-left">
+                            姓名
+                          </th>
+                          {book.assignments.map((item) => (
+                            <th
+                              key={item.id}
+                              className="border-b border-gray-200 px-2 py-2 font-medium text-gray-700"
+                              title={`${item.date} · ${item.title}`}
+                            >
+                              <div>{item.pageLabel}</div>
+                              <div className="text-[10px] font-normal text-gray-400">
+                                {item.date.slice(5)}
+                              </div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {book.students.map((student) => (
+                          <tr
+                            key={student.studentId}
+                            className="border-t border-gray-100"
+                          >
+                            <td className="sticky left-0 z-10 bg-white px-2 py-1 font-medium">
+                              {student.seatNumber}
+                            </td>
+                            <td className="sticky left-12 z-10 bg-white px-2 py-1 text-left">
+                              {student.name}
+                            </td>
+                            {student.cells.map((cell) => {
+                              const key = `book:${student.studentId}:${cell.homeworkId}`;
+                              return (
+                                <td key={cell.homeworkId} className="px-1 py-1">
+                                  <button
+                                    type="button"
+                                    title={
+                                      cell.completed ? "已完成" : "未完成"
+                                    }
+                                    disabled={busyKey === key}
+                                    onClick={() => {
+                                      void handleBookMatrixToggle(
+                                        book.bookId,
+                                        student.studentId,
+                                        cell.homeworkId,
+                                        !cell.completed,
+                                      );
+                                    }}
+                                    className={cn(
+                                      "mx-auto flex h-8 w-8 items-center justify-center rounded-md border text-sm font-bold",
+                                      cell.completed
+                                        ? "border-green-600 bg-green-600 text-white"
+                                        : "border-gray-300 bg-white text-gray-300",
+                                    )}
+                                  >
+                                    {cell.completed ? "✓" : ""}
+                                  </button>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()
+            : null}
+        </Card>
       ) : null}
 
       {view ? (

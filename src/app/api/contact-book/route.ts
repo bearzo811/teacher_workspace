@@ -26,24 +26,32 @@ export async function PUT(request: Request) {
   try {
     const body = (await request.json()) as {
       date?: string;
+      notes?: string[];
       note?: string;
+      assignments?: { bookId: string; pageLabel: string }[];
+      /** @deprecated */
       titles?: string[];
     };
-    if (!body.date || !Array.isArray(body.titles)) {
+    if (!body.date) {
+      return NextResponse.json({ error: "請提供 date" }, { status: 400 });
+    }
+    if (!Array.isArray(body.assignments)) {
       return NextResponse.json(
-        { error: "請提供 date 與 titles 陣列" },
+        { error: "請提供 assignments 陣列（簿本＋頁數）" },
         { status: 400 },
       );
     }
     const data = await saveContactBook({
       date: body.date,
+      notes: body.notes,
       note: body.note,
-      titles: body.titles,
+      assignments: body.assignments,
     });
     return NextResponse.json({ data });
   } catch (error) {
     const message = error instanceof Error ? error.message : "儲存聯絡簿失敗";
-    const status = message.includes("日期") ? 400 : 500;
+    const status =
+      message.includes("日期") || message.includes("簿本") ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

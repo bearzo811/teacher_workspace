@@ -1,18 +1,24 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, lte } from "drizzle-orm";
 import { db } from "@/db";
 import {
   homework,
+  homeworkBooks,
   homeworkRecords,
   students,
   type Homework,
   type HomeworkRecord,
 } from "@/db/schema";
-import { HOMEWORK_TEMPLATES } from "@/types/homework";
-
-export { HOMEWORK_TEMPLATES };
+import {
+  assignmentKey,
+  formatHomeworkTitle,
+  type HomeworkAssignmentInput,
+} from "@/types/homework";
 
 export type HomeworkDayItem = {
   id: string;
+  bookId: string;
+  bookName: string;
+  pageLabel: string;
   title: string;
   date: string;
 };
@@ -49,6 +55,32 @@ export type HomeworkDashboardSummary = {
   missing: { name: string; missing: string[] }[];
 };
 
+export type HomeworkBookProgress = {
+  bookId: string;
+  bookName: string;
+  /** 已指派作業份數 */
+  assignmentCount: number;
+  /** 班級完成率（份數制）：完成格數／(份數×學生數) */
+  completedRatio: number;
+  completedPercent: number;
+  /** 橫軸：此簿本所有指派 */
+  assignments: {
+    id: string;
+    pageLabel: string;
+    date: string;
+    title: string;
+  }[];
+  students: {
+    studentId: string;
+    name: string;
+    seatNumber: number;
+    completedCount: number;
+    totalCount: number;
+    completedPercent: number;
+    cells: { homeworkId: string; completed: boolean }[];
+  }[];
+};
+
 function todayDateString(date = new Date()) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -64,6 +96,26 @@ function normalizeDate(date?: string) {
   return date;
 }
 
+function normalizeAssignments(
+  assignments: HomeworkAssignmentInput[],
+): HomeworkAssignmentInput[] {
+  const cleaned = assignments
+    .map((item) => ({
+      bookId: item.bookId.trim(),
+      pageLabel: item.pageLabel.trim(),
+    }))
+    .filter((item) => item.bookId && item.pageLabel);
+  const unique: HomeworkAssignmentInput[] = [];
+  const seen = new Set<string>();
+  for (const item of cleaned) {
+    const key = assignmentKey(item.bookId, item.pageLabel);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(item);
+  }
+  return unique;
+}
+
 export async function getHomeworkDayView(
   date?: string,
 ): Promise<HomeworkDayView> {
@@ -71,8 +123,15 @@ export async function getHomeworkDayView(
 
   const [items, activeStudents] = await Promise.all([
     db
-      .select()
+      .select({
+        id: homework.id,
+        bookId: homework.bookId,
+        bookName: homeworkBooks.name,
+        pageLabel: homework.pageLabel,
+        date: homework.date,
+      })
       .from(homework)
+      .innerJoin(homeworkBooks, eq(homework.bookId, homeworkBooks.id))
       .where(eq(homework.date, day))
       .orderBy(asc(homework.createdAt)),
     db
@@ -88,7 +147,10 @@ export async function getHomeworkDayView(
 
   const itemViews: HomeworkDayItem[] = items.map((item) => ({
     id: item.id,
-    title: item.title,
+    bookId: item.bookId,
+    bookName: item.bookName,
+    pageLabel: item.pageLabel,
+    title: formatHomeworkTitle(item.bookName, item.pageLabel),
     date: String(item.date),
   }));
 
@@ -162,30 +224,225 @@ export async function getHomeworkDashboardSummary(
   };
 }
 
+/** 簿本進度：以作業份數為單位（非頁數） */
+export async function getHomeworkBookProgress(
+  bookId: string,
+): Promise<HomeworkBookProgress> {
+  const [book] = await db
+    .select()
+    .from(homeworkBooks)
+    .where(eq(homeworkBooks.id, bookId))
+    .limit(1);
+  if (!book) throw new Error("找不到此簿本");
+
+  const [assignments, activeStudents] = await Promise.all([
+    db
+      .select({
+        id: homework.id,
+        pageLabel: homework.pageLabel,
+        date: homework.date,
+      })
+      .from(homework)
+      .where(eq(homework.bookId, bookId))
+      .orderBy(asc(homework.date), asc(homework.createdAt)),
+    db
+      .select({
+        studentId: students.id,
+        name: students.name,
+        seatNumber: students.seatNumber,
+      })
+      .from(students)
+      .where(eq(students.isActive, true))
+      .orderBy(asc(students.seatNumber)),
+  ]);
+
+  const assignmentViews = assignments.map((item) => ({
+    id: item.id,
+    pageLabel: item.pageLabel,
+    date: String(item.date),
+    title: formatHomeworkTitle(book.name, item.pageLabel),
+  }));
+
+  const assignmentCount = assignments.length;
+  const totalCount = assignmentCount;
+
+  if (assignmentCount === 0 || activeStudents.length === 0) {
+    return {
+      bookId: book.id,
+      bookName: book.name,
+      assignmentCount,
+      completedRatio: 0,
+      completedPercent: 0,
+      assignments: assignmentViews,
+      students: activeStudents.map((student) => ({
+        studentId: student.studentId,
+        name: student.name,
+        seatNumber: student.seatNumber,
+        completedCount: 0,
+        totalCount: 0,
+        completedPercent: 0,
+        cells: [],
+      })),
+    };
+  }
+
+  const records = await db
+    .select()
+    .from(homeworkRecords)
+    .where(
+      inArray(
+        homeworkRecords.homeworkId,
+        assignments.map((item) => item.id),
+      ),
+    );
+
+  const completedSet = new Set(
+    records
+      .filter((row) => row.completed)
+      .map((row) => `${row.studentId}:${row.homeworkId}`),
+  );
+
+  const studentsProgress = activeStudents.map((student) => {
+    const cells = assignments.map((item) => ({
+      homeworkId: item.id,
+      completed: completedSet.has(`${student.studentId}:${item.id}`),
+    }));
+    const completedCount = cells.filter((cell) => cell.completed).length;
+    return {
+      studentId: student.studentId,
+      name: student.name,
+      seatNumber: student.seatNumber,
+      completedCount,
+      totalCount,
+      completedPercent:
+        totalCount === 0
+          ? 0
+          : Math.round((completedCount / totalCount) * 100),
+      cells,
+    };
+  });
+
+  const completedCells = studentsProgress.reduce(
+    (sum, student) => sum + student.completedCount,
+    0,
+  );
+  const totalCells = assignmentCount * activeStudents.length;
+  const completedRatio = totalCells === 0 ? 0 : completedCells / totalCells;
+
+  return {
+    bookId: book.id,
+    bookName: book.name,
+    assignmentCount,
+    completedRatio,
+    completedPercent: Math.round(completedRatio * 100),
+    assignments: assignmentViews,
+    students: studentsProgress,
+  };
+}
+
+export async function listAllHomeworkBookProgress(): Promise<
+  HomeworkBookProgress[]
+> {
+  const books = await db
+    .select()
+    .from(homeworkBooks)
+    .where(eq(homeworkBooks.isActive, true))
+    .orderBy(asc(homeworkBooks.sortOrder), asc(homeworkBooks.name));
+  return Promise.all(books.map((book) => getHomeworkBookProgress(book.id)));
+}
+
+/**
+ * 欠繳作業：繳交日 ≤ asOfDate，且學生尚未完成。
+ * 回傳 studentId → 顯示標題陣列（簿本＋頁數）
+ */
+export async function listStudentHomeworkDebts(
+  asOfDate?: string,
+): Promise<Map<string, string[]>> {
+  const day = normalizeDate(asOfDate);
+
+  const [items, activeStudents] = await Promise.all([
+    db
+      .select({
+        id: homework.id,
+        bookName: homeworkBooks.name,
+        pageLabel: homework.pageLabel,
+        date: homework.date,
+      })
+      .from(homework)
+      .innerJoin(homeworkBooks, eq(homework.bookId, homeworkBooks.id))
+      .where(lte(homework.date, day))
+      .orderBy(asc(homework.date), asc(homework.createdAt)),
+    db
+      .select({ studentId: students.id })
+      .from(students)
+      .where(eq(students.isActive, true)),
+  ]);
+
+  const debts = new Map<string, string[]>();
+  for (const student of activeStudents) {
+    debts.set(student.studentId, []);
+  }
+
+  if (items.length === 0) return debts;
+
+  const records = await db
+    .select()
+    .from(homeworkRecords)
+    .where(
+      inArray(
+        homeworkRecords.homeworkId,
+        items.map((item) => item.id),
+      ),
+    );
+
+  const completedSet = new Set(
+    records
+      .filter((row) => row.completed)
+      .map((row) => `${row.studentId}:${row.homeworkId}`),
+  );
+
+  for (const student of activeStudents) {
+    const missing: string[] = [];
+    for (const item of items) {
+      if (completedSet.has(`${student.studentId}:${item.id}`)) continue;
+      missing.push(formatHomeworkTitle(item.bookName, item.pageLabel));
+    }
+    debts.set(student.studentId, missing);
+  }
+
+  return debts;
+}
+
 export async function createHomeworkItems(input: {
   date?: string;
-  titles: string[];
+  assignments: HomeworkAssignmentInput[];
 }): Promise<Homework[]> {
   const day = normalizeDate(input.date);
-  const titles = [
-    ...new Set(
-      input.titles
-        .map((title) => title.trim())
-        .filter((title) => title.length > 0),
-    ),
-  ];
+  const desired = normalizeAssignments(input.assignments);
+  if (desired.length === 0) {
+    throw new Error("請至少提供一個作業（簿本＋頁數）");
+  }
 
-  if (titles.length === 0) {
-    throw new Error("請至少提供一個作業名稱");
+  const bookIds = [...new Set(desired.map((item) => item.bookId))];
+  const books = await db
+    .select()
+    .from(homeworkBooks)
+    .where(inArray(homeworkBooks.id, bookIds));
+  if (books.length !== bookIds.length) {
+    throw new Error("找不到部分簿本");
   }
 
   const existing = await db
     .select()
     .from(homework)
     .where(eq(homework.date, day));
-  const existingTitles = new Set(existing.map((item) => item.title));
+  const existingKeys = new Set(
+    existing.map((item) => assignmentKey(item.bookId, item.pageLabel)),
+  );
 
-  const toInsert = titles.filter((title) => !existingTitles.has(title));
+  const toInsert = desired.filter(
+    (item) => !existingKeys.has(assignmentKey(item.bookId, item.pageLabel)),
+  );
   if (toInsert.length === 0) {
     throw new Error("這些作業今天已建立");
   }
@@ -193,8 +450,9 @@ export async function createHomeworkItems(input: {
   const rows = await db
     .insert(homework)
     .values(
-      toInsert.map((title) => ({
-        title,
+      toInsert.map((item) => ({
+        bookId: item.bookId,
+        pageLabel: item.pageLabel,
         date: day,
         contactBookDate: day,
       })),
@@ -271,3 +529,5 @@ export async function upsertHomeworkRecord(input: {
 
   return rows[0];
 }
+
+export { normalizeAssignments, assignmentKey, formatHomeworkTitle };

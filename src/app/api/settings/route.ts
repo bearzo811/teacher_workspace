@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { SCHOOL_WEEK_MAX, SCHOOL_WEEK_MIN } from "@/lib/schoolWeek";
 import {
   getClassSettings,
   updateClassSettings,
@@ -27,22 +28,93 @@ export async function PATCH(request: Request) {
       chineseEndWeek?: number;
       englishStartWeek?: number;
       englishEndWeek?: number;
+      weekOneStartDate?: string;
+      termEndDate?: string;
       allowDisplayHomeworkToggle?: boolean;
       allowDisplayPassportToggle?: boolean;
       allowDisplayRoutineToggle?: boolean;
+      readingSchoolYear?: string;
+      readingSemester?: string;
+      allowDisplayReadingToggle?: boolean;
       displayCarouselEnabled?: boolean;
       displayToken?: string;
       displayRefreshSeconds?: number;
+      displayContactBookDate?: string;
     };
 
     if (
       body.currentWeek !== undefined &&
-      (!Number.isInteger(body.currentWeek) || body.currentWeek < 1)
+      (!Number.isInteger(body.currentWeek) ||
+        body.currentWeek < SCHOOL_WEEK_MIN ||
+        body.currentWeek > SCHOOL_WEEK_MAX)
     ) {
-      return NextResponse.json({ error: "目前週數無效" }, { status: 400 });
+      return NextResponse.json(
+        { error: `目前週數須為 ${SCHOOL_WEEK_MIN}～${SCHOOL_WEEK_MAX}` },
+        { status: 400 },
+      );
     }
     if (body.grade !== undefined && !Number.isInteger(body.grade)) {
       return NextResponse.json({ error: "年級須為整數" }, { status: 400 });
+    }
+    if (body.weekOneStartDate !== undefined) {
+      const value = body.weekOneStartDate.trim();
+      if (value !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return NextResponse.json(
+          { error: "第一週開啟日格式須為 YYYY-MM-DD 或空白" },
+          { status: 400 },
+        );
+      }
+      body.weekOneStartDate = value;
+    }
+    if (body.termEndDate !== undefined) {
+      const value = body.termEndDate.trim();
+      if (value !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return NextResponse.json(
+          { error: "學期結束日格式須為 YYYY-MM-DD 或空白" },
+          { status: 400 },
+        );
+      }
+      body.termEndDate = value;
+    }
+    if (
+      body.weekOneStartDate !== undefined ||
+      body.termEndDate !== undefined
+    ) {
+      const current = await getClassSettings();
+      const start =
+        body.weekOneStartDate !== undefined
+          ? body.weekOneStartDate
+          : current.weekOneStartDate;
+      const end =
+        body.termEndDate !== undefined
+          ? body.termEndDate
+          : current.termEndDate;
+      if (start && end && end < start) {
+        return NextResponse.json(
+          { error: "學期結束日不可早於第一週開啟日" },
+          { status: 400 },
+        );
+      }
+    }
+    if (
+      body.displayContactBookDate !== undefined &&
+      body.displayContactBookDate !== "" &&
+      !/^\d{4}-\d{2}-\d{2}$/.test(body.displayContactBookDate)
+    ) {
+      return NextResponse.json(
+        { error: "大屏聯絡簿日期格式須為 YYYY-MM-DD 或空白" },
+        { status: 400 },
+      );
+    }
+    if (
+      body.readingSemester !== undefined &&
+      body.readingSemester !== "first" &&
+      body.readingSemester !== "second"
+    ) {
+      return NextResponse.json(
+        { error: "閱讀學期須為 first 或 second" },
+        { status: 400 },
+      );
     }
     for (const key of [
       "chineseStartWeek",
@@ -51,8 +123,18 @@ export async function PATCH(request: Request) {
       "englishEndWeek",
     ] as const) {
       const value = body[key];
-      if (value !== undefined && (!Number.isInteger(value) || value < 1)) {
-        return NextResponse.json({ error: `${key} 無效` }, { status: 400 });
+      if (
+        value !== undefined &&
+        (!Number.isInteger(value) ||
+          value < SCHOOL_WEEK_MIN ||
+          value > SCHOOL_WEEK_MAX)
+      ) {
+        return NextResponse.json(
+          {
+            error: `${key} 須為 ${SCHOOL_WEEK_MIN}～${SCHOOL_WEEK_MAX}`,
+          },
+          { status: 400 },
+        );
       }
     }
     if (

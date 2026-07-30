@@ -10,7 +10,20 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     await assertDisplayToken(searchParams.get("token"));
-    const data = await getDisplayData();
+    const contactBookDate = searchParams.get("contactBookDate") ?? undefined;
+    if (
+      contactBookDate &&
+      contactBookDate !== "" &&
+      !/^\d{4}-\d{2}-\d{2}$/.test(contactBookDate)
+    ) {
+      return NextResponse.json(
+        { error: "聯絡簿日期格式須為 YYYY-MM-DD" },
+        { status: 400 },
+      );
+    }
+    const data = await getDisplayData(
+      contactBookDate ? { contactBookDate } : undefined,
+    );
     return NextResponse.json({ data });
   } catch (error) {
     const message =

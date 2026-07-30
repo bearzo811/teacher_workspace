@@ -83,9 +83,25 @@ export const passportRecords = pgTable(
   ],
 );
 
+export const homeworkBooks = pgTable(
+  "homework_books",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex("homework_books_name_uidx").on(table.name)],
+);
+
 export const homework = pgTable("homework", {
   id: uuid("id").defaultRandom().primaryKey(),
-  title: text("title").notNull(),
+  bookId: uuid("book_id")
+    .notNull()
+    .references(() => homeworkBooks.id),
+  /** 頁數／課次自由文字，例：12-15、12,14、第3課 */
+  pageLabel: text("page_label").notNull(),
   /** 繳交日 */
   date: date("date").notNull(),
   /** 聯絡簿上寫的那一天（可與繳交日不同） */
@@ -123,9 +139,13 @@ export const classSettings = pgTable("class_settings", {
   className: text("class_name").notNull(),
   currentWeek: integer("current_week").notNull(),
   chineseStartWeek: integer("chinese_start_week").notNull().default(3),
-  chineseEndWeek: integer("chinese_end_week").notNull().default(17),
+  chineseEndWeek: integer("chinese_end_week").notNull().default(16),
   englishStartWeek: integer("english_start_week").notNull().default(3),
-  englishEndWeek: integer("english_end_week").notNull().default(17),
+  englishEndWeek: integer("english_end_week").notNull().default(16),
+  /** 第一週開始日（YYYY-MM-DD）；空白＝手動目前週數 */
+  weekOneStartDate: text("week_one_start_date").notNull().default(""),
+  /** 學期結束日（YYYY-MM-DD，含當日）；空白＝僅用週數上限推斷 */
+  termEndDate: text("term_end_date").notNull().default(""),
   /** 大屏：允許學生自助打勾作業 */
   allowDisplayHomeworkToggle: boolean("allow_display_homework_toggle")
     .notNull()
@@ -138,6 +158,14 @@ export const classSettings = pgTable("class_settings", {
   allowDisplayRoutineToggle: boolean("allow_display_routine_toggle")
     .notNull()
     .default(false),
+  /** 閱讀紀錄：學年度（可與班級學年度不同） */
+  readingSchoolYear: text("reading_school_year").notNull().default(""),
+  /** 閱讀紀錄：上／下學期 */
+  readingSemester: text("reading_semester").notNull().default("first"),
+  /** 大屏：允許學生自助點閱讀總表 */
+  allowDisplayReadingToggle: boolean("allow_display_reading_toggle")
+    .notNull()
+    .default(false),
   /** 大屏：面板自動輪播 */
   displayCarouselEnabled: boolean("display_carousel_enabled")
     .notNull()
@@ -146,6 +174,8 @@ export const classSettings = pgTable("class_settings", {
   displayToken: text("display_token").notNull().default(""),
   /** 大屏輪詢秒數 */
   displayRefreshSeconds: integer("display_refresh_seconds").notNull().default(20),
+  /** 大屏聯絡簿顯示日（空白＝跟系統今天） */
+  displayContactBookDate: text("display_contact_book_date").notNull().default(""),
   ...timestamps,
 });
 
@@ -167,7 +197,7 @@ export const dailyTaskCompletions = pgTable(
   ],
 );
 
-/** 聯絡簿當日叮嚀（作業項目同步寫入 homework） */
+/** 聯絡簿當日叮嚀（JSON 陣列字串；不進作業打勾） */
 export const contactBookDays = pgTable(
   "contact_book_days",
   {
@@ -221,9 +251,88 @@ export const todayManualCompletions = pgTable(
   ],
 );
 
+/** 班級行事曆：特殊活動／節日（可整天或時段） */
+export const calendarEvents = pgTable("calendar_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  date: date("date").notNull(),
+  title: text("title").notNull(),
+  allDay: boolean("all_day").notNull().default(true),
+  /** HH:MM，非整天時必填 */
+  startTime: text("start_time"),
+  /** HH:MM，選填 */
+  endTime: text("end_time"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  ...timestamps,
+});
+
+/** 單日放假覆寫（無列＝六日放假、平日上課） */
+export const calendarDayOverrides = pgTable(
+  "calendar_day_overrides",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    date: date("date").notNull(),
+    isHoliday: boolean("is_holiday").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("calendar_day_overrides_date_uidx").on(table.date),
+  ],
+);
+
+/** 值日工作人工覆寫（交換後寫入；無列＝演算法自動） */
+export const dutyOverrides = pgTable(
+  "duty_overrides",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    date: date("date").notNull(),
+    slotKey: text("slot_key").notNull(),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => students.id),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("duty_overrides_date_slot_uidx").on(table.date, table.slotKey),
+  ],
+);
+
+/** 讀報／閱讀心得（學期月份；1,2,7,8 不計） */
+export const readingTypeEnum = pgEnum("reading_type", [
+  "newspaper",
+  "reflection",
+]);
+
+export const readingRecords = pgTable(
+  "reading_records",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => students.id),
+    type: readingTypeEnum("type").notNull(),
+    schoolYear: text("school_year").notNull(),
+    /** first=上學期(9–12)｜second=下學期(3–6) */
+    semester: text("semester").notNull(),
+    month: integer("month").notNull(),
+    status: passportStatusEnum("status").notNull().default("not_started"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("reading_records_student_type_term_month_uidx").on(
+      table.studentId,
+      table.type,
+      table.schoolYear,
+      table.semester,
+      table.month,
+    ),
+  ],
+);
+
 export type Student = typeof students.$inferSelect;
 export type NewStudent = typeof students.$inferInsert;
 export type PassportRecord = typeof passportRecords.$inferSelect;
+export type HomeworkBook = typeof homeworkBooks.$inferSelect;
 export type Homework = typeof homework.$inferSelect;
 export type HomeworkRecord = typeof homeworkRecords.$inferSelect;
 export type ClassSettings = typeof classSettings.$inferSelect;
@@ -231,3 +340,8 @@ export type DailyTaskCompletion = typeof dailyTaskCompletions.$inferSelect;
 export type ContactBookDay = typeof contactBookDays.$inferSelect;
 export type DailyStudentTask = typeof dailyStudentTasks.$inferSelect;
 export type TodayManualCompletion = typeof todayManualCompletions.$inferSelect;
+export type CalendarEvent = typeof calendarEvents.$inferSelect;
+export type NewCalendarEvent = typeof calendarEvents.$inferInsert;
+export type CalendarDayOverride = typeof calendarDayOverrides.$inferSelect;
+export type DutyOverride = typeof dutyOverrides.$inferSelect;
+export type ReadingRecord = typeof readingRecords.$inferSelect;

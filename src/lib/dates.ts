@@ -35,3 +35,26 @@ export function nextSchoolDay(dateStr: string) {
   } while (date.getDay() === 0 || date.getDay() === 6);
   return formatDateInput(date);
 }
+
+/** Month bounds as YYYY-MM-DD (local). month is 1–12. */
+export function monthDateRange(year: number, month: number) {
+  const from = formatDateInput(new Date(year, month - 1, 1));
+  const to = formatDateInput(new Date(year, month, 0));
+  return { from, to };
+}
+
+export function addMonths(year: number, month: number, delta: number) {
+  const date = new Date(year, month - 1 + delta, 1);
+  return { year: date.getFullYear(), month: date.getMonth() + 1 };
+}
+
+/** Whole days from `fromDate` to `toDate` (YYYY-MM-DD). */
+export function daysBetween(fromDate: string, toDate: string) {
+  const from = parseDateInput(fromDate).getTime();
+  const to = parseDateInput(toDate).getTime();
+  return Math.round((to - from) / 86_400_000);
+}
+
+export function formatMonthTitle(year: number, month: number) {
+  return `${year} 年 ${month} 月`;
+}

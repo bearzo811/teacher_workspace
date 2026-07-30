@@ -1,13 +1,12 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { contactBookDays, passportRecords, students } from "@/db/schema";
-import { todayDateString } from "@/lib/dates";
+import { daysBetween, todayDateString } from "@/lib/dates";
 import { getClassSettings } from "@/services/classSettingsService";
 import { getContactBook } from "@/services/contactBookService";
 import { getHomeworkDashboardSummary } from "@/services/homeworkService";
 import {
   getTaskCompletionCount,
-  getTodayManualMap,
   upsertTodayManual,
 } from "@/services/routineService";
 import type { TodayManualKey } from "@/types/today";
@@ -34,6 +33,8 @@ export type TodayItem = {
 export type TodayBoard = {
   date: string;
   className: string;
+  weekProgressLabel: string;
+  vacationCountdownLabel: string | null;
   periods: {
     period: TodayItem["period"];
     label: string;
@@ -82,8 +83,24 @@ async function passportWeekStats(type: "Chinese" | "English", week: number) {
 
 export async function getTodayBoard(date = todayDateString()): Promise<TodayBoard> {
   const settings = await getClassSettings();
-  const week = settings.currentWeek;
-  const manual = await getTodayManualMap(date);
+  const week = settings.schoolWeek.week;
+  const weekLabel = settings.schoolWeek.label;
+  const daysToTermEnd = settings.termEndDate
+    ? daysBetween(date, settings.termEndDate)
+    : -1;
+  const termEndMonth = Number(settings.termEndDate.slice(5, 7));
+  const vacationCountdownLabel =
+    settings.schoolWeek.kind === "in_term" && daysToTermEnd >= 0
+      ? `${termEndMonth >= 6 && termEndMonth <= 8 ? "暑假" : "寒假"}倒數：${daysToTermEnd} 天`
+      : null;
+  // 寒暑假不催護照：用夾住後的週僅在學期中
+  const passportWeek =
+    week > 0
+      ? Math.min(
+          Math.max(week, settings.chineseStartWeek),
+          settings.chineseEndWeek,
+        )
+      : 0;
 
   const [
     homework,
@@ -97,8 +114,12 @@ export async function getTodayBoard(date = todayDateString()): Promise<TodayBoar
     contactSaved,
   ] = await Promise.all([
     getHomeworkDashboardSummary(date),
-    passportWeekStats("Chinese", week),
-    passportWeekStats("English", week),
+    passportWeek > 0
+      ? passportWeekStats("Chinese", passportWeek)
+      : Promise.resolve({ completed: 0, total: 0, missingNames: [] as string[] }),
+    passportWeek > 0
+      ? passportWeekStats("English", passportWeek)
+      : Promise.resolve({ completed: 0, total: 0, missingNames: [] as string[] }),
     getTaskCompletionCount(date, "contact_book_copied"),
     getTaskCompletionCount(date, "morning_cleaning"),
     getTaskCompletionCount(date, "lunch_brushing"),
@@ -117,11 +138,10 @@ export async function getTodayBoard(date = todayDateString()): Promise<TodayBoar
     ? homework.missing.map((m) => m.name)
     : [];
 
-  const contactManual = manual.get("contact_book_confirm") ?? false;
   const contactAuto =
     contactCopied.total > 0 &&
     contactCopied.completed >= contactCopied.total;
-  const contactDone = contactManual || contactAuto;
+  const contactDone = contactAuto;
 
   const editContactDone = contactSaved.length > 0;
 
@@ -155,24 +175,38 @@ export async function getTodayBoard(date = todayDateString()): Promise<TodayBoar
       completed: contactCopied.completed,
       total: contactCopied.total,
       detail: contactDone
-        ? contactManual
-          ? "老師已確認"
-          : "全班已抄"
+        ? "全班已抄"
         : `已抄 ${contactCopied.completed}/${contactCopied.total}`,
       missingNames: contactCopied.missingNames,
       href: "/contact-book",
-      manualKey: "contact_book_confirm",
-      manualCompleted: contactManual,
+      manualKey: null,
+      manualCompleted: false,
+    },
+    {
+      id: "morning_cleaning",
+      period: "arrival",
+      label: "上午打掃",
+      status: statusFromRatio(morning.completed, morning.total),
+      completed: morning.completed,
+      total: morning.total,
+      detail: `已完成 ${morning.completed}/${morning.total}`,
+      missingNames: morning.missingNames,
+      href: "/routines",
+      manualKey: null,
+      manualCompleted: false,
     },
     {
       id: "chinese_passport",
       period: "day",
       label: "國語護照",
-      status: statusFromRatio(chinese.completed, chinese.total),
-      completed: chinese.completed,
-      total: chinese.total,
-      detail: `第 ${week} 週`,
-      missingNames: chinese.missingNames,
+      status:
+        passportWeek > 0
+          ? statusFromRatio(chinese.completed, chinese.total)
+          : "done",
+      completed: passportWeek > 0 ? chinese.completed : null,
+      total: passportWeek > 0 ? chinese.total : null,
+      detail: passportWeek > 0 ? weekLabel : `${weekLabel}（暫停）`,
+      missingNames: passportWeek > 0 ? chinese.missingNames : [],
       href: "/chinese",
       manualKey: null,
       manualCompleted: false,
@@ -181,11 +215,14 @@ export async function getTodayBoard(date = todayDateString()): Promise<TodayBoar
       id: "english_passport",
       period: "day",
       label: "英語護照",
-      status: statusFromRatio(english.completed, english.total),
-      completed: english.completed,
-      total: english.total,
-      detail: `第 ${week} 週`,
-      missingNames: english.missingNames,
+      status:
+        passportWeek > 0
+          ? statusFromRatio(english.completed, english.total)
+          : "done",
+      completed: passportWeek > 0 ? english.completed : null,
+      total: passportWeek > 0 ? english.total : null,
+      detail: passportWeek > 0 ? weekLabel : `${weekLabel}（暫停）`,
+      missingNames: passportWeek > 0 ? english.missingNames : [],
       href: "/english",
       manualKey: null,
       manualCompleted: false,
@@ -210,61 +247,30 @@ export async function getTodayBoard(date = todayDateString()): Promise<TodayBoar
       manualCompleted: false,
     },
     {
-      id: "morning_cleaning",
-      period: "noon",
-      label: "上午打掃",
-      status:
-        manual.get("morning_cleaning") === true
-          ? "done"
-          : statusFromRatio(morning.completed, morning.total),
-      completed: morning.completed,
-      total: morning.total,
-      detail:
-        manual.get("morning_cleaning") === true
-          ? "老師已確認"
-          : `學生 ${morning.completed}/${morning.total}`,
-      missingNames: morning.missingNames,
-      href: "/routines",
-      manualKey: "morning_cleaning",
-      manualCompleted: manual.get("morning_cleaning") === true,
-    },
-    {
       id: "lunch_brushing",
       period: "noon",
       label: "午餐刷牙",
-      status:
-        manual.get("lunch_brushing") === true
-          ? "done"
-          : statusFromRatio(brushing.completed, brushing.total),
+      status: statusFromRatio(brushing.completed, brushing.total),
       completed: brushing.completed,
       total: brushing.total,
-      detail:
-        manual.get("lunch_brushing") === true
-          ? "老師已確認"
-          : `學生 ${brushing.completed}/${brushing.total}`,
+      detail: `已完成 ${brushing.completed}/${brushing.total}`,
       missingNames: brushing.missingNames,
       href: "/routines",
-      manualKey: "lunch_brushing",
-      manualCompleted: manual.get("lunch_brushing") === true,
+      manualKey: null,
+      manualCompleted: false,
     },
     {
       id: "noon_cleaning",
       period: "noon",
       label: "中午打掃",
-      status:
-        manual.get("noon_cleaning") === true
-          ? "done"
-          : statusFromRatio(noon.completed, noon.total),
+      status: statusFromRatio(noon.completed, noon.total),
       completed: noon.completed,
       total: noon.total,
-      detail:
-        manual.get("noon_cleaning") === true
-          ? "老師已確認"
-          : `學生 ${noon.completed}/${noon.total}`,
+      detail: `已完成 ${noon.completed}/${noon.total}`,
       missingNames: noon.missingNames,
       href: "/routines",
-      manualKey: "noon_cleaning",
-      manualCompleted: manual.get("noon_cleaning") === true,
+      manualKey: null,
+      manualCompleted: false,
     },
     {
       id: "edit_contact_book",
@@ -293,6 +299,8 @@ export async function getTodayBoard(date = todayDateString()): Promise<TodayBoar
   return {
     date,
     className: settings.className,
+    weekProgressLabel: settings.weekProgressLabel,
+    vacationCountdownLabel,
     periods: periodMeta.map((meta) => ({
       ...meta,
       items: items.filter((item) => item.period === meta.period),

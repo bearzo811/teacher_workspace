@@ -36,6 +36,62 @@
       "when": 1785410000000,
       "tag": "0004_today_and_routines",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785420000000,
+      "tag": "0005_calendar_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785430000000,
+      "tag": "0006_reading_records",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785440000000,
+      "tag": "0007_display_contact_book_date",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785450000000,
+      "tag": "0008_calendar_day_overrides",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785460000000,
+      "tag": "0009_homework_books",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785470000000,
+      "tag": "0010_week_one_start_date",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1785480000000,
+      "tag": "0011_term_end_date",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1785490000000,
+      "tag": "0012_duty_overrides",
+      "breakpoints": true
     }
   ]
 }

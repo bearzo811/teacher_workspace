@@ -72,6 +72,8 @@ export type PassportMatrixStudent = {
 export type PassportMatrixView = {
   type: PassportType;
   currentWeek: number;
+  /** 目前週文案：第 N 週／暑假／寒假… */
+  weekLabel: string;
   startWeek: number;
   endWeek: number;
   weeks: number[];
@@ -127,11 +129,15 @@ export async function getPassportWeekView(
 ): Promise<PassportWeekView> {
   const settings = await getClassSettings();
   const { startWeek, endWeek } = weekBounds(type, settings);
-  const selectedWeek = week ?? settings.currentWeek;
-
-  if (selectedWeek < startWeek || selectedWeek > endWeek) {
-    throw new Error(`週數須在第 ${startWeek}～${endWeek} 週`);
-  }
+  const resolved = settings.schoolWeek.week;
+  const requested = week ?? resolved;
+  // 寒暑假／週次在護照窗外：不報錯，改夾到最近可顯示週
+  const selectedWeek =
+    requested < startWeek
+      ? startWeek
+      : requested > endWeek
+        ? endWeek
+        : requested;
 
   const rows = await db
     .select({
@@ -174,7 +180,7 @@ export async function getPassportWeekView(
   return {
     type,
     week: selectedWeek,
-    currentWeek: settings.currentWeek,
+    currentWeek: resolved,
     startWeek,
     endWeek,
     completedCount,
@@ -323,7 +329,8 @@ export async function getPassportMatrix(
 
   return {
     type,
-    currentWeek: settings.currentWeek,
+    currentWeek: settings.schoolWeek.week,
+    weekLabel: settings.weekProgressLabel,
     startWeek,
     endWeek,
     weeks,

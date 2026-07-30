@@ -76,24 +76,14 @@ export async function PATCH(request: Request) {
       request.headers.get("X-Display-Mode") === "1";
     if (isDisplay) {
       await assertDisplayPassportToggleEnabled(body.week);
-      // 學生大屏：只能 未開始 → 完成；不可退回、不可設缺家長
-      if (body.status !== "completed") {
+      // 大屏學生可設：未開始／缺家長／已完成（僅自己的格子，由前端座號鎖）
+      if (
+        body.status !== "completed" &&
+        body.status !== "missing_parent" &&
+        body.status !== "not_started"
+      ) {
         return NextResponse.json(
-          { error: "大屏僅可標記本週護照為完成" },
-          { status: 400 },
-        );
-      }
-      const current = await getPassportWeekView(type, body.week);
-      const row = current.students.find((s) => s.studentId === body.studentId);
-      if (row?.status === "missing_parent") {
-        return NextResponse.json(
-          { error: "缺家長狀態僅老師可在護照頁修改" },
-          { status: 400 },
-        );
-      }
-      if (row?.status === "completed") {
-        return NextResponse.json(
-          { error: "大屏不可將已完成改回未開始" },
+          { error: "大屏護照狀態無效" },
           { status: 400 },
         );
       }
