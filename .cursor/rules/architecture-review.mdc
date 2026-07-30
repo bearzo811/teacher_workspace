@@ -1,0 +1,12 @@
+---
+description: Teacher Workspace 使用 Architecture Review Framework；產物在 docs/architecture/
+alwaysApply: true
+---
+
+# Architecture Review（本 repo）
+
+- 標準流程：skill `architecture-review-framework`（v1.0）
+- 產物目錄：`docs/architecture/`
+- **未經使用者批准 Proposal，禁止重構程式**
+- 大功能完成或準備 Release → 跑 Full Inventory + Self Review + Proposal + Release Gate
+- 小修 → Lite Self Review + Gate
