@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { HomeworkChecklist } from "@/components/homework/HomeworkChecklist";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ProgressBar } from "@/components/passport/ProgressBar";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { todayDateString } from "@/lib/dates";
 
 type HomeworkDayView = {
   date: string;
@@ -23,20 +25,18 @@ type HomeworkDayView = {
   totalStudentCount: number;
 };
 
-function todayDateString() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
 export function HomeworkPageClient() {
-  const [date, setDate] = useState(todayDateString);
+  const searchParams = useSearchParams();
+  const queryDate = searchParams.get("date");
+  const [date, setDate] = useState(() => queryDate || todayDateString());
   const [view, setView] = useState<HomeworkDayView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (queryDate) setDate(queryDate);
+  }, [queryDate]);
 
   const load = useCallback(async (selectedDate: string) => {
     setLoading(true);

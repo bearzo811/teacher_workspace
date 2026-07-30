@@ -29,6 +29,7 @@ export async function PATCH(request: Request) {
       englishEndWeek?: number;
       allowDisplayHomeworkToggle?: boolean;
       allowDisplayPassportToggle?: boolean;
+      allowDisplayRoutineToggle?: boolean;
       displayCarouselEnabled?: boolean;
       displayToken?: string;
       displayRefreshSeconds?: number;

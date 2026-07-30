@@ -25,6 +25,22 @@ export const dailyTaskKeyEnum = pgEnum("daily_task_key", [
   "homework",
 ]);
 
+/** 學生當日例行／已抄（大屏個人清單） */
+export const dailyStudentTaskKeyEnum = pgEnum("daily_student_task_key", [
+  "contact_book_copied",
+  "morning_cleaning",
+  "lunch_brushing",
+  "noon_cleaning",
+]);
+
+/** 老師 Today 手動確認項 */
+export const todayManualKeyEnum = pgEnum("today_manual_key", [
+  "contact_book_confirm",
+  "morning_cleaning",
+  "lunch_brushing",
+  "noon_cleaning",
+]);
+
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
@@ -114,8 +130,12 @@ export const classSettings = pgTable("class_settings", {
   allowDisplayHomeworkToggle: boolean("allow_display_homework_toggle")
     .notNull()
     .default(false),
-  /** 大屏：允許學生自助點護照（僅本週） */
+  /** 大屏：允許學生自助點護照（僅本週完成） */
   allowDisplayPassportToggle: boolean("allow_display_passport_toggle")
+    .notNull()
+    .default(false),
+  /** 大屏：允許學生自助勾每日任務／已抄聯絡簿 */
+  allowDisplayRoutineToggle: boolean("allow_display_routine_toggle")
     .notNull()
     .default(false),
   /** 大屏：面板自動輪播 */
@@ -159,6 +179,48 @@ export const contactBookDays = pgTable(
   (table) => [uniqueIndex("contact_book_days_date_uidx").on(table.date)],
 );
 
+/** 學生當日例行勾選（已抄／打掃／刷牙） */
+export const dailyStudentTasks = pgTable(
+  "daily_student_tasks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    taskDate: date("task_date").notNull(),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => students.id),
+    taskKey: dailyStudentTaskKeyEnum("task_key").notNull(),
+    completed: boolean("completed").notNull().default(false),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("daily_student_tasks_date_student_key_uidx").on(
+      table.taskDate,
+      table.studentId,
+      table.taskKey,
+    ),
+  ],
+);
+
+/** 老師 Today 手動確認（打掃等；聯絡簿亦可手動收工） */
+export const todayManualCompletions = pgTable(
+  "today_manual_completions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    taskDate: date("task_date").notNull(),
+    taskKey: todayManualKeyEnum("task_key").notNull(),
+    completed: boolean("completed").notNull().default(false),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("today_manual_completions_date_key_uidx").on(
+      table.taskDate,
+      table.taskKey,
+    ),
+  ],
+);
+
 export type Student = typeof students.$inferSelect;
 export type NewStudent = typeof students.$inferInsert;
 export type PassportRecord = typeof passportRecords.$inferSelect;
@@ -167,3 +229,5 @@ export type HomeworkRecord = typeof homeworkRecords.$inferSelect;
 export type ClassSettings = typeof classSettings.$inferSelect;
 export type DailyTaskCompletion = typeof dailyTaskCompletions.$inferSelect;
 export type ContactBookDay = typeof contactBookDays.$inferSelect;
+export type DailyStudentTask = typeof dailyStudentTasks.$inferSelect;
+export type TodayManualCompletion = typeof todayManualCompletions.$inferSelect;

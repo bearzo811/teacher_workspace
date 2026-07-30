@@ -10,18 +10,20 @@ import {
   Monitor,
   NotebookPen,
   Settings,
+  Sparkles,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: Home },
+  { href: "/", label: "Today", icon: Home },
   { href: "/contact-book", label: "聯絡簿", icon: ClipboardList },
+  { href: "/homework", label: "作業", icon: NotebookPen },
   { href: "/chinese", label: "國語護照", icon: BookOpen },
   { href: "/english", label: "英語護照", icon: Languages },
-  { href: "/homework", label: "作業管理", icon: NotebookPen },
-  { href: "/students", label: "學生中心", icon: Users },
-  { href: "/settings", label: "系統設定", icon: Settings },
+  { href: "/routines", label: "每日任務", icon: Sparkles },
+  { href: "/students", label: "學生", icon: Users },
+  { href: "/settings", label: "設定", icon: Settings },
 ] as const;
 
 export function Sidebar() {

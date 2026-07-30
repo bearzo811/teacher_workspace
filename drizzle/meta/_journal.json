@@ -29,6 +29,13 @@
       "when": 1785400000000,
       "tag": "0003_display_and_homework_dates",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785410000000,
+      "tag": "0004_today_and_routines",
+      "breakpoints": true
     }
   ]
 }

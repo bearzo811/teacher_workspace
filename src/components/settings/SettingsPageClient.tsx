@@ -15,6 +15,7 @@ type SettingsForm = {
   englishEndWeek: string;
   allowDisplayHomeworkToggle: boolean;
   allowDisplayPassportToggle: boolean;
+  allowDisplayRoutineToggle: boolean;
   displayCarouselEnabled: boolean;
   displayToken: string;
   displayRefreshSeconds: string;
@@ -31,6 +32,7 @@ const emptyForm: SettingsForm = {
   englishEndWeek: "",
   allowDisplayHomeworkToggle: false,
   allowDisplayPassportToggle: false,
+  allowDisplayRoutineToggle: false,
   displayCarouselEnabled: false,
   displayToken: "",
   displayRefreshSeconds: "20",
@@ -64,6 +66,7 @@ export function SettingsPageClient() {
           englishEndWeek: number;
           allowDisplayHomeworkToggle: boolean;
           allowDisplayPassportToggle: boolean;
+          allowDisplayRoutineToggle: boolean;
           displayCarouselEnabled: boolean;
           displayToken: string;
           displayRefreshSeconds: number;
@@ -94,6 +97,7 @@ export function SettingsPageClient() {
         englishEndWeek: String(data.englishEndWeek),
         allowDisplayHomeworkToggle: data.allowDisplayHomeworkToggle,
         allowDisplayPassportToggle: data.allowDisplayPassportToggle,
+        allowDisplayRoutineToggle: data.allowDisplayRoutineToggle,
         displayCarouselEnabled: data.displayCarouselEnabled,
         displayToken: data.displayToken ?? "",
         displayRefreshSeconds: String(data.displayRefreshSeconds ?? 20),
@@ -164,6 +168,7 @@ export function SettingsPageClient() {
           englishEndWeek,
           allowDisplayHomeworkToggle: form.allowDisplayHomeworkToggle,
           allowDisplayPassportToggle: form.allowDisplayPassportToggle,
+          allowDisplayRoutineToggle: form.allowDisplayRoutineToggle,
           displayCarouselEnabled: form.displayCarouselEnabled,
           displayToken: form.displayToken.trim(),
           displayRefreshSeconds,
@@ -294,10 +299,17 @@ export function SettingsPageClient() {
             }
           />
           <Toggle
-            label="允許大屏自助點護照（僅本週）"
+            label="允許大屏自助點護照（僅未開始→完成）"
             checked={form.allowDisplayPassportToggle}
             onChange={(value) =>
               updateField("allowDisplayPassportToggle", value)
+            }
+          />
+          <Toggle
+            label="允許大屏自助勾每日任務／已抄聯絡簿"
+            checked={form.allowDisplayRoutineToggle}
+            onChange={(value) =>
+              updateField("allowDisplayRoutineToggle", value)
             }
           />
           <Toggle

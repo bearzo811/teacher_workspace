@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS = {
   englishEndWeek: 17,
   allowDisplayHomeworkToggle: false,
   allowDisplayPassportToggle: false,
+  allowDisplayRoutineToggle: false,
   displayCarouselEnabled: false,
   displayToken: "",
   displayRefreshSeconds: 20,
@@ -43,6 +44,7 @@ export type ClassSettingsUpdate = Partial<{
   englishEndWeek: number;
   allowDisplayHomeworkToggle: boolean;
   allowDisplayPassportToggle: boolean;
+  allowDisplayRoutineToggle: boolean;
   displayCarouselEnabled: boolean;
   displayToken: string;
   displayRefreshSeconds: number;
