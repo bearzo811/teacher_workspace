@@ -6,6 +6,7 @@ import {
   todayManualCompletions,
 } from "@/db/schema";
 import { todayDateString } from "@/lib/dates";
+import { reconcileRoutineReward } from "@/services/gamificationService";
 import {
   DAILY_STUDENT_TASK_LABEL,
   ROUTINE_TASK_KEYS,
@@ -33,7 +34,9 @@ export async function getRoutineDayView(date = todayDateString()) {
     .where(eq(dailyStudentTasks.taskDate, date));
 
   const map = new Map(
-    rows.map((row) => [`${row.studentId}:${row.taskKey}`, row.completed] as const),
+    rows.map(
+      (row) => [`${row.studentId}:${row.taskKey}`, row.completed] as const,
+    ),
   );
 
   const tasks = ROUTINE_TASK_KEYS.map((taskKey) => {
@@ -80,6 +83,33 @@ export async function getStudentTaskMap(
   };
 }
 
+/** 大屏批次讀取：一天只查一次，避免逐位學生 N+1 查詢。 */
+export async function getDailyStudentTaskMaps(
+  date: string,
+): Promise<Map<string, Record<DailyStudentTaskKey, boolean>>> {
+  const rows = await db
+    .select({
+      studentId: dailyStudentTasks.studentId,
+      taskKey: dailyStudentTasks.taskKey,
+      completed: dailyStudentTasks.completed,
+    })
+    .from(dailyStudentTasks)
+    .where(eq(dailyStudentTasks.taskDate, date));
+
+  const result = new Map<string, Record<DailyStudentTaskKey, boolean>>();
+  for (const row of rows) {
+    const tasks = result.get(row.studentId) ?? {
+      contact_book_copied: false,
+      morning_cleaning: false,
+      lunch_brushing: false,
+      noon_cleaning: false,
+    };
+    tasks[row.taskKey] = row.completed;
+    result.set(row.studentId, tasks);
+  }
+  return result;
+}
+
 export async function getTaskCompletionCount(
   date: string,
   taskKey: DailyStudentTaskKey,
@@ -122,7 +152,22 @@ export async function upsertDailyStudentTask(input: {
   taskDate?: string;
 }) {
   const taskDate = input.taskDate ?? todayDateString();
-  const completedAt = input.completed ? new Date() : null;
+  const [existing] = await db
+    .select()
+    .from(dailyStudentTasks)
+    .where(
+      and(
+        eq(dailyStudentTasks.taskDate, taskDate),
+        eq(dailyStudentTasks.studentId, input.studentId),
+        eq(dailyStudentTasks.taskKey, input.taskKey),
+      ),
+    )
+    .limit(1);
+  const completedAt = input.completed
+    ? existing?.completed && existing.completedAt
+      ? existing.completedAt
+      : new Date()
+    : null;
 
   const [student] = await db
     .select()
@@ -154,6 +199,12 @@ export async function upsertDailyStudentTask(input: {
     })
     .returning();
 
+  await reconcileRoutineReward({
+    studentId: input.studentId,
+    taskDate,
+    taskKey: input.taskKey,
+    completed: input.completed,
+  });
   return rows[0];
 }
 
@@ -174,10 +225,7 @@ export async function upsertTodayManual(input: {
       completedAt,
     })
     .onConflictDoUpdate({
-      target: [
-        todayManualCompletions.taskDate,
-        todayManualCompletions.taskKey,
-      ],
+      target: [todayManualCompletions.taskDate, todayManualCompletions.taskKey],
       set: {
         completed: input.completed,
         completedAt,

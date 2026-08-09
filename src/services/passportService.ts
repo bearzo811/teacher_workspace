@@ -1,11 +1,8 @@
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import {
-  passportRecords,
-  students,
-  type PassportRecord,
-} from "@/db/schema";
+import { passportRecords, students, type PassportRecord } from "@/db/schema";
 import { getClassSettings } from "@/services/classSettingsService";
+import { reconcilePassportReward } from "@/services/gamificationService";
 import type { PassportStatus } from "@/types/passport";
 
 export type PassportType = "Chinese" | "English";
@@ -215,7 +212,9 @@ export async function getPassportDashboardSummary(
 ): Promise<PassportDashboardSummary> {
   const matrix = await getPassportMatrix(type);
   const currentWeek = matrix.currentWeek;
-  const weekTotalRow = matrix.weekTotals.find((item) => item.week === currentWeek);
+  const weekTotalRow = matrix.weekTotals.find(
+    (item) => item.week === currentWeek,
+  );
   const weekCompleted = weekTotalRow?.completed ?? 0;
   const weekTotal = weekTotalRow?.total ?? matrix.students.length;
 
@@ -364,8 +363,6 @@ export async function upsertPassportStatus(input: {
     throw new Error("找不到學生");
   }
 
-  const completedAt = input.status === "completed" ? new Date() : null;
-
   const existing = await db
     .select()
     .from(passportRecords)
@@ -378,6 +375,14 @@ export async function upsertPassportStatus(input: {
     )
     .limit(1);
 
+  const completedAt =
+    input.status === "completed"
+      ? existing[0]?.status === "completed" && existing[0].completedAt
+        ? existing[0].completedAt
+        : new Date()
+      : null;
+
+  let result: PassportRecord;
   if (existing[0]) {
     const rows = await db
       .update(passportRecords)
@@ -387,21 +392,31 @@ export async function upsertPassportStatus(input: {
       })
       .where(eq(passportRecords.id, existing[0].id))
       .returning();
-    return rows[0];
+    result = rows[0];
+  } else {
+    const rows = await db
+      .insert(passportRecords)
+      .values({
+        studentId: input.studentId,
+        type: input.type,
+        week: input.week,
+        status: input.status,
+        completedAt,
+      })
+      .returning();
+    result = rows[0];
   }
 
-  const rows = await db
-    .insert(passportRecords)
-    .values({
-      studentId: input.studentId,
-      type: input.type,
-      week: input.week,
-      status: input.status,
-      completedAt,
-    })
-    .returning();
-
-  return rows[0];
+  await reconcilePassportReward({
+    studentId: input.studentId,
+    type: input.type,
+    week: input.week,
+    completed: input.status === "completed",
+    completedAt,
+    isPastWeek:
+      settings.schoolWeek.week > 0 && input.week < settings.schoolWeek.week,
+  });
+  return result;
 }
 
 /** @deprecated use upsertPassportStatus */

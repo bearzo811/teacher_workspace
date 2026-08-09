@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  index,
   integer,
   pgEnum,
   pgTable,
@@ -173,9 +174,13 @@ export const classSettings = pgTable("class_settings", {
   /** 大屏存取 token（空字串＝不驗證） */
   displayToken: text("display_token").notNull().default(""),
   /** 大屏輪詢秒數 */
-  displayRefreshSeconds: integer("display_refresh_seconds").notNull().default(20),
+  displayRefreshSeconds: integer("display_refresh_seconds")
+    .notNull()
+    .default(20),
   /** 大屏聯絡簿顯示日（空白＝跟系統今天） */
-  displayContactBookDate: text("display_contact_book_date").notNull().default(""),
+  displayContactBookDate: text("display_contact_book_date")
+    .notNull()
+    .default(""),
   ...timestamps,
 });
 
@@ -274,9 +279,7 @@ export const calendarDayOverrides = pgTable(
     isHoliday: boolean("is_holiday").notNull(),
     ...timestamps,
   },
-  (table) => [
-    uniqueIndex("calendar_day_overrides_date_uidx").on(table.date),
-  ],
+  (table) => [uniqueIndex("calendar_day_overrides_date_uidx").on(table.date)],
 );
 
 /** 值日工作人工覆寫（交換後寫入；無列＝演算法自動） */
@@ -301,6 +304,8 @@ export const readingTypeEnum = pgEnum("reading_type", [
   "newspaper",
   "reflection",
 ]);
+
+export const gameCurrencyEnum = pgEnum("game_currency", ["xp", "coins"]);
 
 export const readingRecords = pgTable(
   "reading_records",
@@ -329,6 +334,90 @@ export const readingRecords = pgTable(
   ],
 );
 
+/** 養成系統規則；MVP 單班固定使用 id=default。 */
+export const gamificationSettings = pgTable("gamification_settings", {
+  id: text("id").primaryKey().default("default"),
+  enabledAt: timestamp("enabled_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  homeworkOnTimeCoins: integer("homework_on_time_coins").notNull().default(2),
+  homeworkLateCoins: integer("homework_late_coins").notNull().default(1),
+  homeworkMissedCoins: integer("homework_missed_coins").notNull().default(-1),
+  passportOnTimeCoins: integer("passport_on_time_coins").notNull().default(5),
+  passportLateCoins: integer("passport_late_coins").notNull().default(2),
+  passportMissedCoins: integer("passport_missed_coins").notNull().default(-2),
+  routineXp: integer("routine_xp").notNull().default(2),
+  levelBaseXp: integer("level_base_xp").notNull().default(100),
+  ...timestamps,
+});
+
+/** 快速讀取用投影；coin_net 可為負，畫面顯示時最低為 0。 */
+export const studentGameProfiles = pgTable("student_game_profiles", {
+  studentId: uuid("student_id")
+    .primaryKey()
+    .references(() => students.id),
+  xpTotal: integer("xp_total").notNull().default(0),
+  coinNet: integer("coin_net").notNull().default(0),
+  startedAt: timestamp("started_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  ...timestamps,
+});
+
+/**
+ * 每個來源目前生效的效果。effect_key 唯一，重送同一狀態不會再次加扣。
+ * amount=0 代表效果已回沖，但保留歷史身份供之後再次切換。
+ */
+export const gamificationEffects = pgTable(
+  "gamification_effects",
+  {
+    effectKey: text("effect_key").primaryKey(),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => students.id),
+    currency: gameCurrencyEnum("currency").notNull(),
+    sourceType: text("source_type").notNull(),
+    sourceId: text("source_id").notNull(),
+    effectType: text("effect_type").notNull(),
+    amount: integer("amount").notNull().default(0),
+    ruleSnapshot: text("rule_snapshot").notNull().default("{}"),
+    ...timestamps,
+  },
+  (table) => [
+    index("gamification_effects_student_idx").on(table.studentId),
+    index("gamification_effects_source_idx").on(
+      table.sourceType,
+      table.sourceId,
+    ),
+  ],
+);
+
+/** 不可變更的增減帳本；所有回沖都追加反向 delta。 */
+export const gamificationLedger = pgTable(
+  "gamification_ledger",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => students.id),
+    effectKey: text("effect_key").notNull(),
+    currency: gameCurrencyEnum("currency").notNull(),
+    delta: integer("delta").notNull(),
+    balanceAfter: integer("balance_after").notNull(),
+    reason: text("reason").notNull(),
+    metadata: text("metadata").notNull().default("{}"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("gamification_ledger_student_created_idx").on(
+      table.studentId,
+      table.createdAt,
+    ),
+  ],
+);
+
 export type Student = typeof students.$inferSelect;
 export type NewStudent = typeof students.$inferInsert;
 export type PassportRecord = typeof passportRecords.$inferSelect;
@@ -345,3 +434,7 @@ export type NewCalendarEvent = typeof calendarEvents.$inferInsert;
 export type CalendarDayOverride = typeof calendarDayOverrides.$inferSelect;
 export type DutyOverride = typeof dutyOverrides.$inferSelect;
 export type ReadingRecord = typeof readingRecords.$inferSelect;
+export type GamificationSettings = typeof gamificationSettings.$inferSelect;
+export type StudentGameProfile = typeof studentGameProfiles.$inferSelect;
+export type GamificationEffect = typeof gamificationEffects.$inferSelect;
+export type GamificationLedgerEntry = typeof gamificationLedger.$inferSelect;

@@ -1,8 +1,16 @@
 # External Tech Lead Review — Teacher Workspace
 
+## 2026-08-09 Gamification Approval
+
+- Reviewer: Product owner
+- Decision: Approved implementation plan G1–G6
+- Product choices: reversible immediate rewards, automatic deadline penalties,
+  configurable defaults, no backfill, no shop, no leaderboard.
+- Grade: Not supplied by reviewer.
+
 **Reviewer:** （老闆／ChatGPT）  
 **Date:**  
-**Grade:**  
+**Grade:**
 
 > 填完後把「立即改善」對應到 `Architecture_Proposal.md` 的 Proposal ID。  
 > Cursor **只實作你勾選批准的 ID**。
@@ -41,15 +49,15 @@
 
 ## 立即改善
 
-- 
+-
 
 ## 下一版改善
 
-- 
+-
 
 ## 可以不用改
 
-- 
+-
 
 ## Approved Proposal IDs for refactor
 

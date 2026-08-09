@@ -7,8 +7,12 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
+    "test:gamification": "tsx --test tests/gamification.test.ts",
+    "gamification:settle": "tsx scripts/gamification-settle.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:migrate:production": "vercel env run --environment=production -- drizzle-kit migrate",
+    "db:ensure-class-settings:production": "vercel env run --environment=production -- tsx scripts/ensure-class-settings-columns.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:reset-keep-students": "tsx scripts/reset-data-keep-students.ts"

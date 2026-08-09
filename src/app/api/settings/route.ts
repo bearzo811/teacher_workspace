@@ -1,18 +1,33 @@
 import { NextResponse } from "next/server";
+import { apiErrorMessage } from "@/lib/apiError";
 import { SCHOOL_WEEK_MAX, SCHOOL_WEEK_MIN } from "@/lib/schoolWeek";
 import {
   getClassSettings,
   updateClassSettings,
 } from "@/services/classSettingsService";
+import {
+  gamificationRulesView,
+  getGamificationSettings,
+  updateGamificationSettings,
+  type GamificationRulesUpdate,
+} from "@/services/gamificationService";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const data = await getClassSettings();
-    return NextResponse.json({ data });
+    const [data, gameSettings] = await Promise.all([
+      getClassSettings(),
+      getGamificationSettings(),
+    ]);
+    return NextResponse.json({
+      data: {
+        ...data,
+        gamification: gamificationRulesView(gameSettings),
+      },
+    });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "讀取設定失敗";
+    const message = apiErrorMessage(error, "讀取設定失敗");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -40,6 +55,7 @@ export async function PATCH(request: Request) {
       displayToken?: string;
       displayRefreshSeconds?: number;
       displayContactBookDate?: string;
+      gamification?: GamificationRulesUpdate;
     };
 
     if (
@@ -76,19 +92,14 @@ export async function PATCH(request: Request) {
       }
       body.termEndDate = value;
     }
-    if (
-      body.weekOneStartDate !== undefined ||
-      body.termEndDate !== undefined
-    ) {
+    if (body.weekOneStartDate !== undefined || body.termEndDate !== undefined) {
       const current = await getClassSettings();
       const start =
         body.weekOneStartDate !== undefined
           ? body.weekOneStartDate
           : current.weekOneStartDate;
       const end =
-        body.termEndDate !== undefined
-          ? body.termEndDate
-          : current.termEndDate;
+        body.termEndDate !== undefined ? body.termEndDate : current.termEndDate;
       if (start && end && end < start) {
         return NextResponse.json(
           { error: "學期結束日不可早於第一週開啟日" },
@@ -148,8 +159,59 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const data = await updateClassSettings(body);
-    return NextResponse.json({ data });
+    if (body.gamification) {
+      const game = body.gamification;
+      for (const key of [
+        "homeworkOnTimeCoins",
+        "homeworkLateCoins",
+        "passportOnTimeCoins",
+        "passportLateCoins",
+        "routineXp",
+      ] as const) {
+        const value = game[key];
+        if (value !== undefined && (!Number.isInteger(value) || value < 0)) {
+          return NextResponse.json(
+            { error: `${key} 須為 0 以上整數` },
+            { status: 400 },
+          );
+        }
+      }
+      for (const key of [
+        "homeworkMissedCoins",
+        "passportMissedCoins",
+      ] as const) {
+        const value = game[key];
+        if (value !== undefined && (!Number.isInteger(value) || value > 0)) {
+          return NextResponse.json(
+            { error: `${key} 須為 0 以下整數` },
+            { status: 400 },
+          );
+        }
+      }
+      if (
+        game.levelBaseXp !== undefined &&
+        (!Number.isInteger(game.levelBaseXp) || game.levelBaseXp < 1)
+      ) {
+        return NextResponse.json(
+          { error: "levelBaseXp 須為大於 0 的整數" },
+          { status: 400 },
+        );
+      }
+    }
+
+    const { gamification, ...classSettingsInput } = body;
+    const [data, gameSettings] = await Promise.all([
+      updateClassSettings(classSettingsInput),
+      gamification
+        ? updateGamificationSettings(gamification)
+        : getGamificationSettings(),
+    ]);
+    return NextResponse.json({
+      data: {
+        ...data,
+        gamification: gamificationRulesView(gameSettings),
+      },
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "更新設定失敗";
     return NextResponse.json({ error: message }, { status: 500 });

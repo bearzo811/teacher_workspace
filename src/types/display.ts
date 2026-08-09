@@ -1,4 +1,7 @@
-import type { CalendarCountdownItem, CalendarEventView } from "@/types/calendar";
+import type {
+  CalendarCountdownItem,
+  CalendarEventView,
+} from "@/types/calendar";
 import type { HomeworkDayView } from "@/services/homeworkService";
 import type {
   PassportMatrixView,
@@ -6,6 +9,7 @@ import type {
 } from "@/services/passportService";
 import type { PassportStatus } from "@/types/passport";
 import type { ReadingMatrixView } from "@/types/reading";
+import type { GamificationView } from "@/types/gamification";
 
 export type DisplayPersonalRow = {
   studentId: string;
@@ -19,6 +23,7 @@ export type DisplayPersonalRow = {
   englishPassport: PassportStatus;
   homeworkAllDone: boolean;
   homeworkMissing: string[];
+  gamification: GamificationView;
 };
 
 export type DisplayDebtItem = {

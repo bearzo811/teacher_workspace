@@ -20,11 +20,15 @@ function createDb(): Database {
   if (!globalForDb.__teacherWorkspaceDb) {
     globalForDb.__teacherWorkspaceSql = postgres(connectionString, {
       prepare: false,
-      max: 10,
+      // Serverless + Supabase session pooler：避免每 instance max 10 打滿 pool_size
+      max: Number(process.env.DATABASE_POOL_MAX ?? 1),
     });
-    globalForDb.__teacherWorkspaceDb = drizzle(globalForDb.__teacherWorkspaceSql, {
-      schema,
-    });
+    globalForDb.__teacherWorkspaceDb = drizzle(
+      globalForDb.__teacherWorkspaceSql,
+      {
+        schema,
+      },
+    );
   }
 
   return globalForDb.__teacherWorkspaceDb;

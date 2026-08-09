@@ -9,16 +9,29 @@ import {
 import { getClassSettings } from "@/services/classSettingsService";
 import { getContactBook } from "@/services/contactBookService";
 import { getDutyDay, getDutyLeaders } from "@/services/dutyService";
-import { getHomeworkDayView, listStudentHomeworkDebts } from "@/services/homeworkService";
-import { getPassportMatrix, getPassportWeekView } from "@/services/passportService";
+import { getGamificationForStudents } from "@/services/gamificationService";
+import {
+  getHomeworkDayView,
+  listStudentHomeworkDebts,
+} from "@/services/homeworkService";
+import {
+  getPassportMatrix,
+  getPassportWeekView,
+} from "@/services/passportService";
 import { getReadingMatrix } from "@/services/readingService";
 import {
-  getStudentTaskMap,
-  getTaskCompletionCount,
+  getDailyStudentTaskMaps,
   listActiveStudents,
 } from "@/services/routineService";
-import type { DisplayData, DisplayDebtItem, DisplayDebtRow } from "@/types/display";
-import { DAILY_STUDENT_TASK_LABEL } from "@/types/today";
+import type {
+  DisplayData,
+  DisplayDebtItem,
+  DisplayDebtRow,
+} from "@/types/display";
+import {
+  DAILY_STUDENT_TASK_LABEL,
+  type DailyStudentTaskKey,
+} from "@/types/today";
 import type { PassportMatrixView } from "@/services/passportService";
 import type { ReadingMatrixView } from "@/types/reading";
 
@@ -32,8 +45,7 @@ function passportDebts(
   if (!student) return [];
   return student.cells
     .filter(
-      (cell) =>
-        cell.week <= matrix.currentWeek && cell.status !== "completed",
+      (cell) => cell.week <= matrix.currentWeek && cell.status !== "completed",
     )
     .map((cell) => ({
       label: `W${cell.week}`,
@@ -48,15 +60,15 @@ function readingDebts(
 ): DisplayDebtItem[] {
   const student = matrix.students.find((row) => row.studentId === studentId);
   if (!student) return [];
-  return student.cells
-    // 當月 1 日起才列該月；未來月份不提前算欠繳。
-    .filter(
-      (cell) => cell.month <= asOfMonth && cell.status !== "completed",
-    )
-    .map((cell) => ({
-      label: `${cell.month}月`,
-      note: cell.status === "missing_parent" ? "缺家長" : undefined,
-    }));
+  return (
+    student.cells
+      // 當月 1 日起才列該月；未來月份不提前算欠繳。
+      .filter((cell) => cell.month <= asOfMonth && cell.status !== "completed")
+      .map((cell) => ({
+        label: `${cell.month}月`,
+        note: cell.status === "missing_parent" ? "缺家長" : undefined,
+      }))
+  );
 }
 
 /**
@@ -85,8 +97,11 @@ export async function getDisplayData(options?: {
     settings.totalWeeks,
   );
 
+  // 黑板右側的作業進度必須對應這張聯絡簿的繳交日，
+  // 不能固定查系統今天，否則週末／跨日會顯示空白。
+  const contactBook = await getContactBook(contactBookDate);
+
   const [
-    contactBook,
     dutyLeaders,
     dutyToday,
     calendarEvents,
@@ -102,19 +117,15 @@ export async function getDisplayData(options?: {
     readingNewspaper,
     readingReflection,
     activeStudents,
-    copied,
-    morning,
-    brushing,
-    noon,
+    studentTaskMaps,
   ] = await Promise.all([
-    getContactBook(contactBookDate),
     getDutyLeaders(contactBookDate),
     getDutyDay(contactBookDate),
     listCalendarEventsByDate(contactBookDate),
     listCalendarEventsInRange(from, to),
     listHolidayOverridesInRange(from, to),
     listCalendarCountdown({ fromDate: today, limit: 8, withinDays: 120 }),
-    getHomeworkDayView(today),
+    getHomeworkDayView(contactBook.dueDate),
     listStudentHomeworkDebts(today),
     getPassportWeekView("Chinese", settings.schoolWeek.week),
     getPassportWeekView("English", settings.schoolWeek.week),
@@ -123,39 +134,64 @@ export async function getDisplayData(options?: {
     getReadingMatrix("newspaper"),
     getReadingMatrix("reflection"),
     listActiveStudents(),
-    getTaskCompletionCount(today, "contact_book_copied"),
-    getTaskCompletionCount(today, "morning_cleaning"),
-    getTaskCompletionCount(today, "lunch_brushing"),
-    getTaskCompletionCount(today, "noon_cleaning"),
+    getDailyStudentTaskMaps(today),
   ]);
 
-  const personalByStudent = await Promise.all(
-    activeStudents.map(async (student) => {
-      const tasks = await getStudentTaskMap(today, student.studentId);
-      const chineseStatus =
-        chinese.students.find((s) => s.studentId === student.studentId)
-          ?.status ?? "not_started";
-      const englishStatus =
-        english.students.find((s) => s.studentId === student.studentId)
-          ?.status ?? "not_started";
-      const hwRow = homework.students.find(
-        (s) => s.studentId === student.studentId,
-      );
-      return {
-        studentId: student.studentId,
-        name: student.name,
-        seatNumber: student.seatNumber,
-        contactBookCopied: tasks.contact_book_copied,
-        morningCleaning: tasks.morning_cleaning,
-        lunchBrushing: tasks.lunch_brushing,
-        noonCleaning: tasks.noon_cleaning,
-        chinesePassport: chineseStatus,
-        englishPassport: englishStatus,
-        homeworkAllDone: hwRow?.allDone ?? (homework.items.length === 0),
-        homeworkMissing: hwRow?.missingTitles ?? [],
-      };
-    }),
+  const emptyTasks: Record<DailyStudentTaskKey, boolean> = {
+    contact_book_copied: false,
+    morning_cleaning: false,
+    lunch_brushing: false,
+    noon_cleaning: false,
+  };
+  const taskCompletion = (taskKey: DailyStudentTaskKey) => {
+    const completedStudents = activeStudents.filter(
+      (student) => studentTaskMaps.get(student.studentId)?.[taskKey] ?? false,
+    );
+    const completedIds = new Set(
+      completedStudents.map((student) => student.studentId),
+    );
+    return {
+      completed: completedStudents.length,
+      total: activeStudents.length,
+      missingNames: activeStudents
+        .filter((student) => !completedIds.has(student.studentId))
+        .map((student) => student.name),
+    };
+  };
+  const copied = taskCompletion("contact_book_copied");
+  const morning = taskCompletion("morning_cleaning");
+  const brushing = taskCompletion("lunch_brushing");
+  const noon = taskCompletion("noon_cleaning");
+  const gameProfiles = await getGamificationForStudents(
+    activeStudents.map((student) => student.studentId),
   );
+
+  const personalByStudent = activeStudents.map((student) => {
+    const tasks = studentTaskMaps.get(student.studentId) ?? emptyTasks;
+    const chineseStatus =
+      chinese.students.find((s) => s.studentId === student.studentId)?.status ??
+      "not_started";
+    const englishStatus =
+      english.students.find((s) => s.studentId === student.studentId)?.status ??
+      "not_started";
+    const hwRow = homework.students.find(
+      (s) => s.studentId === student.studentId,
+    );
+    return {
+      studentId: student.studentId,
+      name: student.name,
+      seatNumber: student.seatNumber,
+      contactBookCopied: tasks.contact_book_copied,
+      morningCleaning: tasks.morning_cleaning,
+      lunchBrushing: tasks.lunch_brushing,
+      noonCleaning: tasks.noon_cleaning,
+      chinesePassport: chineseStatus,
+      englishPassport: englishStatus,
+      homeworkAllDone: hwRow?.allDone ?? homework.items.length === 0,
+      homeworkMissing: hwRow?.missingTitles ?? [],
+      gamification: gameProfiles.get(student.studentId)!,
+    };
+  });
 
   const debts: DisplayDebtRow[] = activeStudents.map((student) => {
     const homeworkItems = (homeworkDebts.get(student.studentId) ?? []).map(
@@ -163,11 +199,7 @@ export async function getDisplayData(options?: {
     );
     const chinesePassport = passportDebts(chineseMatrix, student.studentId);
     const englishPassport = passportDebts(englishMatrix, student.studentId);
-    const newspaper = readingDebts(
-      readingNewspaper,
-      student.studentId,
-      month,
-    );
+    const newspaper = readingDebts(readingNewspaper, student.studentId, month);
     const reflection = readingDebts(
       readingReflection,
       student.studentId,

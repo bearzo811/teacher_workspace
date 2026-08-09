@@ -10,19 +10,22 @@ import {
   Fragment,
 } from "react";
 import { useSearchParams } from "next/navigation";
-import { formatDisplayDate, formatMonthTitle, addMonths, monthDateRange } from "@/lib/dates";
+import {
+  formatDisplayDate,
+  formatMonthTitle,
+  addMonths,
+  monthDateRange,
+} from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { MonthCalendarGrid } from "@/components/calendar/MonthCalendarGrid";
 import { buildMonthGrid } from "@/lib/calendarMonth";
-import type { DisplayData, DisplayDebtRow, DisplayPersonalRow } from "@/types/display";
-import {
-  formatCountdownLabel,
-  type CalendarEventView,
-} from "@/types/calendar";
-import {
-  nextPassportStatus,
-  type PassportStatus,
-} from "@/types/passport";
+import type {
+  DisplayData,
+  DisplayDebtRow,
+  DisplayPersonalRow,
+} from "@/types/display";
+import { formatCountdownLabel, type CalendarEventView } from "@/types/calendar";
+import { nextPassportStatus, type PassportStatus } from "@/types/passport";
 import type { PassportMatrixView } from "@/services/passportService";
 import {
   READING_SEMESTER_LABEL,
@@ -32,27 +35,22 @@ import {
 } from "@/types/reading";
 
 type PanelKey =
-  | "today"
-  | "lunch"
-  | "debts"
-  | "passport"
-  | "reading"
-  | "calendar";
+  "today" | "gamification" | "lunch" | "debts" | "passport" | "calendar";
 
 const PANEL_ORDER: PanelKey[] = [
   "today",
+  "gamification",
   "passport",
-  "reading",
   "debts",
   "lunch",
   "calendar",
 ];
 const PANEL_LABEL: Record<PanelKey, string> = {
   today: "首頁",
+  gamification: "個人點數",
   lunch: "午餐",
   debts: "欠繳作業名單",
-  passport: "護照總表",
-  reading: "讀報閱讀",
+  passport: "護照與閱讀",
   calendar: "行事曆",
 };
 const SEAT_IDLE_MS = 30_000;
@@ -66,6 +64,9 @@ export function DisplayPageClient() {
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState("");
   const [panel, setPanel] = useState<PanelKey>("today");
+  const [progressPanel, setProgressPanel] = useState<"passport" | "reading">(
+    "passport",
+  );
   const [activeStudentId, setActiveStudentId] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [needsScroll, setNeedsScroll] = useState(false);
@@ -149,19 +150,18 @@ export function DisplayPageClient() {
 
   function bumpIdle() {
     if (idleTimer.current) clearTimeout(idleTimer.current);
-    idleTimer.current = setTimeout(() => setActiveStudentId(null), SEAT_IDLE_MS);
+    idleTimer.current = setTimeout(
+      () => setActiveStudentId(null),
+      SEAT_IDLE_MS,
+    );
   }
 
   function selectStudent(studentId: string) {
     setActiveStudentId((prev) => (prev === studentId ? null : studentId));
     bumpIdle();
-    // 護照／閱讀／欠繳／午餐留當頁；其餘選座後回「首頁」點個人項
+    // 護照與閱讀／欠繳／午餐留當頁；其餘選座後回「首頁」點個人項
     setPanel((prev) =>
-      prev === "passport" ||
-      prev === "reading" ||
-      prev === "debts"
-        ? prev
-        : "today",
+      prev === "passport" || prev === "debts" ? prev : "today",
     );
   }
 
@@ -317,16 +317,11 @@ export function DisplayPageClient() {
     }
   }
 
-  const showSeatPicker =
-    Boolean(
-      (panel === "today" ||
-        panel === "passport" ||
-        panel === "reading") &&
-        (data?.displaySettings.allowStudentHomeworkToggle ||
-          data?.displaySettings.allowStudentPassportToggle ||
-          data?.displaySettings.allowStudentRoutineToggle ||
-          data?.displaySettings.allowStudentReadingToggle),
-    );
+  const showSeatPicker = Boolean(
+    data &&
+    (panel === "today" || panel === "passport") &&
+    data.students.length > 0,
+  );
 
   useLayoutEffect(() => {
     const el = contentScrollRef.current;
@@ -421,9 +416,7 @@ export function DisplayPageClient() {
           </label>
           <button
             type="button"
-            disabled={
-              savingContactDate || data.contactBook.followsSystemToday
-            }
+            disabled={savingContactDate || data.contactBook.followsSystemToday}
             onClick={() => {
               void setContactBookDate("");
             }}
@@ -453,7 +446,8 @@ export function DisplayPageClient() {
               activeStudentId && data.displaySettings.allowStudentRoutineToggle,
             )}
             canHomework={Boolean(
-              activeStudentId && data.displaySettings.allowStudentHomeworkToggle,
+              activeStudentId &&
+              data.displaySettings.allowStudentHomeworkToggle,
             )}
             onRoutine={(taskKey, completed) => {
               if (!activeStudentId) return;
@@ -478,82 +472,114 @@ export function DisplayPageClient() {
         ) : null}
 
         {panel === "debts" ? (
-          <DebtsPanel
-            debts={data.debts}
-            activeStudentId={activeStudentId}
-          />
+          <DebtsPanel debts={data.debts} activeStudentId={activeStudentId} />
         ) : null}
 
         {panel === "calendar" ? <CalendarOverviewPanel data={data} /> : null}
 
-        {panel === "passport" ? (
-          activeStudentId ? (
-            <PassportStudentFocus
-              studentId={activeStudentId}
-              studentLabel={
-                activePersonal
-                  ? `${activePersonal.seatNumber} ${activePersonal.name}`
-                  : ""
-              }
-              chinese={data.passport.chineseMatrix}
-              english={data.passport.englishMatrix}
-              canToggle={Boolean(
-                data.displaySettings.allowStudentPassportToggle,
-              )}
-              busyKey={busyKey}
-              onCycle={(type, week, current) => {
-                void setPassport(
-                  activeStudentId,
-                  type,
-                  week,
-                  nextPassportStatus(current),
-                );
-              }}
-            />
-          ) : (
-            <PassportMatrixOverview
-              chinese={data.passport.chineseMatrix}
-              english={data.passport.englishMatrix}
-            />
-          )
+        {panel === "gamification" ? (
+          <GamificationOverviewPanel rows={data.personal} />
         ) : null}
 
-        {panel === "reading" ? (
-          activeStudentId ? (
-            <ReadingStudentFocus
-              studentId={activeStudentId}
-              studentLabel={
-                activePersonal
-                  ? `${activePersonal.seatNumber} ${activePersonal.name}`
-                  : ""
-              }
-              newspaper={data.reading.newspaper}
-              reflection={data.reading.reflection}
-              canToggle={Boolean(
-                data.displaySettings.allowStudentReadingToggle,
+        {panel === "passport" ? (
+          <div className="flex h-full min-h-0 gap-3">
+            <aside
+              className="flex w-32 shrink-0 flex-col justify-end gap-2 rounded-2xl border border-slate-700 bg-slate-900/80 p-2"
+              aria-label="護照與閱讀分類"
+            >
+              {(
+                [
+                  ["passport", "護照"],
+                  ["reading", "讀報閱讀"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setProgressPanel(key)}
+                  className={cn(
+                    "min-h-16 rounded-xl border px-3 text-lg font-semibold transition",
+                    progressPanel === key
+                      ? "border-sky-300 bg-sky-500 text-white"
+                      : "border-slate-600 bg-slate-800 text-slate-200 active:bg-slate-700",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </aside>
+
+            <div className="min-h-0 min-w-0 flex-1">
+              {progressPanel === "passport" ? (
+                activeStudentId ? (
+                  <PassportStudentFocus
+                    studentId={activeStudentId}
+                    studentLabel={
+                      activePersonal
+                        ? `${activePersonal.seatNumber} ${activePersonal.name}`
+                        : ""
+                    }
+                    chinese={data.passport.chineseMatrix}
+                    english={data.passport.englishMatrix}
+                    canToggle={Boolean(
+                      data.displaySettings.allowStudentPassportToggle,
+                    )}
+                    busyKey={busyKey}
+                    onCycle={(type, week, current) => {
+                      void setPassport(
+                        activeStudentId,
+                        type,
+                        week,
+                        nextPassportStatus(current),
+                      );
+                    }}
+                  />
+                ) : (
+                  <PassportMatrixOverview
+                    chinese={data.passport.chineseMatrix}
+                    english={data.passport.englishMatrix}
+                  />
+                )
+              ) : activeStudentId ? (
+                <ReadingStudentFocus
+                  studentId={activeStudentId}
+                  studentLabel={
+                    activePersonal
+                      ? `${activePersonal.seatNumber} ${activePersonal.name}`
+                      : ""
+                  }
+                  newspaper={data.reading.newspaper}
+                  reflection={data.reading.reflection}
+                  canToggle={Boolean(
+                    data.displaySettings.allowStudentReadingToggle,
+                  )}
+                  busyKey={busyKey}
+                  onCycle={(type, month, current) => {
+                    void setReading(
+                      activeStudentId,
+                      type,
+                      month,
+                      nextPassportStatus(current),
+                    );
+                  }}
+                />
+              ) : (
+                <ReadingMatrixOverview
+                  newspaper={data.reading.newspaper}
+                  reflection={data.reading.reflection}
+                />
               )}
-              busyKey={busyKey}
-              onCycle={(type, month, current) => {
-                void setReading(
-                  activeStudentId,
-                  type,
-                  month,
-                  nextPassportStatus(current),
-                );
-              }}
-            />
-          ) : (
-            <ReadingMatrixOverview
-              newspaper={data.reading.newspaper}
-              reflection={data.reading.reflection}
-            />
-          )
+            </div>
+          </div>
         ) : null}
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-700 bg-slate-950/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_30px_rgba(0,0,0,0.35)] backdrop-blur">
         <div className="mx-auto flex max-w-[1600px] items-end gap-3">
-          <nav className="grid shrink-0 grid-cols-6 gap-2" aria-label="大屏頁面">
+          <nav
+            className="grid shrink-0 grid-cols-6 gap-2"
+            aria-label="大屏頁面"
+          >
             {PANEL_ORDER.map((key) => (
               <button
                 key={key}
@@ -607,6 +633,59 @@ export function DisplayPageClient() {
   );
 }
 
+function GamificationOverviewPanel({ rows }: { rows: DisplayPersonalRow[] }) {
+  const sorted = useMemo(
+    () => [...rows].sort((a, b) => a.seatNumber - b.seatNumber),
+    [rows],
+  );
+  return (
+    <section className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="shrink-0">
+        <h2 className="text-3xl font-semibold">個人點數</h2>
+        <p className="mt-1 text-base text-slate-400">
+          依座號顯示全班 Level、XP 與金幣
+        </p>
+      </div>
+      <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-1 gap-3 overflow-auto sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {sorted.map((row) => (
+          <article
+            key={row.studentId}
+            className="flex min-h-36 flex-col justify-between rounded-2xl border border-slate-700 bg-slate-900/80 p-4"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm text-slate-400">{row.seatNumber} 號</p>
+                <h3 className="mt-1 text-2xl font-semibold">{row.name}</h3>
+              </div>
+              <span className="rounded-full border border-violet-400/50 bg-violet-500/20 px-3 py-1 font-semibold text-violet-200">
+                Lv.{row.gamification.level}
+              </span>
+            </div>
+            <div className="mt-4">
+              <div className="flex justify-between text-sm text-slate-400">
+                <span>XP</span>
+                <span>
+                  {row.gamification.currentLevelXp} /{" "}
+                  {row.gamification.nextLevelXp}
+                </span>
+              </div>
+              <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-slate-700">
+                <div
+                  className="h-full rounded-full bg-violet-400"
+                  style={{ width: `${row.gamification.progressPercent}%` }}
+                />
+              </div>
+              <p className="mt-3 text-right text-xl font-semibold text-amber-200">
+                {row.gamification.coins} 金幣
+              </p>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function DebtsPanel({
   debts,
   activeStudentId,
@@ -627,7 +706,8 @@ function DebtsPanel({
       <div className="shrink-0">
         <h2 className="text-3xl font-semibold">欠繳作業名單</h2>
         <p className="mt-1 text-base text-slate-400">
-          作業（繳交日已到未交）· 護照（本週以前未完成）· 讀報／心得（本學期未完成）
+          作業（繳交日已到未交）· 護照（本週以前未完成）·
+          讀報／心得（本學期未完成）
           {` · ${debtCount} 人有欠繳`}
         </p>
       </div>
@@ -1004,7 +1084,9 @@ function LunchPanel({
                   {LUNCH_DUTY_LEFT.map((group) => {
                     const people = group.slotKeys
                       .map((key) =>
-                        data.dutyToday.slots.find((slot) => slot.slotKey === key),
+                        data.dutyToday.slots.find(
+                          (slot) => slot.slotKey === key,
+                        ),
                       )
                       .filter(Boolean);
                     return (
@@ -1020,7 +1102,9 @@ function LunchPanel({
                   {LUNCH_DUTY_RIGHT.map((group) => {
                     const people = group.slotKeys
                       .map((key) =>
-                        data.dutyToday.slots.find((slot) => slot.slotKey === key),
+                        data.dutyToday.slots.find(
+                          (slot) => slot.slotKey === key,
+                        ),
                       )
                       .filter(Boolean);
                     return (
@@ -1367,7 +1451,9 @@ function PassportMatrixOverview({
       );
       // 可放大也可縮小，讓雙矩陣盡量填滿可視區且不捲動
       const safe =
-        Number.isFinite(next) && next > 0 ? Math.min(Math.max(next, 0.2), 3) : 1;
+        Number.isFinite(next) && next > 0
+          ? Math.min(Math.max(next, 0.2), 3)
+          : 1;
       setScale((prev) => (Math.abs(prev - safe) < 0.01 ? prev : safe));
       setBox((prev) =>
         Math.abs(prev.width - width) < 1 && Math.abs(prev.height - height) < 1
@@ -1560,7 +1646,8 @@ function PassportStudentFocus({
                         "border-rose-300 bg-rose-500 text-white",
                       cell.status === "not_started" &&
                         "border-slate-500 bg-slate-800 text-slate-200",
-                      cell.week === matrix.currentWeek && "ring-2 ring-amber-300",
+                      cell.week === matrix.currentWeek &&
+                        "ring-2 ring-amber-300",
                       canToggle && "cursor-pointer",
                       !canToggle && "cursor-default opacity-90",
                     )}
@@ -1611,7 +1698,9 @@ function ReadingMatrixOverview({
         (viewport.clientHeight - 16) / height,
       );
       const safe =
-        Number.isFinite(next) && next > 0 ? Math.min(Math.max(next, 0.2), 3) : 1;
+        Number.isFinite(next) && next > 0
+          ? Math.min(Math.max(next, 0.2), 3)
+          : 1;
       setScale((prev) => (Math.abs(prev - safe) < 0.01 ? prev : safe));
       setBox((prev) =>
         Math.abs(prev.width - width) < 1 && Math.abs(prev.height - height) < 1
@@ -1874,9 +1963,33 @@ function PersonalChecklist({
 
   return (
     <div className="self-end">
-      <h2 className="text-3xl font-semibold">
-        {row.seatNumber} {row.name}
-      </h2>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h2 className="text-3xl font-semibold">
+          {row.seatNumber} {row.name}
+        </h2>
+        <div className="flex items-center gap-3 text-lg">
+          <span className="rounded-full border border-violet-400/50 bg-violet-500/20 px-3 py-1 font-semibold text-violet-200">
+            Lv.{row.gamification.level}
+          </span>
+          <span className="rounded-full border border-amber-400/50 bg-amber-500/20 px-3 py-1 font-semibold text-amber-200">
+            {row.gamification.coins} 金幣
+          </span>
+        </div>
+      </div>
+      <div className="mt-3">
+        <div className="flex justify-between text-sm text-slate-400">
+          <span>XP</span>
+          <span>
+            {row.gamification.currentLevelXp} / {row.gamification.nextLevelXp}
+          </span>
+        </div>
+        <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-700">
+          <div
+            className="h-full rounded-full bg-violet-400"
+            style={{ width: `${row.gamification.progressPercent}%` }}
+          />
+        </div>
+      </div>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <ul className="space-y-3 text-xl">
           <CheckRow
@@ -1885,16 +1998,13 @@ function PersonalChecklist({
             disabled={
               !canRoutine || busyKey === `${row.studentId}:morning_cleaning`
             }
-            onToggle={() =>
-              onRoutine("morning_cleaning", !row.morningCleaning)
-            }
+            onToggle={() => onRoutine("morning_cleaning", !row.morningCleaning)}
           />
           <CheckRow
             label="抄聯絡簿"
             done={row.contactBookCopied}
             disabled={
-              !canRoutine ||
-              busyKey === `${row.studentId}:contact_book_copied`
+              !canRoutine || busyKey === `${row.studentId}:contact_book_copied`
             }
             onToggle={() =>
               onRoutine("contact_book_copied", !row.contactBookCopied)

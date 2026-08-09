@@ -69,6 +69,38 @@ export function StudentDetailClient({ studentId }: StudentDetailClientProps) {
             <CardDescription>座號與姓名</CardDescription>
           </Card>
 
+          <Card>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <CardTitle>Level {data.gamification.level}</CardTitle>
+                <CardDescription>學生養成進度</CardDescription>
+              </div>
+              <div className="rounded-full bg-amber-100 px-4 py-2 text-lg font-semibold text-amber-800">
+                {data.gamification.coins} 金幣
+              </div>
+            </div>
+            <div className="mt-5">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>XP</span>
+                <span>
+                  {data.gamification.currentLevelXp} /{" "}
+                  {data.gamification.nextLevelXp}
+                </span>
+              </div>
+              <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-violet-500"
+                  style={{
+                    width: `${data.gamification.progressPercent}%`,
+                  }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-gray-400">
+                累積 {data.gamification.totalXp} XP
+              </p>
+            </div>
+          </Card>
+
           <div className="grid gap-4 sm:grid-cols-3">
             <Card>
               <CardTitle>國語護照</CardTitle>
@@ -96,6 +128,42 @@ export function StudentDetailClient({ studentId }: StudentDetailClientProps) {
               </p>
             </Card>
           </div>
+
+          <Card>
+            <CardTitle>最近養成紀錄</CardTitle>
+            <CardDescription>最近 20 筆 XP／金幣變動</CardDescription>
+            {data.gamificationRecent.length === 0 ? (
+              <p className="mt-4 text-sm text-gray-400">尚無紀錄</p>
+            ) : (
+              <ul className="mt-4 divide-y divide-gray-100">
+                {data.gamificationRecent.map((entry) => (
+                  <li
+                    key={entry.id}
+                    className="flex items-center justify-between gap-3 py-3 text-sm"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-800">
+                        {entry.reason}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {new Date(entry.createdAt).toLocaleString("zh-TW")}
+                      </p>
+                    </div>
+                    <span
+                      className={
+                        entry.delta >= 0
+                          ? "font-semibold text-emerald-600"
+                          : "font-semibold text-rose-600"
+                      }
+                    >
+                      {entry.delta >= 0 ? "+" : ""}
+                      {entry.delta} {entry.currency === "xp" ? "XP" : "金幣"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
         </>
       ) : null}
     </div>

@@ -24,6 +24,14 @@ type SettingsForm = {
   displayCarouselEnabled: boolean;
   displayToken: string;
   displayRefreshSeconds: string;
+  homeworkOnTimeCoins: string;
+  homeworkLateCoins: string;
+  homeworkMissedCoins: string;
+  passportOnTimeCoins: string;
+  passportLateCoins: string;
+  passportMissedCoins: string;
+  routineXp: string;
+  levelBaseXp: string;
 };
 
 const emptyForm: SettingsForm = {
@@ -46,6 +54,14 @@ const emptyForm: SettingsForm = {
   displayCarouselEnabled: false,
   displayToken: "",
   displayRefreshSeconds: "20",
+  homeworkOnTimeCoins: "2",
+  homeworkLateCoins: "1",
+  homeworkMissedCoins: "-1",
+  passportOnTimeCoins: "5",
+  passportLateCoins: "2",
+  passportMissedCoins: "-2",
+  routineXp: "2",
+  levelBaseXp: "100",
 };
 
 export function SettingsPageClient() {
@@ -89,6 +105,16 @@ export function SettingsPageClient() {
           displayCarouselEnabled: boolean;
           displayToken: string;
           displayRefreshSeconds: number;
+          gamification: {
+            homeworkOnTimeCoins: number;
+            homeworkLateCoins: number;
+            homeworkMissedCoins: number;
+            passportOnTimeCoins: number;
+            passportLateCoins: number;
+            passportMissedCoins: number;
+            routineXp: number;
+            levelBaseXp: number;
+          };
         };
         error?: string;
       };
@@ -118,8 +144,7 @@ export function SettingsPageClient() {
         englishStartWeek: String(data.englishStartWeek),
         englishEndWeek: String(data.englishEndWeek),
         readingSchoolYear: data.readingSchoolYear ?? "",
-        readingSemester:
-          data.readingSemester === "second" ? "second" : "first",
+        readingSemester: data.readingSemester === "second" ? "second" : "first",
         allowDisplayHomeworkToggle: data.allowDisplayHomeworkToggle,
         allowDisplayPassportToggle: data.allowDisplayPassportToggle,
         allowDisplayRoutineToggle: data.allowDisplayRoutineToggle,
@@ -127,6 +152,14 @@ export function SettingsPageClient() {
         displayCarouselEnabled: data.displayCarouselEnabled,
         displayToken: data.displayToken ?? "",
         displayRefreshSeconds: String(data.displayRefreshSeconds ?? 20),
+        homeworkOnTimeCoins: String(data.gamification.homeworkOnTimeCoins),
+        homeworkLateCoins: String(data.gamification.homeworkLateCoins),
+        homeworkMissedCoins: String(data.gamification.homeworkMissedCoins),
+        passportOnTimeCoins: String(data.gamification.passportOnTimeCoins),
+        passportLateCoins: String(data.gamification.passportLateCoins),
+        passportMissedCoins: String(data.gamification.passportMissedCoins),
+        routineXp: String(data.gamification.routineXp),
+        levelBaseXp: String(data.gamification.levelBaseXp),
       });
       setActiveCount(studentsJson.data?.length ?? 0);
     } catch (err) {
@@ -161,6 +194,16 @@ export function SettingsPageClient() {
       const displayRefreshSeconds = Number(form.displayRefreshSeconds);
       const weekOneStartDate = form.weekOneStartDate.trim();
       const termEndDate = form.termEndDate.trim();
+      const gameNumbers = {
+        homeworkOnTimeCoins: Number(form.homeworkOnTimeCoins),
+        homeworkLateCoins: Number(form.homeworkLateCoins),
+        homeworkMissedCoins: Number(form.homeworkMissedCoins),
+        passportOnTimeCoins: Number(form.passportOnTimeCoins),
+        passportLateCoins: Number(form.passportLateCoins),
+        passportMissedCoins: Number(form.passportMissedCoins),
+        routineXp: Number(form.routineXp),
+        levelBaseXp: Number(form.levelBaseXp),
+      };
 
       if (
         !form.schoolYear.trim() ||
@@ -171,7 +214,8 @@ export function SettingsPageClient() {
         !Number.isInteger(chineseEndWeek) ||
         !Number.isInteger(englishStartWeek) ||
         !Number.isInteger(englishEndWeek) ||
-        !Number.isInteger(displayRefreshSeconds)
+        !Number.isInteger(displayRefreshSeconds) ||
+        Object.values(gameNumbers).some((value) => !Number.isInteger(value))
       ) {
         throw new Error("請檢查欄位，數字須為整數");
       }
@@ -186,7 +230,10 @@ export function SettingsPageClient() {
       ) {
         throw new Error("護照起迄週須在 1～25");
       }
-      if (chineseStartWeek > chineseEndWeek || englishStartWeek > englishEndWeek) {
+      if (
+        chineseStartWeek > chineseEndWeek ||
+        englishStartWeek > englishEndWeek
+      ) {
         throw new Error("起週不可大於迄週");
       }
       if (
@@ -232,6 +279,7 @@ export function SettingsPageClient() {
           displayCarouselEnabled: form.displayCarouselEnabled,
           displayToken: form.displayToken.trim(),
           displayRefreshSeconds,
+          gamification: gameNumbers,
         }),
       });
       const json = (await response.json()) as { error?: string };
@@ -315,9 +363,7 @@ export function SettingsPageClient() {
           />
           <Field
             label={
-              hasWeekOne
-                ? "手動備援週數（未設開啟日時用）"
-                : "目前週數（手動）"
+              hasWeekOne ? "手動備援週數（未設開啟日時用）" : "目前週數（手動）"
             }
             type="number"
             value={form.currentWeek}
@@ -335,7 +381,9 @@ export function SettingsPageClient() {
 
       <Card>
         <CardTitle>國語護照</CardTitle>
-        <CardDescription>完成區間建議第 3～16 週（可改，範圍 1～25）</CardDescription>
+        <CardDescription>
+          完成區間建議第 3～16 週（可改，範圍 1～25）
+        </CardDescription>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field
             label="開始週"
@@ -354,7 +402,9 @@ export function SettingsPageClient() {
 
       <Card>
         <CardTitle>英語護照</CardTitle>
-        <CardDescription>完成區間建議第 3～16 週（可改，範圍 1～25）</CardDescription>
+        <CardDescription>
+          完成區間建議第 3～16 週（可改，範圍 1～25）
+        </CardDescription>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field
             label="開始週"
@@ -374,7 +424,8 @@ export function SettingsPageClient() {
       <Card>
         <CardTitle>閱讀總表</CardTitle>
         <CardDescription>
-          上學期 9–12 月、下學期 3–6 月（1、2、7、8 月除外）。空白學年＝依月份自動建議。
+          上學期 9–12 月、下學期 3–6 月（1、2、7、8
+          月除外）。空白學年＝依月份自動建議。
         </CardDescription>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field
@@ -401,6 +452,63 @@ export function SettingsPageClient() {
               下學期（3–6）
             </label>
           </div>
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle>學生養成</CardTitle>
+        <CardDescription>
+          數值調整只影響之後的新事件，不會重算既有帳本。逾期補交保留扣款，另發較少金幣。
+        </CardDescription>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <Field
+            label="作業準時完成（金幣）"
+            type="number"
+            value={form.homeworkOnTimeCoins}
+            onChange={(value) => updateField("homeworkOnTimeCoins", value)}
+          />
+          <Field
+            label="作業逾期補交（金幣）"
+            type="number"
+            value={form.homeworkLateCoins}
+            onChange={(value) => updateField("homeworkLateCoins", value)}
+          />
+          <Field
+            label="作業逾期未交（負數）"
+            type="number"
+            value={form.homeworkMissedCoins}
+            onChange={(value) => updateField("homeworkMissedCoins", value)}
+          />
+          <Field
+            label="護照準時完成（金幣）"
+            type="number"
+            value={form.passportOnTimeCoins}
+            onChange={(value) => updateField("passportOnTimeCoins", value)}
+          />
+          <Field
+            label="護照逾期補完（金幣）"
+            type="number"
+            value={form.passportLateCoins}
+            onChange={(value) => updateField("passportLateCoins", value)}
+          />
+          <Field
+            label="護照逾期未完成（負數）"
+            type="number"
+            value={form.passportMissedCoins}
+            onChange={(value) => updateField("passportMissedCoins", value)}
+          />
+          <Field
+            label="每項生活習慣（XP）"
+            type="number"
+            value={form.routineXp}
+            onChange={(value) => updateField("routineXp", value)}
+          />
+          <Field
+            label="升級基數 XP（下一級＝基數×目前等級）"
+            type="number"
+            value={form.levelBaseXp}
+            onChange={(value) => updateField("levelBaseXp", value)}
+          />
         </div>
       </Card>
 
@@ -493,7 +601,9 @@ function Field({
   className?: string;
 }) {
   return (
-    <label className={`flex flex-col gap-1 text-sm text-gray-700 ${className ?? ""}`}>
+    <label
+      className={`flex flex-col gap-1 text-sm text-gray-700 ${className ?? ""}`}
+    >
       {label}
       <input
         type={type}

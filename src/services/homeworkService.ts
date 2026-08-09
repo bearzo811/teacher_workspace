@@ -13,6 +13,10 @@ import {
   formatHomeworkTitle,
   type HomeworkAssignmentInput,
 } from "@/types/homework";
+import {
+  clearGamificationEffectsForSource,
+  reconcileHomeworkReward,
+} from "@/services/gamificationService";
 
 export type HomeworkDayItem = {
   id: string;
@@ -193,9 +197,7 @@ export async function getHomeworkDayView(
   });
 
   const completedStudentCount =
-    items.length === 0
-      ? 0
-      : studentRows.filter((row) => row.allDone).length;
+    items.length === 0 ? 0 : studentRows.filter((row) => row.allDone).length;
 
   return {
     date: day,
@@ -315,9 +317,7 @@ export async function getHomeworkBookProgress(
       completedCount,
       totalCount,
       completedPercent:
-        totalCount === 0
-          ? 0
-          : Math.round((completedCount / totalCount) * 100),
+        totalCount === 0 ? 0 : Math.round((completedCount / totalCount) * 100),
       cells,
     };
   });
@@ -463,6 +463,7 @@ export async function createHomeworkItems(input: {
 }
 
 export async function deleteHomeworkItem(id: string): Promise<void> {
+  await clearGamificationEffectsForSource("homework", id);
   await db.delete(homeworkRecords).where(eq(homeworkRecords.homeworkId, id));
   await db.delete(homework).where(eq(homework.id, id));
 }
@@ -484,15 +485,11 @@ export async function upsertHomeworkRecord(input: {
   const [student] = await db
     .select()
     .from(students)
-    .where(
-      and(eq(students.id, input.studentId), eq(students.isActive, true)),
-    )
+    .where(and(eq(students.id, input.studentId), eq(students.isActive, true)))
     .limit(1);
   if (!student) {
     throw new Error("找不到學生");
   }
-
-  const completedAt = input.completed ? new Date() : null;
 
   const existing = await db
     .select()
@@ -505,6 +502,13 @@ export async function upsertHomeworkRecord(input: {
     )
     .limit(1);
 
+  const completedAt = input.completed
+    ? existing[0]?.completed && existing[0].completedAt
+      ? existing[0].completedAt
+      : new Date()
+    : null;
+
+  let result: HomeworkRecord;
   if (existing[0]) {
     const rows = await db
       .update(homeworkRecords)
@@ -514,20 +518,28 @@ export async function upsertHomeworkRecord(input: {
       })
       .where(eq(homeworkRecords.id, existing[0].id))
       .returning();
-    return rows[0];
+    result = rows[0];
+  } else {
+    const rows = await db
+      .insert(homeworkRecords)
+      .values({
+        homeworkId: input.homeworkId,
+        studentId: input.studentId,
+        completed: input.completed,
+        completedAt,
+      })
+      .returning();
+    result = rows[0];
   }
 
-  const rows = await db
-    .insert(homeworkRecords)
-    .values({
-      homeworkId: input.homeworkId,
-      studentId: input.studentId,
-      completed: input.completed,
-      completedAt,
-    })
-    .returning();
-
-  return rows[0];
+  await reconcileHomeworkReward({
+    studentId: input.studentId,
+    homeworkId: input.homeworkId,
+    dueDate: String(hw.date),
+    completed: input.completed,
+    completedAt,
+  });
+  return result;
 }
 
 export { normalizeAssignments, assignmentKey, formatHomeworkTitle };

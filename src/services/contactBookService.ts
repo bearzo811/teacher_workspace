@@ -8,6 +8,7 @@ import {
 } from "@/db/schema";
 import { nextSchoolDay } from "@/lib/dates";
 import { getClassSettings } from "@/services/classSettingsService";
+import { clearGamificationEffectsForSource } from "@/services/gamificationService";
 import { normalizeAssignments } from "@/services/homeworkService";
 import {
   assignmentKey,
@@ -201,6 +202,9 @@ export async function saveContactBook(input: {
     (item) => !desiredSet.has(assignmentKey(item.bookId, item.pageLabel)),
   );
   if (toDelete.length > 0) {
+    for (const item of toDelete) {
+      await clearGamificationEffectsForSource("homework", item.id);
+    }
     const ids = toDelete.map((item) => item.id);
     await db
       .delete(homeworkRecords)

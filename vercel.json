@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["hnd1"],
+  "crons": [
+    {
+      "path": "/api/cron/gamification-settle",
+      "schedule": "5 16 * * *"
+    }
+  ]
+}

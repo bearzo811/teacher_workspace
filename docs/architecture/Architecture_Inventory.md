@@ -1,5 +1,42 @@
 # Architecture Inventory — Teacher Workspace
 
+## 2026-08-09 Gamification Delta
+
+| Area              | Fact                                                                         |
+| ----------------- | ---------------------------------------------------------------------------- |
+| Feature           | Per-student Level／XP／coins; no shop or leaderboard                         |
+| Source of truth   | `gamification_effects` current effects + immutable `gamification_ledger`     |
+| Read projection   | `student_game_profiles`                                                      |
+| Rules             | Singleton `gamification_settings`, defaults configurable in Settings         |
+| Reward hooks      | `homeworkService`, `passportService`, `routineService`                       |
+| Penalties         | Vercel Cron daily at 00:05 Asia/Taipei via `/api/cron/gamification-settle`   |
+| Idempotency       | Deterministic effect key + Postgres advisory transaction lock                |
+| UI                | Student detail + display personal checklist                                  |
+| Backfill          | None; migration initializes all current students at Level 1 / 0 XP / 0 coins |
+| Security boundary | Cron requires `CRON_SECRET`; teacher APIs still follow existing no-auth MVP  |
+| Migration         | `0013_student_gamification.sql`; additive tables/type/indexes only           |
+
+### New dependency flow
+
+```text
+Homework / Passport / Routine command
+  → gamificationService.setGamificationEffect
+  → effect delta + profile projection + immutable ledger (one transaction)
+
+Vercel Cron
+  → overdue scanner
+  → same setGamificationEffect path
+```
+
+### New files
+
+- `src/lib/gamification.ts`
+- `src/services/gamificationService.ts`
+- `src/types/gamification.ts`
+- `src/app/api/cron/gamification-settle/route.ts`
+- `drizzle/0013_student_gamification.sql`
+- `tests/gamification.test.ts`
+
 **Date:** 2026-07-30  
 **Mode:** Full  
 **Commit baseline:** local (post teacher/display split; may include uncommitted work)
@@ -8,19 +45,19 @@
 
 ## 1. Overview
 
-| Item | Value |
-|------|-------|
-| Name | Teacher Workspace（導師工作台） |
-| Stack | Next.js 15 App Router, React 19, TypeScript, Tailwind 4, Drizzle, Supabase Postgres, Lucide |
-| Package manager | npm |
-| Build | `next build --turbopack` |
-| TypeScript | Yes |
-| State | Component `useState` + fetch（Zustand installed, **unused**） |
-| Routing | App Router；`(teacher)` + `/display` |
-| API | Route Handlers → Services → Drizzle |
-| DB | Supabase Postgres |
-| Auth | None（MVP） |
-| Deploy | Vercel（`teacher-workspace`） |
+| Item            | Value                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| Name            | Teacher Workspace（導師工作台）                                                             |
+| Stack           | Next.js 15 App Router, React 19, TypeScript, Tailwind 4, Drizzle, Supabase Postgres, Lucide |
+| Package manager | npm                                                                                         |
+| Build           | `next build --turbopack`                                                                    |
+| TypeScript      | Yes                                                                                         |
+| State           | Component `useState` + fetch（Zustand installed, **unused**）                               |
+| Routing         | App Router；`(teacher)` + `/display`                                                        |
+| API             | Route Handlers → Services → Drizzle                                                         |
+| DB              | Supabase Postgres                                                                           |
+| Auth            | None（MVP）                                                                                 |
+| Deploy          | Vercel（`teacher-workspace`）                                                               |
 
 ---
 
@@ -64,17 +101,17 @@ Page (thin) → *PageClient (fetch + UI state)
 
 **Count:** 29 under `src/components/**/*.tsx`
 
-| File | ~Lines | Notes |
-|------|--------|-------|
-| `settings/SettingsPageClient.tsx` | 382 | Largest；settings + display flags |
-| `display/DisplayPageClient.tsx` | 352 | Polling, carousel, seat lock, mutations |
-| `contact-book/ContactBookPageClient.tsx` | 315 | Editor + preview + print |
-| `passport/PassportPageClient.tsx` | 234 | |
-| `homework/HomeworkPageClient.tsx` | 230 | |
-| `students/StudentsPageClient.tsx` | 209 | |
-| Others | ≤166 | Mostly OK |
+| File                                     | ~Lines | Notes                                   |
+| ---------------------------------------- | ------ | --------------------------------------- |
+| `settings/SettingsPageClient.tsx`        | 382    | Largest；settings + display flags       |
+| `display/DisplayPageClient.tsx`          | 352    | Polling, carousel, seat lock, mutations |
+| `contact-book/ContactBookPageClient.tsx` | 315    | Editor + preview + print                |
+| `passport/PassportPageClient.tsx`        | 234    |                                         |
+| `homework/HomeworkPageClient.tsx`        | 230    |                                         |
+| `students/StudentsPageClient.tsx`        | 209    |                                         |
+| Others                                   | ≤166   | Mostly OK                               |
 
-**>300 lines:** SettingsPageClient, DisplayPageClient, ContactBookPageClient  
+**>300 lines:** SettingsPageClient, DisplayPageClient, ContactBookPageClient
 
 **God / extract candidates:** DisplayPageClient, SettingsPageClient, ContactBookPageClient；shared fetch boilerplate across PageClients.
 
@@ -82,24 +119,24 @@ Page (thin) → *PageClient (fetch + UI state)
 
 ## 5. Hooks
 
-| Name | Status |
-|------|--------|
-| Custom hooks | **None**（`src/hooks/` empty） |
+| Name              | Status                                                                              |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| Custom hooks      | **None**（`src/hooks/` empty）                                                      |
 | Patterns in pages | `useState` / `useEffect` / `useCallback`；display uses `useSearchParams` + Suspense |
 
 ---
 
 ## 6. Services
 
-| Service | Responsibility | SRP |
-|---------|----------------|-----|
-| `studentService` | CRUD, soft delete, detail stats | OK / slightly heavy detail |
-| `passportService` | Week, matrix, dashboard summary, upsert | **Fat** (~413 lines) |
-| `homeworkService` | Day view, create/delete, records | OK |
-| `contactBookService` | Note + reconcile homework dual-date | OK |
-| `classSettingsService` | Single-row settings | Clear |
-| `dashboardService` | Dashboard SSOT + daily tasks | OK |
-| `displayService` | Display SSOT + token/toggle asserts | OK |
+| Service                | Responsibility                          | SRP                        |
+| ---------------------- | --------------------------------------- | -------------------------- |
+| `studentService`       | CRUD, soft delete, detail stats         | OK / slightly heavy detail |
+| `passportService`      | Week, matrix, dashboard summary, upsert | **Fat** (~413 lines)       |
+| `homeworkService`      | Day view, create/delete, records        | OK                         |
+| `contactBookService`   | Note + reconcile homework dual-date     | OK                         |
+| `classSettingsService` | Single-row settings                     | Clear                      |
+| `dashboardService`     | Dashboard SSOT + daily tasks            | OK                         |
+| `displayService`       | Display SSOT + token/toggle asserts     | OK                         |
 
 **Duplication:** date helpers partially split (`lib/dates` vs service-local); matrix assembly patterns similar across passport/homework.
 
@@ -107,17 +144,17 @@ Page (thin) → *PageClient (fetch + UI state)
 
 ## 7. Database
 
-| Table | Key fields | Indexes / constraints |
-|-------|------------|------------------------|
-| `students` | name, seat_number, is_active | PK；seat unique only in service |
-| `passport_records` | student_id, type, week, status | UNIQUE(student,type,week)；FK student |
-| `homework` | title, date(due), contact_book_date | PK |
-| `homework_records` | homework_id, student_id, completed | UNIQUE(hw,student)；FKs |
-| `class_settings` | class meta, weeks, display_* | Single-row convention |
-| `daily_task_completions` | task_date, task_key, completed | UNIQUE(date,key) |
-| `contact_book_days` | date, note | UNIQUE(date) |
+| Table                    | Key fields                          | Indexes / constraints                 |
+| ------------------------ | ----------------------------------- | ------------------------------------- |
+| `students`               | name, seat_number, is_active        | PK；seat unique only in service       |
+| `passport_records`       | student_id, type, week, status      | UNIQUE(student,type,week)；FK student |
+| `homework`               | title, date(due), contact_book_date | PK                                    |
+| `homework_records`       | homework_id, student_id, completed  | UNIQUE(hw,student)；FKs               |
+| `class_settings`         | class meta, weeks, display_*        | Single-row convention                 |
+| `daily_task_completions` | task_date, task_key, completed      | UNIQUE(date,key)                      |
+| `contact_book_days`      | date, note                          | UNIQUE(date)                          |
 
-**Enums:** `passport_type`, `passport_status`, `daily_task_key`  
+**Enums:** `passport_type`, `passport_status`, `daily_task_key`
 
 **RLS / Triggers / Views / Functions:** **not defined in repo migrations**.
 
@@ -125,19 +162,19 @@ Page (thin) → *PageClient (fetch + UI state)
 
 ## 8. API
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/api/dashboard` | Dashboard aggregate |
-| PATCH | `/api/daily-tasks` | Today task toggle |
-| GET/PATCH | `/api/passport` | Matrix/week + status upsert |
-| GET/POST | `/api/homework` | Day view / create |
-| DELETE | `/api/homework/[id]` | Delete item |
-| PATCH | `/api/homework-record` | Completion（display gate） |
-| GET/PUT | `/api/contact-book` | Read/save + reconcile |
-| GET/POST | `/api/students` | List/create |
-| GET/PATCH/DELETE | `/api/students/[id]` | Detail/update/soft-delete |
-| GET/PATCH | `/api/settings` | Class + display settings |
-| GET | `/api/display` | Display aggregate（optional token） |
+| Method           | Path                   | Purpose                             |
+| ---------------- | ---------------------- | ----------------------------------- |
+| GET              | `/api/dashboard`       | Dashboard aggregate                 |
+| PATCH            | `/api/daily-tasks`     | Today task toggle                   |
+| GET/PATCH        | `/api/passport`        | Matrix/week + status upsert         |
+| GET/POST         | `/api/homework`        | Day view / create                   |
+| DELETE           | `/api/homework/[id]`   | Delete item                         |
+| PATCH            | `/api/homework-record` | Completion（display gate）          |
+| GET/PUT          | `/api/contact-book`    | Read/save + reconcile               |
+| GET/POST         | `/api/students`        | List/create                         |
+| GET/PATCH/DELETE | `/api/students/[id]`   | Detail/update/soft-delete           |
+| GET/PATCH        | `/api/settings`        | Class + display settings            |
+| GET              | `/api/display`         | Display aggregate（optional token） |
 
 Contract: `{ data }` / `{ error }`；status often inferred from error message strings.
 
@@ -145,30 +182,30 @@ Contract: `{ data }` / `{ error }`；status often inferred from error message st
 
 ## 9. State
 
-| Tech | Usage |
-|------|-------|
-| useState | Primary |
-| Zustand | 4 stores present, **zero imports from UI** |
-| Context / RQ / SWR / Redux | None |
+| Tech                       | Usage                                      |
+| -------------------------- | ------------------------------------------ |
+| useState                   | Primary                                    |
+| Zustand                    | 4 stores present, **zero imports from UI** |
+| Context / RQ / SWR / Redux | None                                       |
 
 ---
 
 ## 10. Dependencies（notable）
 
-| Package | Needed? |
-|---------|---------|
-| next/react/drizzle/postgres/tailwind | Yes |
-| zustand | Questionable until wired |
-| lucide / clsx / cva / tailwind-merge | Yes |
+| Package                              | Needed?                  |
+| ------------------------------------ | ------------------------ |
+| next/react/drizzle/postgres/tailwind | Yes                      |
+| zustand                              | Questionable until wired |
+| lucide / clsx / cva / tailwind-merge | Yes                      |
 
 ---
 
 ## 11. Routes
 
-| Path | Role |
-|------|------|
-| `/` `/contact-book` `/chinese` `/english` `/homework` `/students` `/students/[id]` `/settings` | Teacher |
-| `/display?token=` | Classroom |
+| Path                                                                                           | Role      |
+| ---------------------------------------------------------------------------------------------- | --------- |
+| `/` `/contact-book` `/chinese` `/english` `/homework` `/students` `/students/[id]` `/settings` | Teacher   |
+| `/display?token=`                                                                              | Classroom |
 
 Flow: settings/students → passports/homework；contact book → due homework next school day → display sync via polling.
 
@@ -206,8 +243,8 @@ Route-level splitting only. Display polls every N seconds（default 20）. No vi
 
 ## 17. Tech debt snapshot
 
-| Level | Items |
-|-------|-------|
-| High | No auth/RLS on public deploy； Zustand dead code； display token ≠ auth |
-| Med | Fat PageClients； fat passportService； stringly status codes； seat_number no DB unique； weekends-only nextSchoolDay |
-| Low | Empty hooks/utils； default public SVGs； thin shared UI |
+| Level | Items                                                                                                                  |
+| ----- | ---------------------------------------------------------------------------------------------------------------------- |
+| High  | No auth/RLS on public deploy； Zustand dead code； display token ≠ auth                                                |
+| Med   | Fat PageClients； fat passportService； stringly status codes； seat_number no DB unique； weekends-only nextSchoolDay |
+| Low   | Empty hooks/utils； default public SVGs； thin shared UI                                                               |

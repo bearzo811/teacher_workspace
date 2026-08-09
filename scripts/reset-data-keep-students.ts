@@ -45,6 +45,10 @@ async function main() {
   console.log(`保留學生 ${studentCount} 人，開始清空其他資料…`);
 
   await sql.begin(async (tx) => {
+    await tx`DELETE FROM gamification_ledger`;
+    await tx`DELETE FROM gamification_effects`;
+    await tx`DELETE FROM student_game_profiles`;
+    await tx`DELETE FROM gamification_settings`;
     await tx`DELETE FROM homework_records`;
     await tx`DELETE FROM homework`;
     await tx`DELETE FROM homework_books`;
@@ -104,9 +108,18 @@ async function main() {
         ${DEFAULT_CLASS_SETTINGS.display_contact_book_date}
       )
     `;
+    await tx`
+      INSERT INTO gamification_settings (id) VALUES ('default')
+    `;
+    await tx`
+      INSERT INTO student_game_profiles (student_id)
+      SELECT id FROM students
+    `;
   });
 
-  console.log("完成：作業／聯絡簿／護照／讀報／行事曆／值日／每日勾選已清空");
+  console.log(
+    "完成：作業／聯絡簿／護照／讀報／行事曆／值日／每日勾選／養成帳本已清空",
+  );
   console.log("class_settings 已恢復預設（四年三班、第 8 週等）");
 }
 
