@@ -6,6 +6,7 @@ import {
 } from "@/services/routineService";
 import { isDisplayKeyRequest, isTeacherRequest } from "@/lib/access";
 import { isDailyStudentTaskKey } from "@/types/today";
+import { touchDisplayVersion } from "@/services/classSettingsService";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,7 @@ export async function PATCH(request: Request) {
       completed: body.completed,
       taskDate: body.taskDate,
     });
+    await touchDisplayVersion();
     return NextResponse.json({ data });
   } catch (error) {
     const message =

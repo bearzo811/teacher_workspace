@@ -61,6 +61,11 @@ export type HomeworkDashboardSummary = {
   missing: { name: string; missing: string[] }[];
 };
 
+export type StudentHomeworkStatusItem = {
+  label: string;
+  status: "unsubmitted" | "pending_confirmation" | "correction_required" | "completed";
+};
+
 export type HomeworkBookProgress = {
   bookId: string;
   bookName: string;
@@ -351,12 +356,12 @@ export async function listAllHomeworkBookProgress(): Promise<
 }
 
 /**
- * 欠繳作業：繳交日 ≤ asOfDate，且學生尚未完成。
- * 回傳 studentId → 顯示標題陣列（簿本＋頁數）
+ * 繳交日已到的作業狀態，供大屏欠繳頁清楚呈現「未交／待確認／需訂正／已完成」。
+ * 回傳 studentId → 簿本＋頁數與目前狀態。
  */
 export async function listStudentHomeworkDebts(
   asOfDate?: string,
-): Promise<Map<string, string[]>> {
+): Promise<Map<string, StudentHomeworkStatusItem[]>> {
   const day = normalizeDate(asOfDate);
 
   const [items, activeStudents] = await Promise.all([
@@ -377,7 +382,7 @@ export async function listStudentHomeworkDebts(
       .where(eq(students.isActive, true)),
   ]);
 
-  const debts = new Map<string, string[]>();
+  const debts = new Map<string, StudentHomeworkStatusItem[]>();
   for (const student of activeStudents) {
     debts.set(student.studentId, []);
   }
@@ -394,19 +399,22 @@ export async function listStudentHomeworkDebts(
       ),
     );
 
-  const completedSet = new Set(
-    records
-      .filter((row) => row.completed)
-      .map((row) => `${row.studentId}:${row.homeworkId}`),
+  const statusMap = new Map(
+    records.map((row) => [
+      `${row.studentId}:${row.homeworkId}`,
+      row.status,
+    ] as const),
   );
 
   for (const student of activeStudents) {
-    const missing: string[] = [];
+    const assignments: StudentHomeworkStatusItem[] = [];
     for (const item of items) {
-      if (completedSet.has(`${student.studentId}:${item.id}`)) continue;
-      missing.push(formatHomeworkTitle(item.bookName, item.pageLabel));
+      assignments.push({
+        label: formatHomeworkTitle(item.bookName, item.pageLabel),
+        status: statusMap.get(`${student.studentId}:${item.id}`) ?? "unsubmitted",
+      });
     }
-    debts.set(student.studentId, missing);
+    debts.set(student.studentId, assignments);
   }
 
   return debts;

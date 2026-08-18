@@ -4,6 +4,7 @@ import {
   copyContactBook,
   saveContactBook,
 } from "@/services/contactBookService";
+import { touchDisplayVersion } from "@/services/classSettingsService";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,7 @@ export async function PUT(request: Request) {
       note: body.note,
       assignments: body.assignments,
     });
+    await touchDisplayVersion();
     return NextResponse.json({ data });
   } catch (error) {
     const message = error instanceof Error ? error.message : "儲存聯絡簿失敗";
@@ -61,7 +63,9 @@ export async function POST(request: Request) {
   try {
     const body = await request.json() as { fromDate?: string; toDate?: string };
     if (!body.fromDate || !body.toDate) return NextResponse.json({ error: "請提供來源與目標日期" }, { status: 400 });
-    return NextResponse.json({ data: await copyContactBook({ fromDate: body.fromDate, toDate: body.toDate }) });
+    const data = await copyContactBook({ fromDate: body.fromDate, toDate: body.toDate });
+    await touchDisplayVersion();
+    return NextResponse.json({ data });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "複製聯絡簿失敗" }, { status: 400 });
   }

@@ -4,59 +4,34 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 
-type Item = { id: string; name: string; icon: string; price: number; stock: number; isActive: boolean };
-type Order = { order: { id: string; status: string; price: number; requestedAt: string }; itemName: string; itemIcon: string; studentName: string; seatNumber: number };
+type Item = { id: string; name: string; icon: string; price: number; stock: number; isActive: boolean; kind: "physical" | "privilege"; description: string };
+type Reward = { reward: { id: string; studentId: string; itemName: string; itemIcon: string; pricePaid: number; source: string; status: string }; name: string; seatNumber: number };
+// /api/students 回傳的是資料表主鍵 id（不是大屏資料使用的 studentId）。
+type Student = { id: string; name: string; seatNumber: number };
 
 export function ShopPageClient() {
-  const [items, setItems] = useState<Item[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("0");
-  const [stock, setStock] = useState("0");
-  const [icon, setIcon] = useState("🎁");
-  const [error, setError] = useState<string | null>(null);
-  const [shopOpen, setShopOpen] = useState(false);
+  const [items, setItems] = useState<Item[]>([]); const [pending, setPending] = useState<Reward[]>([]); const [rewards, setRewards] = useState<Reward[]>([]); const [students, setStudents] = useState<Student[]>([]);
+  const [name, setName] = useState(""); const [icon, setIcon] = useState("🎁"); const [price, setPrice] = useState("0"); const [stock, setStock] = useState("-1"); const [kind, setKind] = useState<"physical" | "privilege">("physical"); const [description, setDescription] = useState("");
+  const [giftStudent, setGiftStudent] = useState(""); const [giftItem, setGiftItem] = useState(""); const [error, setError] = useState<string | null>(null); const [shopOpen, setShopOpen] = useState(false); const [lunchVideoQuery, setLunchVideoQuery] = useState("");
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editItem, setEditItem] = useState({ name: "", icon: "🎁", price: "0", stock: "-1", kind: "physical" as "physical" | "privilege", description: "" });
   const load = useCallback(async () => {
-    const [response, settingsResponse] = await Promise.all([fetch("/api/shop"), fetch("/api/settings")]);
-    const json = await response.json() as { data?: { items: Item[]; orders: Order[] }; error?: string };
-    if (!response.ok) throw new Error(json.error ?? "讀取商店失敗");
-    setItems(json.data?.items ?? []); setOrders(json.data?.orders ?? []);
-    const settings = await settingsResponse.json() as { data?: { shopOpen?: boolean } };
-    if (settingsResponse.ok) setShopOpen(settings.data?.shopOpen === true);
+    const [a, b, c] = await Promise.all([fetch("/api/shop"), fetch("/api/settings"), fetch("/api/students")]); const shop = await a.json() as { data?: { items: Item[]; pendingRequests: Reward[]; rewards: Reward[] }; error?: string };
+    if (!a.ok) throw new Error(shop.error ?? "讀取商店失敗"); setItems(shop.data?.items ?? []); setPending(shop.data?.pendingRequests ?? []); setRewards(shop.data?.rewards ?? []);
+    const settings = await b.json() as { data?: { shopOpen?: boolean; lunchVideoQuery?: string } }; if (b.ok) { setShopOpen(settings.data?.shopOpen === true); setLunchVideoQuery(settings.data?.lunchVideoQuery ?? ""); } const roster = await c.json() as { data?: Student[] }; if (c.ok) setStudents(roster.data ?? []);
   }, []);
-  useEffect(() => { void load().catch((err) => setError(err.message)); }, [load]);
-  async function create() {
-    setError(null);
-    try {
-      const response = await fetch("/api/shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, icon, price: Number(price), stock: Number(stock) }) });
-      const json = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(json.error ?? "新增失敗");
-      setName(""); setPrice("0"); setStock("0"); await load();
-    } catch (err) { setError(err instanceof Error ? err.message : "新增失敗"); }
-  }
-  async function resolve(id: string, approve: boolean) {
-    setError(null);
-    try {
-      const response = await fetch("/api/shop", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "resolve", id, approve }) });
-      const json = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(json.error ?? "處理失敗");
-      await load();
-    } catch (err) { setError(err instanceof Error ? err.message : "處理失敗"); }
-  }
-  async function toggleShopOpen() {
-    try {
-      const next = !shopOpen;
-      const response = await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shopOpen: next }) });
-      const json = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(json.error ?? "更新商店時間失敗");
-      setShopOpen(next);
-    } catch (err) { setError(err instanceof Error ? err.message : "更新商店時間失敗"); }
-  }
-  return <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-    <header className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-2xl font-semibold">商店</h1><p className="mt-1 text-sm text-gray-500">學生申請後先保留庫存與點數；核准才正式扣點。</p></div><Button variant={shopOpen ? "primary" : "secondary"} onClick={() => void toggleShopOpen()}>{shopOpen ? "商店時間：開放中（點此關閉）" : "開啟商店時間"}</Button></header>
+  useEffect(() => { void load().catch((e) => setError(e.message)); }, [load]);
+  async function call(method: "POST" | "PATCH", body: unknown) { const r = await fetch("/api/shop", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const j = await r.json() as { error?: string }; if (!r.ok) throw new Error(j.error ?? "操作失敗"); }
+  async function act(work: () => Promise<void>) { setError(null); try { await work(); await load(); } catch (e) { setError(e instanceof Error ? e.message : "操作失敗"); } }
+  function beginEdit(item: Item) { setEditingItemId(item.id); setEditItem({ name: item.name, icon: item.icon, price: String(item.price), stock: String(item.stock), kind: item.kind, description: item.description }); }
+  return <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+    <header className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-2xl font-semibold">商店與背包</h1><p className="mt-1 text-sm text-gray-500">兌換後立即扣金幣並永久放入背包；學生申請使用時再由老師核銷。</p></div><Button variant={shopOpen ? "primary" : "secondary"} onClick={() => void act(async () => { const next = !shopOpen; const r = await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shopOpen: next }) }); if (!r.ok) throw new Error("更新商店時間失敗"); setShopOpen(next); })}>{shopOpen ? "商店時間：開放中（點此關閉）" : "開啟商店時間"}</Button></header>
     {error ? <p className="text-sm text-red-600">{error}</p> : null}
-    <Card><CardTitle>新增商品</CardTitle><div className="mt-4 grid gap-2 sm:grid-cols-4"><input value={icon} onChange={(e) => setIcon(e.target.value)} className="h-10 rounded border px-3" aria-label="商品圖示"/><input value={name} onChange={(e) => setName(e.target.value)} placeholder="商品名稱" className="h-10 rounded border px-3"/><input value={price} onChange={(e) => setPrice(e.target.value)} type="number" min="0" className="h-10 rounded border px-3" placeholder="點數"/><input value={stock} onChange={(e) => setStock(e.target.value)} type="number" min="0" className="h-10 rounded border px-3" placeholder="庫存"/></div><Button className="mt-3" disabled={!name.trim()} onClick={() => void create()}>新增商品</Button></Card>
-    <Card><CardTitle>商品清單</CardTitle><div className="mt-3 grid gap-2 sm:grid-cols-2">{items.map((item) => <div key={item.id} className="rounded-lg border p-3"><b>{item.icon} {item.name}</b><p className="text-sm text-gray-500">{item.price} 點・庫存 {item.stock} {item.isActive ? "" : "・已下架"}</p></div>)}</div></Card>
-    <Card><CardTitle>待處理申請</CardTitle><CardDescription>核准後扣點；拒絕後釋放保留庫存與點數。</CardDescription><div className="mt-3 space-y-2">{orders.filter(({ order }) => order.status === "pending").map(({ order, itemName, itemIcon, studentName, seatNumber }) => <div key={order.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-3"><span className="flex-1">{seatNumber} 號 {studentName}：{itemIcon} {itemName}（{order.price} 點）</span><Button size="sm" onClick={() => void resolve(order.id, true)}>核准</Button><Button size="sm" variant="secondary" onClick={() => void resolve(order.id, false)}>拒絕</Button></div>)}{orders.every(({order}) => order.status !== "pending") ? <p className="text-sm text-gray-400">目前沒有待處理申請</p> : null}</div></Card>
+    <Card><CardTitle>新增商品</CardTitle><CardDescription>圖示會顯示在大屏；類型用來區分實體物品與可使用的權益。庫存填 -1 代表無限供應；商品說明會顯示在學生背包。</CardDescription><div className="mt-4 grid gap-2 sm:grid-cols-3"><label className="text-sm">圖示<input value={icon} onChange={(e) => setIcon(e.target.value)} className="mt-1 h-10 w-full rounded border px-3" placeholder="例：🎁"/></label><label className="text-sm">商品名稱<input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 h-10 w-full rounded border px-3" placeholder="例：點歌一次"/></label><label className="text-sm">獎品類型<select value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} className="mt-1 h-10 w-full rounded border px-3"><option value="physical">實體獎品（可領取）</option><option value="privilege">權益獎品（可使用）</option></select></label><label className="text-sm">兌換金幣<input value={price} onChange={(e) => setPrice(e.target.value)} type="number" min="0" className="mt-1 h-10 w-full rounded border px-3" placeholder="例：10"/></label><label className="text-sm">庫存數量<input value={stock} onChange={(e) => setStock(e.target.value)} type="number" min="-1" className="mt-1 h-10 w-full rounded border px-3" placeholder="-1 代表無限供應"/></label><label className="text-sm">學生看得到的說明<input value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1 h-10 w-full rounded border px-3" placeholder="例：可在午休點一首歌"/></label></div><Button className="mt-3" disabled={!name.trim()} onClick={() => void act(async () => { await call("POST", { name, icon, price: Number(price), stock: Number(stock), kind, description }); setName(""); setDescription(""); })}>新增商品</Button></Card>
+    <Card><CardTitle>商品清單</CardTitle><CardDescription>編輯只影響未來兌換；刪除會下架商品，不會影響學生已經持有的背包獎品。</CardDescription><div className="mt-3 grid gap-2 sm:grid-cols-2">{items.filter((item) => item.isActive).map((item) => editingItemId === item.id ? <div key={item.id} className="rounded-lg border p-3"><div className="grid gap-2 sm:grid-cols-2"><input value={editItem.icon} onChange={(e) => setEditItem({ ...editItem, icon: e.target.value })} className="h-9 rounded border px-2" aria-label="編輯圖示"/><input value={editItem.name} onChange={(e) => setEditItem({ ...editItem, name: e.target.value })} className="h-9 rounded border px-2" aria-label="編輯名稱"/><select value={editItem.kind} onChange={(e) => setEditItem({ ...editItem, kind: e.target.value as typeof editItem.kind })} className="h-9 rounded border px-2"><option value="physical">實體獎品</option><option value="privilege">權益獎品</option></select><input value={editItem.price} onChange={(e) => setEditItem({ ...editItem, price: e.target.value })} type="number" min="0" className="h-9 rounded border px-2" aria-label="編輯金幣"/><input value={editItem.stock} onChange={(e) => setEditItem({ ...editItem, stock: e.target.value })} type="number" min="-1" className="h-9 rounded border px-2" aria-label="編輯庫存"/><input value={editItem.description} onChange={(e) => setEditItem({ ...editItem, description: e.target.value })} className="h-9 rounded border px-2" aria-label="編輯說明"/></div><div className="mt-2 flex gap-2"><Button size="sm" onClick={() => void act(async () => { await call("PATCH", { id: item.id, ...editItem, price: Number(editItem.price), stock: Number(editItem.stock) }); setEditingItemId(null); })}>儲存變更</Button><Button size="sm" variant="secondary" onClick={() => setEditingItemId(null)}>取消</Button></div></div> : <div key={item.id} className="rounded-lg border p-3"><div className="flex gap-2"><b className="flex-1">{item.icon} {item.name}</b><span className="text-sm text-gray-500">{item.kind === "physical" ? "實體" : "權益"}</span></div><p className="mt-1 text-sm text-gray-500">{item.price} 金幣・{item.stock < 0 ? "無限供應" : `庫存 ${item.stock}`}</p>{item.description ? <p className="text-sm text-gray-500">{item.description}</p> : null}<div className="mt-2 flex gap-2"><Button size="sm" variant="secondary" onClick={() => beginEdit(item)}>編輯</Button><Button size="sm" variant="secondary" onClick={() => { if (window.confirm(`確定刪除「${item.name}」？學生已持有的獎品會保留。`)) void act(() => call("PATCH", { id: item.id, isActive: false })); }}>刪除</Button></div></div>)}</div>{items.every((item) => !item.isActive) ? <p className="mt-3 text-sm text-gray-400">目前沒有上架商品</p> : null}</Card>
+    <Card><CardTitle>贈送獎品</CardTitle><div className="mt-3 grid gap-2 sm:grid-cols-3"><select value={giftStudent} onChange={(e) => setGiftStudent(e.target.value)} className="h-10 rounded border px-3"><option value="">選擇學生</option>{students.map((s) => <option key={s.id} value={s.id}>{s.seatNumber} 號 {s.name}</option>)}</select><select value={giftItem} onChange={(e) => setGiftItem(e.target.value)} className="h-10 rounded border px-3"><option value="">選擇商品</option>{items.filter((item) => item.isActive).map((i) => <option key={i.id} value={i.id}>{i.icon} {i.name}</option>)}</select><Button disabled={!giftStudent || !giftItem} onClick={() => void act(async () => { await call("POST", { action: "grant", studentId: giftStudent, itemId: giftItem }); setGiftStudent(""); setGiftItem(""); })}>放入學生背包</Button></div></Card>
+    <Card><CardTitle>午餐點歌／影音</CardTitle><CardDescription>學生使用「點歌一次」後，請在這裡輸入歌曲名稱或 YouTube 網址；大屏午餐頁會自動播放。清空並儲存即可停止播放。</CardDescription><div className="mt-3 flex flex-wrap gap-2"><input value={lunchVideoQuery} onChange={(e) => setLunchVideoQuery(e.target.value)} className="h-10 min-w-72 flex-1 rounded border px-3" placeholder="例：周杰倫 稻香，或貼上 YouTube 網址"/><Button onClick={() => void act(async () => { const r = await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lunchVideoQuery }) }); const j = await r.json() as { error?: string }; if (!r.ok) throw new Error(j.error ?? "儲存午餐影音失敗"); })}>儲存並播放</Button><Button variant="secondary" onClick={() => void act(async () => { const r = await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lunchVideoQuery: "" }) }); if (!r.ok) throw new Error("清除午餐影音失敗"); setLunchVideoQuery(""); })}>清空影音</Button></div></Card>
+    <Card><CardTitle>待處理使用申請</CardTitle><CardDescription>學生提出「我要領取／使用」後，由老師核銷或退回背包。</CardDescription><div className="mt-3 space-y-2">{pending.map(({ reward, name: studentName, seatNumber }) => <div key={reward.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-3"><span className="flex-1">{seatNumber} 號 {studentName}：{reward.itemIcon} {reward.itemName}</span><Button size="sm" onClick={() => void act(() => call("PATCH", { action: "redeem", id: reward.id }))}>核銷完成</Button><Button size="sm" variant="secondary" onClick={() => void act(() => call("PATCH", { action: "return", id: reward.id }))}>退回背包</Button></div>)}{pending.length === 0 ? <p className="text-sm text-gray-400">目前沒有待處理申請</p> : null}</div></Card>
+    <Card><CardTitle>學生背包</CardTitle><CardDescription>撤銷尚未使用的獎品時，可選擇退款；庫存不會自動回補。</CardDescription><div className="mt-3 grid gap-2 sm:grid-cols-2">{rewards.filter(({ reward }) => reward.status !== "redeemed" && reward.status !== "revoked").map(({ reward, name: studentName, seatNumber }) => <div key={reward.id} className="rounded-lg border p-3"><b>{seatNumber} 號 {studentName}：{reward.itemIcon} {reward.itemName}</b><p className="mt-1 text-sm text-gray-500">{reward.status === "requested" ? "待老師核銷" : "放在背包中"}・{reward.source === "gift" ? "老師贈送" : `${reward.pricePaid} 金幣兌換`}</p><div className="mt-2 flex gap-2"><Button size="sm" variant="secondary" onClick={() => void act(() => call("PATCH", { action: "revoke", id: reward.id, refund: false }))}>撤銷</Button>{reward.source === "purchase" ? <Button size="sm" variant="secondary" onClick={() => void act(() => call("PATCH", { action: "revoke", id: reward.id, refund: true }))}>撤銷並退款</Button> : null}</div></div>)}</div></Card>
   </div>;
 }

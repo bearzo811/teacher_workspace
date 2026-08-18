@@ -24,7 +24,7 @@ import {
   getAbsentStudentIds,
   listActiveStudents,
 } from "@/services/routineService";
-import { listShopItems } from "@/services/shopService";
+import { listShopItems, listStudentRewards } from "@/services/shopService";
 import { getTermPassportView } from "@/services/termPassportService";
 import type {
   DisplayData,
@@ -39,6 +39,12 @@ import type { PassportMatrixView } from "@/services/passportService";
 import type { ReadingMatrixView } from "@/types/reading";
 
 export type { DisplayData };
+
+const DISPLAY_CACHE_MS = 15_000;
+const displayCache = new Map<
+  string,
+  { version: string; expiresAt: number; data: DisplayData }
+>();
 
 function passportDebts(
   matrix: PassportMatrixView,
@@ -97,6 +103,29 @@ export async function getDisplayData(options?: {
   contactBookDate?: string;
 }): Promise<DisplayData> {
   const settings = await getClassSettings();
+  const version = settings.updatedAt.toISOString();
+  const cacheKey = options?.contactBookDate?.trim() || "system-today";
+  const cached = displayCache.get(cacheKey);
+  if (
+    cached &&
+    cached.version === version &&
+    cached.expiresAt > Date.now()
+  ) {
+    return cached.data;
+  }
+
+  const data = await buildDisplayData(options, settings);
+  displayCache.set(cacheKey, {
+    version,
+    expiresAt: Date.now() + DISPLAY_CACHE_MS,
+    data,
+  });
+  return data;
+}
+
+async function buildDisplayData(options: {
+  contactBookDate?: string;
+} | undefined, settings: Awaited<ReturnType<typeof getClassSettings>>): Promise<DisplayData> {
   const today = todayDateString();
   const override = options?.contactBookDate?.trim() ?? "";
   const contactBookDate =
@@ -138,6 +167,7 @@ export async function getDisplayData(options?: {
     studentTaskMaps,
     absentStudentIds,
     shopItems,
+    rewards,
     termChinesePassport,
     termEnglishPassport,
   ] = await Promise.all([
@@ -146,8 +176,10 @@ export async function getDisplayData(options?: {
     listCalendarEventsByDate(contactBookDate),
     listCalendarEventsInRange(from, to),
     listHolidayOverridesInRange(from, to),
-    listCalendarCountdown({ fromDate: today, limit: 8, withinDays: 120 }),
-    getHomeworkDayView(contactBook.dueDate),
+    listCalendarCountdown({ fromDate: today, limit: 8, withinDays: 365 }),
+    // 大屏黑板可顯示今天要抄的聯絡簿；但學生座號區要勾的是「今天到期」、
+    // 也就是前一個上課日抄寫的作業，兩者不能共用聯絡簿的繳交日。
+    getHomeworkDayView(today),
     listStudentHomeworkDebts(today),
     getPassportWeekView("Chinese", settings.schoolWeek.week),
     getPassportWeekView("English", settings.schoolWeek.week),
@@ -159,6 +191,7 @@ export async function getDisplayData(options?: {
     getDailyStudentTaskMaps(today),
     getAbsentStudentIds(today),
     settings.shopOpen ? listShopItems({ activeOnly: true }) : Promise.resolve([]),
+    listStudentRewards(),
     getTermPassportView("Chinese"),
     getTermPassportView("English"),
   ]);
@@ -192,6 +225,22 @@ export async function getDisplayData(options?: {
   const gameProfiles = await getGamificationForStudents(
     activeStudents.map((student) => student.studentId),
   );
+  // 大屏的「作業」是繳交統計：只有未交才算尚未繳交。
+  // 待老師確認、需訂正與已完成都代表學生已經交出作業。
+  const homeworkSubmission = new Map(
+    homework.students.map((row) => {
+      const missingTitles = row.cells
+        .filter((cell) => cell.status === "unsubmitted")
+        .map((cell) => cell.title);
+      return [
+        row.studentId,
+        {
+          allSubmitted: homework.items.length === 0 || missingTitles.length === 0,
+          missingTitles,
+        },
+      ] as const;
+    }),
+  );
 
   const personalByStudent = activeStudents.map((student) => {
     const tasks = studentTaskMaps.get(student.studentId) ?? emptyTasks;
@@ -201,9 +250,6 @@ export async function getDisplayData(options?: {
     const englishStatus =
       english.students.find((s) => s.studentId === student.studentId)?.status ??
       "not_started";
-    const hwRow = homework.students.find(
-      (s) => s.studentId === student.studentId,
-    );
     const termChinese = termChinesePassport.students.find((row) => row.studentId === student.studentId)?.completed ?? false;
     const termEnglish = termEnglishPassport.students.find((row) => row.studentId === student.studentId)?.completed ?? false;
     return {
@@ -218,15 +264,18 @@ export async function getDisplayData(options?: {
       englishPassport: englishStatus,
       termChinesePassportCompleted: termChinese,
       termEnglishPassportCompleted: termEnglish,
-      homeworkAllDone: hwRow?.allDone ?? homework.items.length === 0,
-      homeworkMissing: hwRow?.missingTitles ?? [],
+      homeworkAllDone:
+        homeworkSubmission.get(student.studentId)?.allSubmitted ??
+        homework.items.length === 0,
+      homeworkMissing:
+        homeworkSubmission.get(student.studentId)?.missingTitles ?? [],
       gamification: gameProfiles.get(student.studentId)!,
     };
   });
 
   const debts: DisplayDebtRow[] = activeStudents.map((student) => {
     const homeworkItems = (homeworkDebts.get(student.studentId) ?? []).map(
-      (label) => ({ label }),
+      (item) => ({ label: item.label, status: item.status }),
     );
     const chinesePassport = passportDebts(chineseMatrix, student.studentId);
     const englishPassport = passportDebts(englishMatrix, student.studentId);
@@ -236,8 +285,17 @@ export async function getDisplayData(options?: {
       student.studentId,
       month,
     );
+    const hasBlockingDebt =
+      homeworkItems.some(
+        (item) =>
+          item.status === "unsubmitted" || item.status === "correction_required",
+      ) ||
+      chinesePassport.length > 0 ||
+      englishPassport.length > 0 ||
+      newspaper.length > 0 ||
+      reflection.length > 0;
     const hasDebt =
-      homeworkItems.length > 0 ||
+      homeworkItems.some((item) => item.status !== "completed") ||
       chinesePassport.length > 0 ||
       englishPassport.length > 0 ||
       newspaper.length > 0 ||
@@ -252,10 +310,12 @@ export async function getDisplayData(options?: {
       newspaper,
       reflection,
       hasDebt,
+      hasBlockingDebt,
     };
   });
 
   return {
+    version: settings.updatedAt.toISOString(),
     className: settings.className,
     schoolYear: settings.schoolYear,
     today,
@@ -312,11 +372,16 @@ export async function getDisplayData(options?: {
       {
         key: "homework",
         label: "作業",
-        completed: homework.completedStudentCount,
+        completed: [...homeworkSubmission.values()].filter(
+          (row) => row.allSubmitted,
+        ).length,
         total: homework.totalStudentCount,
         missingNames: homework.students
-          .filter((s) => s.missingTitles.length > 0)
-          .map((s) => s.name),
+          .filter(
+            (student) =>
+              homeworkSubmission.get(student.studentId)?.missingTitles.length,
+          )
+          .map((student) => student.name),
       },
     ],
     lunchProgress: [
@@ -335,6 +400,7 @@ export async function getDisplayData(options?: {
         missingNames: noon.missingNames,
       },
     ],
+    lunchVideoQuery: settings.lunchVideoQuery,
     dutyToday: {
       date: dutyToday.date,
       isHoliday: dutyToday.isHoliday,
@@ -352,8 +418,15 @@ export async function getDisplayData(options?: {
     personal: personalByStudent,
     shop: {
       open: settings.shopOpen,
-      items: shopItems.map((item) => ({ id: item.id, name: item.name, icon: item.icon, price: item.price, stock: item.stock })),
+      items: shopItems.map((item) => ({ id: item.id, name: item.name, icon: item.icon, price: item.price, stock: item.stock, kind: item.kind, description: item.description })),
     },
+    backpacks: activeStudents.map((student) => ({
+      studentId: student.studentId, name: student.name, seatNumber: student.seatNumber,
+      items: rewards.filter((row) => row.reward.studentId === student.studentId).map(({ reward }) => ({
+        id: reward.id, itemId: reward.itemId, itemName: reward.itemName, itemIcon: reward.itemIcon,
+        kind: reward.kind, description: reward.description, status: reward.status,
+      })),
+    })),
     displaySettings: {
       allowStudentHomeworkToggle: settings.allowDisplayHomeworkToggle,
       allowStudentPassportToggle: settings.allowDisplayPassportToggle,

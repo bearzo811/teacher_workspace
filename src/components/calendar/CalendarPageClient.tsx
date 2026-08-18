@@ -100,7 +100,8 @@ export function CalendarPageClient() {
   const loadCountdown = useCallback(async () => {
     const from = todayDateString();
     const end = new Date();
-    end.setDate(end.getDate() + 120);
+    // 顯示未來一學年，避免 1 月等較遠的學期活動被 120 天上限排除。
+    end.setDate(end.getDate() + 365);
     const to = formatDateInput(end);
     const response = await fetch(
       `/api/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,

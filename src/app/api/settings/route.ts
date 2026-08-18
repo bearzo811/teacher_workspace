@@ -56,6 +56,7 @@ export async function PATCH(request: Request) {
       displayRefreshSeconds?: number;
       displayContactBookDate?: string;
       shopOpen?: boolean;
+      lunchVideoQuery?: string;
       gamification?: GamificationRulesUpdate;
     };
 
@@ -117,6 +118,12 @@ export async function PATCH(request: Request) {
         { error: "大屏聯絡簿日期格式須為 YYYY-MM-DD 或空白" },
         { status: 400 },
       );
+    }
+    if (body.lunchVideoQuery !== undefined) {
+      if (typeof body.lunchVideoQuery !== "string" || body.lunchVideoQuery.length > 300) {
+        return NextResponse.json({ error: "午餐影音內容不可超過 300 個字元" }, { status: 400 });
+      }
+      body.lunchVideoQuery = body.lunchVideoQuery.trim();
     }
     if (
       body.readingSemester !== undefined &&

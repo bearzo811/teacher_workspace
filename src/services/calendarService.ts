@@ -182,7 +182,8 @@ export async function listCalendarCountdown(options?: {
 }): Promise<CalendarCountdownItem[]> {
   const fromDate = options?.fromDate ?? todayDateString();
   parseDateInput(fromDate);
-  const withinDays = options?.withinDays ?? 120;
+  // 一個學年內的活動都應可在倒數區看到；120 天會漏掉下學期初的活動。
+  const withinDays = options?.withinDays ?? 365;
   const limit = options?.limit ?? 12;
   const end = parseDateInput(fromDate);
   end.setDate(end.getDate() + withinDays);

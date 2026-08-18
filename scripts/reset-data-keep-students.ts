@@ -5,7 +5,7 @@
 import { config } from "dotenv";
 import postgres from "postgres";
 
-config({ path: ".env.local" });
+config({ path: process.env.ENV_FILE || ".env.local" });
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -14,10 +14,10 @@ if (!connectionString) {
 }
 
 const DEFAULT_CLASS_SETTINGS = {
-  school_year: "114",
+  school_year: "115",
   grade: 4,
-  class_name: "四年三班",
-  current_week: 8,
+  class_name: "四年甲班",
+  current_week: 1,
   chinese_start_week: 3,
   chinese_end_week: 16,
   english_start_week: 3,
@@ -32,8 +32,10 @@ const DEFAULT_CLASS_SETTINGS = {
   allow_display_reading_toggle: false,
   display_carousel_enabled: false,
   display_token: "",
+  display_token_hash: "",
   display_refresh_seconds: 20,
   display_contact_book_date: "",
+  shop_open: false,
 };
 
 const sql = postgres(connectionString, { prepare: false, max: 1 });
@@ -45,23 +47,35 @@ async function main() {
   console.log(`保留學生 ${studentCount} 人，開始清空其他資料…`);
 
   await sql.begin(async (tx) => {
+    await tx`DELETE FROM student_reward_history`;
+    await tx`DELETE FROM student_rewards`;
+    await tx`DELETE FROM shop_orders`;
+    await tx`DELETE FROM shop_items`;
     await tx`DELETE FROM gamification_ledger`;
     await tx`DELETE FROM gamification_effects`;
-    await tx`DELETE FROM student_game_profiles`;
-    await tx`DELETE FROM gamification_settings`;
+    await tx`DELETE FROM homework_record_history`;
     await tx`DELETE FROM homework_records`;
     await tx`DELETE FROM homework`;
     await tx`DELETE FROM homework_books`;
+    await tx`DELETE FROM homework_subjects`;
+    await tx`DELETE FROM term_passport_history`;
+    await tx`DELETE FROM term_passport_records`;
     await tx`DELETE FROM passport_records`;
     await tx`DELETE FROM reading_records`;
     await tx`DELETE FROM daily_student_tasks`;
+    await tx`DELETE FROM daily_absences`;
     await tx`DELETE FROM duty_overrides`;
     await tx`DELETE FROM today_manual_completions`;
     await tx`DELETE FROM daily_task_completions`;
     await tx`DELETE FROM contact_book_days`;
+    await tx`DELETE FROM contact_book_templates`;
     await tx`DELETE FROM calendar_events`;
     await tx`DELETE FROM calendar_day_overrides`;
     await tx`DELETE FROM class_settings`;
+    await tx`DELETE FROM term_roster_entries`;
+    await tx`DELETE FROM terms`;
+    await tx`DELETE FROM student_game_profiles`;
+    await tx`DELETE FROM gamification_settings`;
 
     await tx`
       INSERT INTO class_settings (
@@ -83,8 +97,10 @@ async function main() {
         allow_display_reading_toggle,
         display_carousel_enabled,
         display_token,
+        display_token_hash,
         display_refresh_seconds,
-        display_contact_book_date
+        display_contact_book_date,
+        shop_open
       ) VALUES (
         ${DEFAULT_CLASS_SETTINGS.school_year},
         ${DEFAULT_CLASS_SETTINGS.grade},
@@ -104,8 +120,10 @@ async function main() {
         ${DEFAULT_CLASS_SETTINGS.allow_display_reading_toggle},
         ${DEFAULT_CLASS_SETTINGS.display_carousel_enabled},
         ${DEFAULT_CLASS_SETTINGS.display_token},
+        ${DEFAULT_CLASS_SETTINGS.display_token_hash},
         ${DEFAULT_CLASS_SETTINGS.display_refresh_seconds},
-        ${DEFAULT_CLASS_SETTINGS.display_contact_book_date}
+        ${DEFAULT_CLASS_SETTINGS.display_contact_book_date},
+        ${DEFAULT_CLASS_SETTINGS.shop_open}
       )
     `;
     await tx`
@@ -118,9 +136,9 @@ async function main() {
   });
 
   console.log(
-    "完成：作業／聯絡簿／護照／讀報／行事曆／值日／每日勾選／養成帳本已清空",
+    "完成：保留學生名冊；其餘作業／聯絡簿／護照／閱讀／行事曆／值日／每日任務／商店／養成資料均已清空",
   );
-  console.log("class_settings 已恢復預設（四年三班、第 8 週等）");
+  console.log("class_settings 已恢復空白初始狀態（115 學年、四年甲班、第 1 週）");
 }
 
 main()

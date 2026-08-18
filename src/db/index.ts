@@ -20,8 +20,11 @@ function createDb(): Database {
   if (!globalForDb.__teacherWorkspaceDb) {
     globalForDb.__teacherWorkspaceSql = postgres(connectionString, {
       prepare: false,
-      // Serverless + Supabase session pooler：避免每 instance max 10 打滿 pool_size
-      max: Number(process.env.DATABASE_POOL_MAX ?? 1),
+      // 大屏會平行讀取多個領域資料。預設 3 條連線可避免單一連線把所有查詢序列化，
+      // 在 serverless 部署時仍可透過 DATABASE_POOL_MAX 依 Supabase 額度下修。
+      max: Number(process.env.DATABASE_POOL_MAX ?? 3),
+      // 閒置連線盡快歸還給 Supabase session pool，避免短命程序累積占滿額度。
+      idle_timeout: Number(process.env.DATABASE_IDLE_TIMEOUT_SECONDS ?? 20),
     });
     globalForDb.__teacherWorkspaceDb = drizzle(
       globalForDb.__teacherWorkspaceSql,

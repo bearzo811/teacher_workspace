@@ -5,6 +5,7 @@ import { daysBetween, todayDateString } from "@/lib/dates";
 import { getClassSettings } from "@/services/classSettingsService";
 import { getContactBook } from "@/services/contactBookService";
 import { getHomeworkDashboardSummary } from "@/services/homeworkService";
+import { listPendingRewardRequests } from "@/services/shopService";
 import {
   getTaskCompletionCount,
   upsertTodayManual,
@@ -112,6 +113,7 @@ export async function getTodayBoard(date = todayDateString()): Promise<TodayBoar
     noon,
     contactBook,
     contactSaved,
+    pendingRewardRequests,
   ] = await Promise.all([
     getHomeworkDashboardSummary(date),
     passportWeek > 0
@@ -130,6 +132,7 @@ export async function getTodayBoard(date = todayDateString()): Promise<TodayBoar
       .from(contactBookDays)
       .where(eq(contactBookDays.date, date))
       .limit(1),
+    listPendingRewardRequests(),
   ]);
 
   const hwCompleted = homework.hasItems ? homework.completed : 0;
@@ -284,6 +287,19 @@ export async function getTodayBoard(date = todayDateString()): Promise<TodayBoar
         : "尚未儲存今日聯絡簿",
       missingNames: [],
       href: "/contact-book",
+      manualKey: null,
+      manualCompleted: false,
+    },
+    {
+      id: "reward_requests",
+      period: "dismissal",
+      label: "待處理獎品",
+      status: pendingRewardRequests.length ? "attention" : "done",
+      completed: null,
+      total: null,
+      detail: pendingRewardRequests.length ? `${pendingRewardRequests.length} 件等待核銷` : "目前沒有待處理申請",
+      missingNames: pendingRewardRequests.map((item) => item.name),
+      href: "/shop",
       manualKey: null,
       manualCompleted: false,
     },

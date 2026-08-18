@@ -32,6 +32,8 @@ export type DisplayDebtItem = {
   label: string;
   /** missing_parent 時標示 */
   note?: string;
+  /** 作業才有四種繳交狀態；其餘項目只有完成／未完成。 */
+  status?: "unsubmitted" | "pending_confirmation" | "correction_required" | "completed";
 };
 
 export type DisplayDebtRow = {
@@ -43,7 +45,10 @@ export type DisplayDebtRow = {
   englishPassport: DisplayDebtItem[];
   newspaper: DisplayDebtItem[];
   reflection: DisplayDebtItem[];
+  /** 尚有待處理或待老師確認的項目。 */
   hasDebt: boolean;
+  /** 學生仍須自己完成的項目；此狀態才限制下課與商店。 */
+  hasBlockingDebt: boolean;
 };
 
 export type DisplayProgressItem = {
@@ -54,7 +59,16 @@ export type DisplayProgressItem = {
   missingNames: string[];
 };
 
+export type DisplayBackpackItem = {
+  id: string; itemId: string | null; itemName: string; itemIcon: string;
+  kind: "physical" | "privilege"; description: string;
+  status: "available" | "requested" | "redeemed" | "revoked";
+};
+export type DisplayBackpackRow = { studentId: string; name: string; seatNumber: number; items: DisplayBackpackItem[] };
+
 export type DisplayData = {
+  /** 資料版本；供大屏以低成本輪詢變更。 */
+  version: string;
   className: string;
   schoolYear: string;
   today: string;
@@ -99,6 +113,7 @@ export type DisplayData = {
   progress: DisplayProgressItem[];
   /** 午餐頁進度：刷牙、中午打掃 */
   lunchProgress: DisplayProgressItem[];
+  lunchVideoQuery: string;
   /** 今日中午值日工作分配 */
   dutyToday: {
     date: string;
@@ -114,8 +129,9 @@ export type DisplayData = {
   personal: DisplayPersonalRow[];
   shop: {
     open: boolean;
-    items: { id: string; name: string; icon: string; price: number; stock: number }[];
+    items: { id: string; name: string; icon: string; price: number; stock: number; kind: "physical" | "privilege"; description: string }[];
   };
+  backpacks: DisplayBackpackRow[];
   displaySettings: {
     allowStudentHomeworkToggle: boolean;
     allowStudentPassportToggle: boolean;

@@ -8,6 +8,7 @@ import {
 import { assertDisplayPassportToggleEnabled } from "@/services/displayService";
 import { isDisplayKeyRequest, isTeacherRequest } from "@/lib/access";
 import { isPassportStatus } from "@/types/passport";
+import { touchDisplayVersion } from "@/services/classSettingsService";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +92,7 @@ export async function PATCH(request: Request) {
       week: body.week,
       status: body.status,
     });
+    await touchDisplayVersion();
     return NextResponse.json({ data });
   } catch (error) {
     const message = error instanceof Error ? error.message : "更新護照失敗";
