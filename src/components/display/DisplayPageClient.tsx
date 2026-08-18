@@ -174,7 +174,8 @@ export function DisplayPageClient() {
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState("");
   const [panel, setPanel] = useState<PanelKey>("today");
-  const [studentView, setStudentView] = useState<"overview" | "shop">("overview");
+  const [studentView, setStudentView] = useState<"overview" | "shop" | "backpack">("overview");
+  const [backpackStudentId, setBackpackStudentId] = useState<string | null>(null);
   const [progressPanel, setProgressPanel] = useState<"passport" | "reading">(
     "passport",
   );
@@ -182,8 +183,11 @@ export function DisplayPageClient() {
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [shopRequests, setShopRequests] = useState<Set<string>>(() => new Set());
   const [needsScroll, setNeedsScroll] = useState(false);
+  const displaySyncInterval = data
+    ? Math.max(2, Math.min(data.displaySettings.refreshSeconds, 5)) * 1000
+    : 0;
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const displayVersionRef = useRef("");
   const contentScrollRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -194,7 +198,9 @@ export function DisplayPageClient() {
         error?: string;
       };
       if (!response.ok) throw new Error(json.error ?? "讀取失敗");
-      setData(json.data ?? null);
+      const nextData = json.data ?? null;
+      displayVersionRef.current = nextData?.version ?? displayVersionRef.current;
+      setData(nextData);
       setError(null);
       const now = new Date();
       setUpdatedAt(
@@ -209,27 +215,30 @@ export function DisplayPageClient() {
     void load();
   }, [load]);
 
-  useEffect(() => {
-    return () => {
-      if (refreshTimer.current) clearTimeout(refreshTimer.current);
-    };
-  }, []);
+  const checkDisplayVersion = useCallback(async () => {
+    try {
+      const response = await fetch("/api/display/version", {
+        headers: displayHeaders,
+      });
+      const json = (await response.json()) as {
+        data?: { version?: string };
+      };
+      if (!response.ok || !json.data?.version) return;
+      if (displayVersionRef.current && json.data.version !== displayVersionRef.current) {
+        void load();
+      }
+    } catch {
+      // 背景同步失敗不影響學生當下已看到的 optimistic UI；下次輪詢會再嘗試。
+    }
+  }, [displayHeaders, load]);
 
-  const scheduleRefresh = useCallback(() => {
-    if (refreshTimer.current) clearTimeout(refreshTimer.current);
-    refreshTimer.current = setTimeout(() => {
-      refreshTimer.current = null;
-      void load();
-    }, 800);
-  }, [load]);
-
   useEffect(() => {
-    if (!data) return;
+    if (!displaySyncInterval) return;
     const id = setInterval(() => {
-      scheduleRefresh();
-    }, data.displaySettings.refreshSeconds * 1000);
+      void checkDisplayVersion();
+    }, displaySyncInterval);
     return () => clearInterval(id);
-  }, [data?.displaySettings.refreshSeconds, data, scheduleRefresh]);
+  }, [displaySyncInterval, checkDisplayVersion]);
 
   useEffect(() => {
     if (!data?.displaySettings.carouselEnabled || activeStudentId) return;
@@ -253,6 +262,11 @@ export function DisplayPageClient() {
   }
 
   function selectStudent(studentId: string) {
+    if (activeStudentId === studentId) {
+      setActiveStudentId(null);
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+      return;
+    }
     setActiveStudentId(studentId);
     bumpIdle();
     setPanel((prev) => (prev === "passport" || prev === "student" ? prev : "today"));
@@ -277,9 +291,32 @@ export function DisplayPageClient() {
     completed: boolean,
   ) {
     if (!data) return;
+    const previousData = data;
     const taskDate = data.today;
     setBusyKey(`${studentId}:${taskKey}`);
     bumpIdle();
+    // 點擊當下先更新畫面；網路與資料庫寫入在背景完成，失敗才還原。
+    setData((previous) => {
+      if (!previous) return previous;
+      const personal = previous.personal.map((row) => {
+        if (row.studentId !== studentId) return row;
+        if (taskKey === "morning_cleaning") return { ...row, morningCleaning: completed };
+        if (taskKey === "contact_book_copied") return { ...row, contactBookCopied: completed };
+        if (taskKey === "lunch_brushing") return { ...row, lunchBrushing: completed };
+        if (taskKey === "noon_cleaning") return { ...row, noonCleaning: completed };
+        return row;
+      });
+      const updateProgress = (items: DisplayData["progress"], key: string) =>
+        items.map((item) => item.key === key
+          ? { ...item, completed: Math.max(0, item.completed + (completed ? 1 : -1)) }
+          : item);
+      return {
+        ...previous,
+        personal,
+        progress: updateProgress(previous.progress, taskKey),
+        lunchProgress: updateProgress(previous.lunchProgress, taskKey),
+      };
+    });
     try {
       const response = await fetch("/api/routines", {
         method: "PATCH",
@@ -293,30 +330,8 @@ export function DisplayPageClient() {
       });
       const json = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(json.error ?? "更新失敗");
-      // 先立即反映按鈕狀態，再在背景同步完整大屏資料，避免每次操作都卡住。
-      setData((previous) => {
-        if (!previous) return previous;
-        const personal = previous.personal.map((row) => {
-          if (row.studentId !== studentId) return row;
-          if (taskKey === "morning_cleaning") return { ...row, morningCleaning: completed };
-          if (taskKey === "contact_book_copied") return { ...row, contactBookCopied: completed };
-          if (taskKey === "lunch_brushing") return { ...row, lunchBrushing: completed };
-          if (taskKey === "noon_cleaning") return { ...row, noonCleaning: completed };
-          return row;
-        });
-        const updateProgress = (items: DisplayData["progress"], key: string) =>
-          items.map((item) => item.key === key
-            ? { ...item, completed: Math.max(0, item.completed + (completed ? 1 : -1)) }
-            : item);
-        return {
-          ...previous,
-          personal,
-          progress: updateProgress(previous.progress, taskKey),
-          lunchProgress: updateProgress(previous.lunchProgress, taskKey),
-        };
-      });
-      scheduleRefresh();
     } catch (err) {
+      setData(previousData);
       setError(err instanceof Error ? err.message : "更新失敗");
     } finally {
       setBusyKey(null);
@@ -367,7 +382,6 @@ export function DisplayPageClient() {
       });
       const json = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(json.error ?? "更新失敗");
-      scheduleRefresh();
     } catch (err) {
       setData(previousData);
       setError(err instanceof Error ? err.message : "更新失敗");
@@ -386,9 +400,33 @@ export function DisplayPageClient() {
     const previousData = data;
     setBusyKey(`${studentId}:${homeworkId}`);
     bumpIdle();
-    setData((current) => current
-      ? { ...current, homework: updateHomeworkStatus(current.homework, studentId, homeworkId, next ? "pending_confirmation" : "unsubmitted") }
-      : current);
+    setData((current) => {
+      if (!current) return current;
+      const homework = updateHomeworkStatus(
+        current.homework,
+        studentId,
+        homeworkId,
+        next ? "pending_confirmation" : "unsubmitted",
+      );
+      const submittedRows = homework.students.filter((row) =>
+        row.cells.every((cell) => cell.status !== "unsubmitted"),
+      );
+      return {
+        ...current,
+        homework,
+        progress: current.progress.map((item) =>
+          item.key === "homework"
+            ? {
+                ...item,
+                completed: submittedRows.length,
+                missingNames: homework.students
+                  .filter((row) => row.cells.some((cell) => cell.status === "unsubmitted"))
+                  .map((row) => row.name),
+              }
+            : item,
+        ),
+      };
+    });
     try {
       const response = await fetch("/api/homework-record", {
         method: "PATCH",
@@ -401,7 +439,6 @@ export function DisplayPageClient() {
       });
       const json = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(json.error ?? "更新失敗");
-      scheduleRefresh();
     } catch (err) {
       setData(previousData);
       setError(err instanceof Error ? err.message : "更新失敗");
@@ -419,43 +456,32 @@ export function DisplayPageClient() {
       const response = await fetch("/api/shop", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...displayHeaders },
-        body: JSON.stringify({ action: "request", studentId, itemId }),
+        body: JSON.stringify({ action: "purchase", studentId, itemId }),
       });
       const json = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(json.error ?? "申請兌換失敗");
-      scheduleRefresh();
+      if (!response.ok) throw new Error(json.error ?? "兌換失敗");
     } catch (err) {
       setShopRequests((previous) => {
         const next = new Set(previous);
         next.delete(requestKey);
         return next;
       });
-      setError(err instanceof Error ? err.message : "申請兌換失敗");
+      setError(err instanceof Error ? err.message : "兌換失敗");
     } finally {
       setBusyKey(null);
     }
   }
 
-  async function toggleTermPassport(studentId: string, type: "Chinese" | "English", completed: boolean) {
-    if (!data?.displaySettings.allowStudentPassportToggle || activeStudentId !== studentId) return;
+  async function requestBackpackUse(rewardId: string, cancel = false) {
+    if (!data) return;
     const previousData = data;
-    setBusyKey(`term-passport:${type}`);
-    setData((current) => current
-      ? {
-          ...current,
-          personal: current.personal.map((row) => row.studentId !== studentId
-            ? row
-            : type === "Chinese"
-              ? { ...row, termChinesePassportCompleted: !completed }
-              : { ...row, termEnglishPassportCompleted: !completed }),
-        }
-      : current);
+    setBusyKey(`reward:${rewardId}`);
+    setData((current) => current ? { ...current, backpacks: current.backpacks.map((bag) => ({ ...bag, items: bag.items.map((item) => item.id === rewardId ? { ...item, status: cancel ? "available" : "requested" } : item) })) } : current);
     try {
-      const response = await fetch("/api/term-passports", { method: "PATCH", headers: { "Content-Type": "application/json", ...displayHeaders }, body: JSON.stringify({ studentId, type, completed: !completed }) });
-      const json = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(json.error ?? "更新護照失敗");
-      scheduleRefresh();
-    } catch (err) { setData(previousData); setError(err instanceof Error ? err.message : "更新護照失敗"); } finally { setBusyKey(null); }
+      const response = await fetch("/api/shop", { method: "POST", headers: { "Content-Type": "application/json", ...displayHeaders }, body: JSON.stringify({ action: cancel ? "cancel-use" : "request-use", rewardId }) });
+      const json = await response.json() as { error?: string }; if (!response.ok) throw new Error(json.error ?? "更新背包失敗");
+    } catch (err) { setData(previousData); setError(err instanceof Error ? err.message : "更新背包失敗"); }
+    finally { setBusyKey(null); }
   }
 
   async function setReading(
@@ -492,7 +518,6 @@ export function DisplayPageClient() {
       });
       const json = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(json.error ?? "更新失敗");
-      scheduleRefresh();
     } catch (err) {
       setData(previousData);
       setError(err instanceof Error ? err.message : "更新失敗");
@@ -552,14 +577,9 @@ export function DisplayPageClient() {
     >
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-4 md:gap-8">
-          <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
-              Classroom Display
-            </p>
-            <h1 className="text-2xl font-semibold md:text-3xl">
-              {data.className}
-            </h1>
-          </div>
+          <h1 className="text-2xl font-semibold md:text-3xl">
+            {data.className}
+          </h1>
           <DisplayHeaderClock />
         </div>
         <div className="text-right">
@@ -597,10 +617,6 @@ export function DisplayPageClient() {
               if (!activeStudentId) return;
               void toggleHomeworkCell(activeStudentId, homeworkId, next);
             }}
-            canTermPassport={Boolean(activeStudentId && data.displaySettings.allowStudentPassportToggle)}
-            onTermPassport={(type, completed) => {
-              if (activeStudentId) void toggleTermPassport(activeStudentId, type, completed);
-            }}
           />
         ) : null}
 
@@ -611,6 +627,7 @@ export function DisplayPageClient() {
             data={data}
             busyKey={busyKey}
             canRoutine
+            displayHeaders={displayHeaders}
             onRoutineCell={(studentId, taskKey, completed) => {
               void patchRoutineRequest(studentId, taskKey, completed);
             }}
@@ -622,7 +639,7 @@ export function DisplayPageClient() {
             <ShopDisplayPanel
               data={data}
               row={activePersonal}
-              hasDebt={Boolean(activePersonal && data.debts.find((debt) => debt.studentId === activePersonal.studentId)?.hasDebt)}
+              hasDebt={Boolean(activePersonal && data.debts.find((debt) => debt.studentId === activePersonal.studentId)?.hasBlockingDebt)}
               busyKey={busyKey}
               requestedItems={shopRequests}
               onBack={() => setStudentView("overview")}
@@ -630,12 +647,15 @@ export function DisplayPageClient() {
                 if (activeStudentId) void requestShopItem(activeStudentId, itemId);
               }}
             />
+          ) : studentView === "backpack" ? (
+            <BackpackDisplayPanel bag={data.backpacks.find((item) => item.studentId === backpackStudentId) ?? null} busyKey={busyKey} onBack={() => setStudentView("overview")} onRequest={(rewardId, cancel) => void requestBackpackUse(rewardId, cancel)} />
           ) : (
             <GamificationOverviewPanel
               rows={data.personal}
               debts={data.debts}
               shopOpen={data.shop.open}
               onOpenShop={() => setStudentView("shop")}
+              onOpenBackpack={(studentId) => { setBackpackStudentId(studentId); setStudentView("backpack"); }}
             />
           )
         ) : null}
@@ -787,21 +807,6 @@ export function DisplayPageClient() {
               </div>
             </div>
           ) : null}
-          {activePersonal ? (
-            <button
-              type="button"
-              disabled={Boolean(data.debts.find((debt) => debt.studentId === activePersonal.studentId)?.hasDebt)}
-              onClick={() => {
-                setActiveStudentId(null);
-                bumpIdle();
-              }}
-              className="min-h-14 rounded-xl bg-amber-400 px-5 text-lg font-bold text-slate-950 disabled:cursor-not-allowed disabled:bg-rose-900 disabled:text-rose-100"
-            >
-              {data.debts.find((debt) => debt.studentId === activePersonal.studentId)?.hasDebt
-                ? "有欠繳，不能下課"
-                : "我完成了／換下一位"}
-            </button>
-          ) : null}
         </div>
       </div>
     </div>
@@ -813,33 +818,34 @@ function GamificationOverviewPanel({
   debts,
   shopOpen,
   onOpenShop,
+  onOpenBackpack,
 }: {
   rows: DisplayPersonalRow[];
   debts: DisplayDebtRow[];
   shopOpen: boolean;
   onOpenShop: () => void;
+  onOpenBackpack: (studentId: string) => void;
 }) {
   const sorted = useMemo(
     () => [...rows].sort((a, b) => a.seatNumber - b.seatNumber),
     [rows],
   );
   const debtStudentIds = useMemo(
-    () => new Set(debts.filter((debt) => debt.hasDebt).map((debt) => debt.studentId)),
+    () => new Set(debts.filter((debt) => debt.hasBlockingDebt).map((debt) => debt.studentId)),
     [debts],
   );
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="shrink-0">
         <h2 className="text-3xl font-semibold">個人點數</h2>
-        <p className="mt-1 text-base text-slate-400">
-          依座號顯示全班 Level、XP 與金幣
-        </p>
       </div>
       <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-1 gap-3 overflow-auto sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {sorted.map((row) => (
-          <article
+          <button
+            type="button"
+            onClick={() => onOpenBackpack(row.studentId)}
             key={row.studentId}
-            className="flex min-h-36 flex-col justify-between rounded-2xl border border-slate-700 bg-slate-900/80 p-4"
+            className="flex min-h-36 flex-col justify-between rounded-2xl border border-slate-700 bg-slate-900/80 p-4 text-left transition active:scale-[0.98]"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -873,7 +879,7 @@ function GamificationOverviewPanel({
                 {row.gamification.coins} 金幣
               </p>
             </div>
-          </article>
+          </button>
         ))}
         <button
           type="button"
@@ -981,7 +987,7 @@ function ShopDisplayPanel({
               <span className="text-4xl">{item.icon}</span>
               <span className="mt-3 text-xl font-semibold">{item.name}</span>
               <span className="mt-auto text-lg text-amber-200">
-                {requested ? "✓ 已送出兌換申請" : `${item.price} 金幣`}
+                {requested ? "✓ 已放入背包" : `${item.price} 金幣`}
               </span>
               {item.stock >= 0 ? <span className="mt-1 text-sm text-slate-400">庫存 {item.stock}</span> : null}
             </button>
@@ -992,21 +998,31 @@ function ShopDisplayPanel({
   );
 }
 
+function BackpackDisplayPanel({ bag, busyKey, onBack, onRequest }: { bag: DisplayData["backpacks"][number] | null; busyKey: string | null; onBack: () => void; onRequest: (rewardId: string, cancel: boolean) => void }) {
+  const grouped = useMemo(() => {
+    const map = new Map<string, DisplayData["backpacks"][number]["items"]>();
+    for (const item of bag?.items.filter((item) => item.status === "available" || item.status === "requested") ?? []) {
+      const key = `${item.itemName}:${item.kind}:${item.description}:${item.status}`; map.set(key, [...(map.get(key) ?? []), item]);
+    }
+    return [...map.values()];
+  }, [bag]);
+  return <section className="flex min-h-0 flex-1 flex-col gap-4 rounded-2xl border border-violet-400/40 bg-slate-900/80 p-5"><div className="flex items-center justify-between gap-3"><div><h2 className="text-3xl font-semibold">{bag ? `${bag.seatNumber} 號 ${bag.name} 的背包` : "學生背包"}</h2><p className="mt-1 text-base text-slate-400">獎品永久保留；使用後請交給老師核銷。</p></div><button type="button" onClick={onBack} className="min-h-12 rounded-xl border border-slate-600 bg-slate-800 px-4 text-lg font-semibold">返回</button></div>{!bag ? <div className="flex flex-1 items-center justify-center text-xl text-slate-400">請選擇學生</div> : grouped.length === 0 ? <div className="flex flex-1 items-center justify-center text-xl text-slate-400">背包目前沒有可使用的獎品</div> : <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-auto sm:grid-cols-2 lg:grid-cols-3">{grouped.map((items) => { const item = items[0]; const requested = item.status === "requested"; return <div key={`${item.id}:${item.status}`} className="flex min-h-40 flex-col rounded-2xl border border-violet-400/40 bg-slate-950/50 p-4"><span className="text-4xl">{item.itemIcon}</span><b className="mt-2 text-xl">{item.itemName} × {items.length}</b><span className="mt-1 text-sm text-slate-400">{item.kind === "physical" ? "實體獎品" : "權益獎品"}{item.description ? `・${item.description}` : ""}</span><button type="button" disabled={busyKey === `reward:${item.id}`} onClick={() => onRequest(item.id, requested)} className={cn("mt-auto min-h-12 rounded-xl px-3 text-lg font-semibold", requested ? "bg-slate-700 text-slate-100" : "bg-violet-500 text-white")}>{requested ? "取消使用申請" : item.kind === "physical" ? "我要領取" : "我要使用"}</button></div>; })}</div>}</section>;
+}
+
 function DebtsPanel({
   debts,
 }: {
   debts: DisplayDebtRow[];
 }) {
-  const debtCount = debts.filter((row) => row.hasDebt).length;
+  const debtCount = debts.filter((row) => row.hasBlockingDebt).length;
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
       <div className="shrink-0">
         <h2 className="text-3xl font-semibold">欠繳作業</h2>
         <p className="mt-1 text-base text-slate-400">
-          作業（繳交日已到未交）· 護照（本週以前未完成）·
-          讀報／心得（本學期未完成）
-          {` · ${debtCount} 人有欠繳`}
+          作業狀態、護照與閱讀進度一覽 ·
+          {` ${debtCount} 人尚有需要自己完成的項目`}
         </p>
       </div>
 
@@ -1017,7 +1033,7 @@ function DebtsPanel({
                 key={row.studentId}
                 className={cn(
                   "rounded-2xl border bg-slate-900/90 p-4",
-                  row.hasDebt ? "border-rose-400/40" : "border-emerald-400/40",
+                  row.hasBlockingDebt ? "border-rose-400/40" : "border-emerald-400/40",
                 )}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1026,16 +1042,16 @@ function DebtsPanel({
                   </h3>
                   <span className={cn(
                     "rounded-full px-3 py-1 text-base font-semibold",
-                    row.hasDebt
+                    row.hasBlockingDebt
                       ? "border border-rose-400/60 bg-rose-500/20 text-rose-100"
                       : "border border-emerald-400/60 bg-emerald-500/20 text-emerald-100",
                   )}>
-                    {row.hasDebt ? "不能下課" : "可以下課／兌換商品"}
+                    {row.hasBlockingDebt ? "不能下課" : "可以下課／兌換商品"}
                   </span>
                 </div>
                 {row.hasDebt ? (
                   <>
-                    <DebtGroup label="作業" items={row.homework} />
+                    <HomeworkStatusGroups items={row.homework} />
                     <DebtGroup label="國語護照" items={row.chinesePassport} />
                     <DebtGroup label="英語護照" items={row.englishPassport} />
                     <DebtGroup label="讀報" items={row.newspaper} />
@@ -1080,6 +1096,67 @@ function DebtGroup({
   );
 }
 
+const HOMEWORK_STATUS_META = {
+  unsubmitted: {
+    label: "未交（請繳交）",
+    className: "border-rose-400/50 bg-rose-500/15 text-rose-100",
+  },
+  correction_required: {
+    label: "需訂正",
+    className: "border-orange-400/50 bg-orange-500/15 text-orange-100",
+  },
+  pending_confirmation: {
+    label: "已交，待老師確認",
+    className: "border-amber-400/50 bg-amber-500/15 text-amber-100",
+  },
+  completed: {
+    label: "已完成",
+    className: "border-emerald-400/50 bg-emerald-500/15 text-emerald-100",
+  },
+} as const;
+
+function HomeworkStatusGroups({
+  items,
+}: {
+  items: DisplayDebtRow["homework"];
+}) {
+  if (items.length === 0) return null;
+  const statuses = [
+    "unsubmitted",
+    "correction_required",
+    "pending_confirmation",
+    "completed",
+  ] as const;
+
+  return (
+    <div className="mt-3 space-y-2.5">
+      <p className="text-sm font-semibold text-slate-400">作業</p>
+      {statuses.map((status) => {
+        const grouped = items.filter((item) => item.status === status);
+        if (grouped.length === 0) return null;
+        const meta = HOMEWORK_STATUS_META[status];
+        return (
+          <div key={status}>
+            <p className="text-sm font-medium text-slate-300">
+              {meta.label} <span className="text-slate-500">{grouped.length}</span>
+            </p>
+            <ul className="mt-1 flex flex-wrap gap-1.5">
+              {grouped.map((item) => (
+                <li
+                  key={`${status}-${item.label}`}
+                  className={cn("rounded-lg border px-2.5 py-1 text-base", meta.className)}
+                >
+                  {item.label}
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function TodayPanel({
   data,
   row,
@@ -1088,8 +1165,6 @@ function TodayPanel({
   canHomework,
   onRoutine,
   onHomework,
-  canTermPassport,
-  onTermPassport,
 }: {
   data: DisplayData;
   row: DisplayPersonalRow | null;
@@ -1098,8 +1173,6 @@ function TodayPanel({
   canHomework: boolean;
   onRoutine: (taskKey: string, completed: boolean) => void;
   onHomework: (homeworkId: string, next: boolean) => void;
-  canTermPassport: boolean;
-  onTermPassport: (type: "Chinese" | "English", completed: boolean) => void;
 }) {
   const boardViewportRef = useRef<HTMLDivElement>(null);
   const boardContentRef = useRef<HTMLDivElement>(null);
@@ -1239,8 +1312,6 @@ function TodayPanel({
           canHomework={canHomework}
           onRoutine={onRoutine}
           onHomework={onHomework}
-          canTermPassport={canTermPassport}
-          onTermPassport={onTermPassport}
         />
       ) : (
         <TodayProgressOverview data={data} />
@@ -1251,13 +1322,10 @@ function TodayPanel({
 
 function TodayProgressOverview({ data }: { data: DisplayData }) {
   return (
-    <div className="grid min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-2 self-stretch overflow-hidden">
+    <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2 self-stretch overflow-hidden">
       <h2 className="text-2xl font-semibold leading-tight text-slate-200">
         今日進度
       </h2>
-      <p className="text-sm leading-tight text-slate-500">
-        選座號後改為個人打勾
-      </p>
       <div className="grid min-h-0 grid-rows-3 gap-2 overflow-hidden">
         {data.progress.map((item) => {
           const pct =
@@ -1281,9 +1349,13 @@ function TodayProgressOverview({ data }: { data: DisplayData }) {
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              <p className="mt-1.5 text-base text-slate-500">
-                {item.completed === item.total ? "全部完成" : "還有人尚未完成"}
-              </p>
+              {item.missingNames.length > 0 ? (
+                <p className="mt-1.5 truncate text-base text-rose-300">
+                  未完成：{item.missingNames.join("、")}
+                </p>
+              ) : (
+                <p className="mt-1.5 text-base text-emerald-300">全部完成</p>
+              )}
             </div>
           );
         })}
@@ -1359,11 +1431,13 @@ function LunchPanel({
   data,
   busyKey,
   canRoutine,
+  displayHeaders,
   onRoutineCell,
 }: {
   data: DisplayData;
   busyKey: string | null;
   canRoutine: boolean;
+  displayHeaders: Record<string, string>;
   onRoutineCell: (
     studentId: string,
     taskKey: "lunch_brushing" | "noon_cleaning",
@@ -1374,11 +1448,12 @@ function LunchPanel({
     () => [...data.personal].sort((a, b) => a.seatNumber - b.seatNumber),
     [data.personal],
   );
+  const videoUrl = toYouTubeEmbedUrl(data.lunchVideoQuery);
 
   return (
     <section className="grid min-h-0 flex-1 gap-4 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80 p-4 lg:grid-cols-2">
       <div className="flex h-full min-h-0 items-center justify-center overflow-hidden rounded-2xl border border-dashed border-slate-600 bg-slate-950/30">
-        <p className="text-lg text-slate-500">影音區（預留）</p>
+        {videoUrl ? <LunchVideoPlayer query={data.lunchVideoQuery} src={videoUrl} displayHeaders={displayHeaders} /> : <p className="text-lg text-slate-500">目前沒有午餐影音</p>}
       </div>
 
       <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1.55fr)_minmax(0,1fr)] gap-2 overflow-hidden">
@@ -1388,7 +1463,7 @@ function LunchPanel({
           </h2>
           <div className="mt-2 min-h-0 flex-1 overflow-hidden">
             {data.dutyToday.isHoliday ? (
-              <p className="text-lg text-slate-400">當天放假，無值日排程</p>
+              <p className="text-lg text-slate-400">今天放假，無值日排程</p>
             ) : (
               <div className="grid h-full min-h-0 grid-cols-2 gap-2">
                 <div className="flex min-h-0 flex-col gap-2">
@@ -1442,6 +1517,42 @@ function LunchPanel({
       </div>
     </section>
   );
+}
+
+function LunchVideoPlayer({ query, src, displayHeaders }: { query: string; src: string; displayHeaders: Record<string, string> }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const endedRef = useRef(false);
+  useEffect(() => {
+    endedRef.current = false;
+    const listen = (event: MessageEvent) => {
+      if (!event.origin.includes("youtube")) return;
+      let data: unknown;
+      try { data = typeof event.data === "string" ? JSON.parse(event.data) : event.data; } catch { return; }
+      if (!data || typeof data !== "object" || !("event" in data) || (data as { event?: string }).event !== "onStateChange" || (data as { info?: number }).info !== 0 || endedRef.current) return;
+      endedRef.current = true;
+      void fetch("/api/display/video-ended", { method: "POST", headers: { "Content-Type": "application/json", ...displayHeaders }, body: JSON.stringify({ query }) });
+    };
+    window.addEventListener("message", listen);
+    return () => window.removeEventListener("message", listen);
+  }, [displayHeaders, query]);
+  const connect = () => {
+    const target = iframeRef.current?.contentWindow;
+    if (!target) return;
+    target.postMessage(JSON.stringify({ event: "listening", id: 1, channel: "widget" }), "*");
+    target.postMessage(JSON.stringify({ event: "command", func: "addEventListener", args: ["onStateChange"] }), "*");
+  };
+  return <iframe ref={iframeRef} title="午餐影音" src={src} onLoad={connect} className="h-full w-full border-0" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />;
+}
+
+function toYouTubeEmbedUrl(value: string): string | null {
+  const query = value.trim();
+  if (!query) return null;
+  try {
+    const url = new URL(query);
+    const id = url.hostname === "youtu.be" ? url.pathname.slice(1) : url.searchParams.get("v") ?? (url.pathname.startsWith("/embed/") ? url.pathname.split("/")[2] : "");
+    if (/^[A-Za-z0-9_-]{11}$/.test(id)) return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&enablejsapi=1`;
+  } catch { /* 歌名改用 YouTube 搜尋播放清單 */ }
+  return `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(query)}&autoplay=1&rel=0&enablejsapi=1`;
 }
 
 const LUNCH_MATRIX_TASKS = [
@@ -1913,9 +2024,6 @@ function PassportStudentFocus({
     <section className="flex h-full min-h-0 flex-col justify-end gap-4 overflow-hidden">
       <div className="rounded-2xl border border-sky-400/50 bg-slate-900/90 p-4">
         <h2 className="text-3xl font-semibold text-sky-100">{studentLabel}</h2>
-        <p className="mt-1 text-base text-slate-400">
-          只顯示你的橫欄 · 點週數循環（未開始／缺／完成）
-        </p>
       </div>
       {rows.map(({ label, matrix, type }) => {
         const student = matrix.students.find(
@@ -2075,7 +2183,7 @@ function CompactReadingMatrix({
   return (
     <section className="shrink-0 rounded-xl border border-slate-700 bg-slate-900/80 p-3">
       <h2 className="whitespace-nowrap px-1 text-lg font-semibold">
-        {title} · {matrix.overallCompleted}/{matrix.overallTotal}
+        {title}
       </h2>
       <table className="mt-2 w-max border-collapse text-center text-xs leading-none">
         <thead>
@@ -2246,8 +2354,6 @@ function PersonalChecklist({
   canHomework,
   onRoutine,
   onHomework,
-  canTermPassport,
-  onTermPassport,
 }: {
   data: DisplayData;
   row: DisplayPersonalRow | null;
@@ -2256,8 +2362,6 @@ function PersonalChecklist({
   canHomework: boolean;
   onRoutine: (taskKey: string, completed: boolean) => void;
   onHomework: (homeworkId: string, next: boolean) => void;
-  canTermPassport: boolean;
-  onTermPassport: (type: "Chinese" | "English", completed: boolean) => void;
 }) {
   if (!row) {
     return (
@@ -2327,11 +2431,13 @@ function PersonalChecklist({
               今日無繳交項
             </li>
           ) : (
-            hwCells.map((cell) => (
+            hwCells.map((cell) => {
+              const submitted = cell.completed || cell.status === "pending_confirmation";
+              return (
               <CheckRow
                 key={cell.homeworkId}
                 label={cell.title}
-                done={cell.completed}
+                done={submitted}
                 note={
                   cell.status === "pending_confirmation"
                     ? "已送出，待老師確認"
@@ -2346,15 +2452,12 @@ function PersonalChecklist({
                   !canHomework ||
                   busyKey === `${row.studentId}:${cell.homeworkId}`
                 }
-                onToggle={() => onHomework(cell.homeworkId, !cell.completed)}
+                onToggle={() => onHomework(cell.homeworkId, !submitted)}
               />
-            ))
+              );
+            })
           )}
         </ul>
-      </div>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <button type="button" disabled={!canTermPassport || busyKey === "term-passport:Chinese"} onClick={() => onTermPassport("Chinese", row.termChinesePassportCompleted)} className={cn("rounded-xl border px-4 py-3 text-left text-lg", row.termChinesePassportCompleted ? "border-emerald-400 bg-emerald-500/20" : "border-slate-600 bg-slate-950/40")}>國語護照 <span className="float-right">{row.termChinesePassportCompleted ? "已完成 ✓" : "我完成了"}</span></button>
-        <button type="button" disabled={!canTermPassport || busyKey === "term-passport:English"} onClick={() => onTermPassport("English", row.termEnglishPassportCompleted)} className={cn("rounded-xl border px-4 py-3 text-left text-lg", row.termEnglishPassportCompleted ? "border-emerald-400 bg-emerald-500/20" : "border-slate-600 bg-slate-950/40")}>英語護照 <span className="float-right">{row.termEnglishPassportCompleted ? "已完成 ✓" : "我完成了"}</span></button>
       </div>
     </div>
   );

@@ -32,7 +32,16 @@ const DEFAULT_SETTINGS = {
   displayRefreshSeconds: 20,
   displayContactBookDate: "",
   shopOpen: false,
+  lunchVideoQuery: "",
 } as const;
+
+const SETTINGS_CACHE_MS = 3_000;
+let cachedSettings: { value: ClassSettingsView; expiresAt: number } | null = null;
+let pendingSettings: Promise<ClassSettingsView> | null = null;
+
+function clearSettingsCache() {
+  cachedSettings = null;
+}
 
 export type ClassSettingsView = Omit<ClassSettings, "displayToken" | "displayTokenHash"> & {
   hasDisplayToken: boolean;
@@ -75,6 +84,21 @@ export function resolvedCurrentWeek(settings: ClassSettingsView) {
 
 /** MVP: single row. Create defaults if missing. */
 export async function getClassSettings(): Promise<ClassSettingsView> {
+  if (cachedSettings && cachedSettings.expiresAt > Date.now()) {
+    return cachedSettings.value;
+  }
+  if (pendingSettings) return pendingSettings;
+  pendingSettings = readClassSettings();
+  try {
+    const value = await pendingSettings;
+    cachedSettings = { value, expiresAt: Date.now() + SETTINGS_CACHE_MS };
+    return value;
+  } finally {
+    pendingSettings = null;
+  }
+}
+
+async function readClassSettings(): Promise<ClassSettingsView> {
   const existing = await db.select().from(classSettings).limit(1);
   if (existing[0]) {
     const row = existing[0];
@@ -94,6 +118,24 @@ export async function getClassSettings(): Promise<ClassSettingsView> {
     .values({ ...DEFAULT_SETTINGS })
     .returning();
   return withSchoolWeek(created[0]);
+}
+
+/**
+ * 輕量的大屏同步版本。所有會改變大屏內容的寫入都觸碰此時間戳，
+ * 大屏只需輪詢一列設定，版本有變動才重抓完整資料。
+ */
+export async function touchDisplayVersion(): Promise<void> {
+  const current = await getClassSettings();
+  await db
+    .update(classSettings)
+    .set({ updatedAt: new Date() })
+    .where(eq(classSettings.id, current.id));
+  clearSettingsCache();
+}
+
+export async function getDisplayVersion(): Promise<string> {
+  const settings = await getClassSettings();
+  return settings.updatedAt.toISOString();
 }
 
 export type ClassSettingsUpdate = Partial<{
@@ -118,6 +160,7 @@ export type ClassSettingsUpdate = Partial<{
   displayRefreshSeconds: number;
   displayContactBookDate: string;
   shopOpen: boolean;
+  lunchVideoQuery: string;
 }>;
 
 export async function updateClassSettings(
@@ -137,7 +180,9 @@ export async function updateClassSettings(
     .set(update)
     .where(eq(classSettings.id, current.id))
     .returning();
-  return withSchoolWeek(rows[0]);
+  const updated = withSchoolWeek(rows[0]);
+  cachedSettings = { value: updated, expiresAt: Date.now() + SETTINGS_CACHE_MS };
+  return updated;
 }
 
 /** 大屏登入專用；絕不向客戶端回傳原始存取碼或雜湊。 */

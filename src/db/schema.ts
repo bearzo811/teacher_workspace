@@ -32,6 +32,9 @@ export const shopOrderStatusEnum = pgEnum("shop_order_status", [
   "rejected",
   "cancelled",
 ]);
+export const rewardKindEnum = pgEnum("reward_kind", ["physical", "privilege"]);
+export const rewardStatusEnum = pgEnum("reward_status", ["available", "requested", "redeemed", "revoked"]);
+export const rewardSourceEnum = pgEnum("reward_source", ["purchase", "gift"]);
 
 export const dailyTaskKeyEnum = pgEnum("daily_task_key", [
   "chinese_passport",
@@ -93,6 +96,11 @@ export const passportRecords = pgTable(
       table.studentId,
       table.type,
       table.week,
+    ),
+    index("passport_records_type_week_student_idx").on(
+      table.type,
+      table.week,
+      table.studentId,
     ),
   ],
 );
@@ -160,7 +168,10 @@ export const homework = pgTable("homework", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-});
+}, (table) => [
+  index("homework_date_idx").on(table.date),
+  index("homework_contact_book_date_idx").on(table.contactBookDate),
+]);
 
 export const homeworkRecords = pgTable(
   "homework_records",
@@ -288,6 +299,8 @@ export const classSettings = pgTable("class_settings", {
     .notNull()
     .default(""),
   shopOpen: boolean("shop_open").notNull().default(false),
+  /** 午餐大屏影音：歌曲名稱或 YouTube 網址；空白時不播放 */
+  lunchVideoQuery: text("lunch_video_query").notNull().default(""),
   ...timestamps,
 });
 
@@ -399,7 +412,7 @@ export const calendarEvents = pgTable("calendar_events", {
   endTime: text("end_time"),
   sortOrder: integer("sort_order").notNull().default(0),
   ...timestamps,
-});
+}, (table) => [index("calendar_events_date_idx").on(table.date)]);
 
 /** 單日放假覆寫（無列＝六日放假、平日上課） */
 export const calendarDayOverrides = pgTable(
@@ -461,6 +474,12 @@ export const readingRecords = pgTable(
       table.schoolYear,
       table.semester,
       table.month,
+    ),
+    index("reading_records_type_term_student_idx").on(
+      table.type,
+      table.schoolYear,
+      table.semester,
+      table.studentId,
     ),
   ],
 );
@@ -554,10 +573,51 @@ export const shopItems = pgTable("shop_items", {
   name: text("name").notNull(),
   icon: text("icon").notNull().default("🎁"),
   price: integer("price").notNull(),
+  kind: rewardKindEnum("kind").notNull().default("physical"),
+  description: text("description").notNull().default(""),
+  /** -1 代表無限供應 */
   stock: integer("stock").notNull(),
   isActive: boolean("is_active").notNull().default(true),
   ...timestamps,
 });
+
+/** 每一筆是學生真正持有的一份獎品；保留快照以支援商品下架後查閱歷史。 */
+export const studentRewards = pgTable(
+  "student_rewards",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    studentId: uuid("student_id").notNull().references(() => students.id),
+    itemId: uuid("item_id").references(() => shopItems.id),
+    itemName: text("item_name").notNull(),
+    itemIcon: text("item_icon").notNull().default("🎁"),
+    kind: rewardKindEnum("kind").notNull(),
+    description: text("description").notNull().default(""),
+    pricePaid: integer("price_paid").notNull().default(0),
+    source: rewardSourceEnum("source").notNull(),
+    status: rewardStatusEnum("status").notNull().default("available"),
+    requestedAt: timestamp("requested_at", { withTimezone: true }),
+    redeemedAt: timestamp("redeemed_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index("student_rewards_student_status_idx").on(table.studentId, table.status),
+    index("student_rewards_status_requested_idx").on(table.status, table.requestedAt),
+  ],
+);
+
+export const studentRewardHistory = pgTable(
+  "student_reward_history",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    rewardId: uuid("reward_id").notNull().references(() => studentRewards.id),
+    action: text("action").notNull(),
+    actor: text("actor").notNull(),
+    note: text("note").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("student_reward_history_reward_idx").on(table.rewardId, table.createdAt)],
+);
 
 export const shopOrders = pgTable(
   "shop_orders",
@@ -593,6 +653,7 @@ export type Term = typeof terms.$inferSelect;
 export type TermRosterEntry = typeof termRosterEntries.$inferSelect;
 export type DutyOverride = typeof dutyOverrides.$inferSelect;
 export type ReadingRecord = typeof readingRecords.$inferSelect;
+export type StudentReward = typeof studentRewards.$inferSelect;
 export type GamificationSettings = typeof gamificationSettings.$inferSelect;
 export type StudentGameProfile = typeof studentGameProfiles.$inferSelect;
 export type GamificationEffect = typeof gamificationEffects.$inferSelect;

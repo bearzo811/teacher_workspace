@@ -6,6 +6,7 @@ import {
 import { isPassportStatus } from "@/types/passport";
 import { isReadingType } from "@/types/reading";
 import { isDisplayKeyRequest, isTeacherRequest } from "@/lib/access";
+import { touchDisplayVersion } from "@/services/classSettingsService";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +72,7 @@ export async function PATCH(request: Request) {
       month: body.month,
       status: body.status,
     });
+    await touchDisplayVersion();
     return NextResponse.json({ data });
   } catch (error) {
     const message =

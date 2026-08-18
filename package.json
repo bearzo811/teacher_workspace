@@ -15,7 +15,8 @@
     "db:ensure-class-settings:production": "vercel env run --environment=production -- tsx scripts/ensure-class-settings-columns.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:reset-keep-students": "tsx scripts/reset-data-keep-students.ts"
+    "db:reset-keep-students": "tsx scripts/reset-data-keep-students.ts",
+    "db:reset-keep-students:production": "vercel env run --environment=production -- tsx scripts/reset-data-keep-students.ts"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

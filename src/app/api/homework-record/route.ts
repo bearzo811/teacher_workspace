@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isDisplayKeyRequest, isTeacherRequest } from "@/lib/access";
 import { upsertHomeworkRecord } from "@/services/homeworkService";
 import { assertDisplayHomeworkToggleEnabled } from "@/services/displayService";
+import { touchDisplayVersion } from "@/services/classSettingsService";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,7 @@ export async function PATCH(request: Request) {
       status: body.status,
       actor: isDisplay ? "student" : "teacher",
     });
+    await touchDisplayVersion();
     return NextResponse.json({ data });
   } catch (error) {
     const message = error instanceof Error ? error.message : "更新作業紀錄失敗";
