@@ -21,8 +21,11 @@ import {
 import { getReadingMatrix } from "@/services/readingService";
 import {
   getDailyStudentTaskMaps,
+  getAbsentStudentIds,
   listActiveStudents,
 } from "@/services/routineService";
+import { listShopItems } from "@/services/shopService";
+import { getTermPassportView } from "@/services/termPassportService";
 import type {
   DisplayData,
   DisplayDebtItem,
@@ -60,10 +63,25 @@ function readingDebts(
 ): DisplayDebtItem[] {
   const student = matrix.students.find((row) => row.studentId === studentId);
   if (!student) return [];
+  const dueMonths = (() => {
+    if (matrix.semester === "first") {
+      // 上學期跨年度：9～12 月依序到期，1 月才補上 1 月任務；7、8 月不算欠繳。
+      if (asOfMonth >= 9 && asOfMonth <= 12) {
+        return new Set(Array.from({ length: asOfMonth - 8 }, (_, index) => index + 9));
+      }
+      if (asOfMonth === 1) return new Set([9, 10, 11, 12, 1]);
+      return new Set<number>();
+    }
+    // 下學期為同一年 2～6 月；其餘月份不列欠繳。
+    if (asOfMonth >= 2 && asOfMonth <= 6) {
+      return new Set(Array.from({ length: asOfMonth - 1 }, (_, index) => index + 2));
+    }
+    return new Set<number>();
+  })();
   return (
     student.cells
-      // 當月 1 日起才列該月；未來月份不提前算欠繳。
-      .filter((cell) => cell.month <= asOfMonth && cell.status !== "completed")
+      // 只列本學期目前已到期的月份；跨年的上學期不可直接比較月份數字。
+      .filter((cell) => dueMonths.has(cell.month) && cell.status !== "completed")
       .map((cell) => ({
         label: `${cell.month}月`,
         note: cell.status === "missing_parent" ? "缺家長" : undefined,
@@ -118,6 +136,10 @@ export async function getDisplayData(options?: {
     readingReflection,
     activeStudents,
     studentTaskMaps,
+    absentStudentIds,
+    shopItems,
+    termChinesePassport,
+    termEnglishPassport,
   ] = await Promise.all([
     getDutyLeaders(contactBookDate),
     getDutyDay(contactBookDate),
@@ -135,6 +157,10 @@ export async function getDisplayData(options?: {
     getReadingMatrix("reflection"),
     listActiveStudents(),
     getDailyStudentTaskMaps(today),
+    getAbsentStudentIds(today),
+    settings.shopOpen ? listShopItems({ activeOnly: true }) : Promise.resolve([]),
+    getTermPassportView("Chinese"),
+    getTermPassportView("English"),
   ]);
 
   const emptyTasks: Record<DailyStudentTaskKey, boolean> = {
@@ -144,7 +170,8 @@ export async function getDisplayData(options?: {
     noon_cleaning: false,
   };
   const taskCompletion = (taskKey: DailyStudentTaskKey) => {
-    const completedStudents = activeStudents.filter(
+    const eligibleStudents = activeStudents.filter((student) => !absentStudentIds.has(student.studentId));
+    const completedStudents = eligibleStudents.filter(
       (student) => studentTaskMaps.get(student.studentId)?.[taskKey] ?? false,
     );
     const completedIds = new Set(
@@ -152,8 +179,8 @@ export async function getDisplayData(options?: {
     );
     return {
       completed: completedStudents.length,
-      total: activeStudents.length,
-      missingNames: activeStudents
+      total: eligibleStudents.length,
+      missingNames: eligibleStudents
         .filter((student) => !completedIds.has(student.studentId))
         .map((student) => student.name),
     };
@@ -177,6 +204,8 @@ export async function getDisplayData(options?: {
     const hwRow = homework.students.find(
       (s) => s.studentId === student.studentId,
     );
+    const termChinese = termChinesePassport.students.find((row) => row.studentId === student.studentId)?.completed ?? false;
+    const termEnglish = termEnglishPassport.students.find((row) => row.studentId === student.studentId)?.completed ?? false;
     return {
       studentId: student.studentId,
       name: student.name,
@@ -187,6 +216,8 @@ export async function getDisplayData(options?: {
       noonCleaning: tasks.noon_cleaning,
       chinesePassport: chineseStatus,
       englishPassport: englishStatus,
+      termChinesePassportCompleted: termChinese,
+      termEnglishPassportCompleted: termEnglish,
       homeworkAllDone: hwRow?.allDone ?? homework.items.length === 0,
       homeworkMissing: hwRow?.missingTitles ?? [],
       gamification: gameProfiles.get(student.studentId)!,
@@ -319,26 +350,22 @@ export async function getDisplayData(options?: {
       })),
     },
     personal: personalByStudent,
+    shop: {
+      open: settings.shopOpen,
+      items: shopItems.map((item) => ({ id: item.id, name: item.name, icon: item.icon, price: item.price, stock: item.stock })),
+    },
     displaySettings: {
       allowStudentHomeworkToggle: settings.allowDisplayHomeworkToggle,
       allowStudentPassportToggle: settings.allowDisplayPassportToggle,
       allowStudentRoutineToggle: settings.allowDisplayRoutineToggle,
-      allowStudentReadingToggle: settings.allowDisplayReadingToggle,
+      // 閱讀／讀報依產品規格只由老師完成。
+      allowStudentReadingToggle: false,
       carouselEnabled: settings.displayCarouselEnabled,
       refreshSeconds: Math.max(5, settings.displayRefreshSeconds || 20),
-      hasToken: Boolean(settings.displayToken.trim()),
+      hasToken: settings.hasDisplayToken,
     },
     students: activeStudents,
   };
-}
-
-export async function assertDisplayToken(token: string | null | undefined) {
-  const settings = await getClassSettings();
-  const expected = settings.displayToken.trim();
-  if (!expected) return;
-  if ((token ?? "").trim() !== expected) {
-    throw new Error("大屏存取碼錯誤");
-  }
 }
 
 export async function assertDisplayHomeworkToggleEnabled() {

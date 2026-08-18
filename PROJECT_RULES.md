@@ -74,11 +74,11 @@ Backlog（打掃、AI、多班級、Auth 等）未經 PRD 更新與使用者確�
 
 ---
 
-## Auth（MVP）
+## Auth（MVP 安全強化）
 
-* **不實作登入**。
-* 不擅自加入 Supabase Auth／OAuth／多使用者權限。
-* 需要時先改 PRD／TDD。
+* 單一教師使用環境變數密碼與安全 session cookie 登入。
+* 大屏使用獨立、受限的短效 session；不得持有教師權限。
+* 不加入 Supabase Auth／OAuth／多使用者／多班級權限；需要時先改 PRD／TDD。
 
 ---
 
@@ -161,7 +161,7 @@ chore: …
 
 未經 PRD／TDD 更新與確認，不要自行加入：
 
-* Login／Auth／多教師／多班級
+* Supabase Auth／OAuth／多教師／多班級
 * localStorage 當護照／作業／今日工作正式資料
 * 複製國語／英語兩套護照頁
 * Dashboard Widget 內自行計算完成率

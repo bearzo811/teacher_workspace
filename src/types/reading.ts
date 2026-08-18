@@ -3,7 +3,7 @@ import type { PassportStatus } from "@/types/passport";
 /** 讀報／閱讀心得 */
 export type ReadingType = "newspaper" | "reflection";
 
-/** first=上學期(9–12)｜second=下學期(3–6)；1,2,7,8 不計 */
+/** first=上學期(9–1)｜second=下學期(2–6)；7、8 月不計 */
 export type ReadingSemester = "first" | "second";
 
 export const READING_TYPE_LABEL: Record<ReadingType, string> = {
@@ -17,8 +17,8 @@ export const READING_SEMESTER_LABEL: Record<ReadingSemester, string> = {
 };
 
 export const READING_SEMESTER_MONTHS: Record<ReadingSemester, number[]> = {
-  first: [9, 10, 11, 12],
-  second: [3, 4, 5, 6],
+  first: [9, 10, 11, 12, 1],
+  second: [2, 3, 4, 5, 6],
 };
 
 export function isReadingType(value: unknown): value is ReadingType {
@@ -38,12 +38,12 @@ export function isReadingMonth(
 
 /**
  * 依今天推下一個／當前學期。
- * 7–8 月 → 上學期；1–2 月 → 下學期；其餘落在進行中的學期。
+ * 7–8 月 → 上學期；其餘落在進行中的學期。
  */
 export function suggestReadingSemester(
   month = new Date().getMonth() + 1,
 ): ReadingSemester {
-  if (month >= 7 && month <= 12) return "first";
+  if (month === 1 || month >= 7) return "first";
   return "second";
 }
 

@@ -23,6 +23,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       name?: string;
+      subjectId?: string | null;
       sortOrder?: number;
     };
     if (typeof body.name !== "string") {
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
     }
     const data = await createHomeworkBook({
       name: body.name,
+      subjectId: body.subjectId,
       sortOrder: body.sortOrder,
     });
     return NextResponse.json({ data }, { status: 201 });
@@ -46,6 +48,7 @@ export async function PATCH(request: Request) {
     const body = (await request.json()) as {
       id?: string;
       name?: string;
+      subjectId?: string | null;
       sortOrder?: number;
       isActive?: boolean;
     };
@@ -55,6 +58,7 @@ export async function PATCH(request: Request) {
     const data = await updateHomeworkBook({
       id: body.id,
       name: body.name,
+      subjectId: body.subjectId,
       sortOrder: body.sortOrder,
       isActive: body.isActive,
     });

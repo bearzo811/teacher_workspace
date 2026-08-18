@@ -1,23 +1,13 @@
-# Architecture docs — Teacher Workspace
+# 架構文件 — Teacher Workspace
 
-本目錄依 **Architecture Review Framework v1.0**（跨專案 skill：`architecture-review-framework`）。
+目前完整審核：2026-08-18。
 
-| File | Phase | Owner |
-|------|-------|--------|
-| [Architecture_Inventory.md](./Architecture_Inventory.md) | 2 Inventory | Cursor |
-| [Tech_Lead_Self_Review.md](./Tech_Lead_Self_Review.md) | 3 Self Review | Cursor |
-| [Architecture_Proposal.md](./Architecture_Proposal.md) | 4 Proposal | Cursor |
-| [External_Review.md](./External_Review.md) | 5 External | 你 |
-| [Release_Gate.md](./Release_Gate.md) | Gate | 雙方 |
+| 檔案 | 階段 | 狀態 |
+| --- | --- | --- |
+| `Architecture_Inventory.md` | 事實盤點 | 已更新 |
+| `Tech_Lead_Self_Review.md` | L6 技術主管自評 | B- |
+| `Architecture_Proposal.md` | 排序後的改善提案 | 等待擁有者批准 |
+| `External_Review.md` | 擁有者／外部審查 | 保留舊批准紀錄；請在下方填寫本輪 P1–P9 決定 |
+| `Release_Gate.md` | 發版決策 | 公開網路使用不通過 |
 
-## 目前狀態（2026-07-30）
-
-1. Phase 2–4 已產出。  
-2. **等待你填 `External_Review.md`（Grade + 批准 Proposal IDs）。**  
-3. 未批准前 **不進行程式重構**。  
-4. Release Gate 預設 **FAIL**（P1/P2/P3/P8 仍 OPEN）；自用可明示 waiver。
-
-## 下一步口令
-
-- 填完 External Review 後：`批准 Proposal P1 P3 P8，開始 Refactor`（IDs 以你勾的為準）  
-- 或：`豁免 P1 P2，Release Gate PASS WITH WAIVER`
+本輪未進行任何原始碼重構。請明確批准提案 ID（例如：`批准 P1 P2 P3 P4`）後，才會開始實作。

@@ -55,6 +55,7 @@ export async function PATCH(request: Request) {
       displayToken?: string;
       displayRefreshSeconds?: number;
       displayContactBookDate?: string;
+      shopOpen?: boolean;
       gamification?: GamificationRulesUpdate;
     };
 

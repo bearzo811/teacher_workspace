@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
 import {
   getRoutineDayView,
+  setDailyAbsence,
   upsertDailyStudentTask,
 } from "@/services/routineService";
-import { getClassSettings } from "@/services/classSettingsService";
+import { isDisplayKeyRequest, isTeacherRequest } from "@/lib/access";
 import { isDailyStudentTaskKey } from "@/types/today";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    if (!(await isTeacherRequest())) {
+      return NextResponse.json({ error: "未授權" }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date") ?? undefined;
     const data = await getRoutineDayView(date);
@@ -29,8 +33,14 @@ export async function PATCH(request: Request) {
       completed?: boolean;
       taskDate?: string;
       displayMode?: boolean;
+      absence?: boolean;
     };
 
+    if (typeof body.absence === "boolean" && body.studentId && body.taskDate) {
+      if (!(await isTeacherRequest())) return NextResponse.json({ error: "未授權" }, { status: 401 });
+      await setDailyAbsence({ studentId: body.studentId, taskDate: body.taskDate, absent: body.absence });
+      return NextResponse.json({ data: { ok: true } });
+    }
     if (
       !body.studentId ||
       !isDailyStudentTaskKey(body.taskKey) ||
@@ -42,19 +52,11 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const isDisplay =
-      body.displayMode === true ||
-      request.headers.get("X-Display-Mode") === "1";
-    if (isDisplay) {
-      const settings = await getClassSettings();
-      if (!settings.allowDisplayRoutineToggle) {
-        return NextResponse.json(
-          { error: "老師尚未開放大屏每日任務／已抄勾選" },
-          { status: 400 },
-        );
-      }
+    const teacher = await isTeacherRequest();
+    const isDisplay = !teacher && (await isDisplayKeyRequest(request));
+    if (!teacher && !isDisplay) {
+      return NextResponse.json({ error: "未授權" }, { status: 401 });
     }
-
     const data = await upsertDailyStudentTask({
       studentId: body.studentId,
       taskKey: body.taskKey,

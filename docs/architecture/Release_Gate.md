@@ -1,133 +1,29 @@
-# Release Gate — Student Gamification MVP
+# 發版關卡 — Teacher Workspace
 
-Date: 2026-08-09
+日期：2026-08-18
+範圍：本次儲存庫架構審核（非正式環境部署認證）。
 
-- [x] Owner approved proposals G1–G6.
-- [x] TypeScript production build passes.
-- [x] ESLint passes.
-- [x] Gamification pure tests pass (4/4).
-- [x] Drizzle migration journal check passes.
-- [x] No database password or connection string appears in tracked source.
-- [x] Owner approved the additive migration after backup/risk confirmation.
-- [x] Migration `0013_student_gamification` applied.
-- [x] Production `CRON_SECRET` configured; unauthenticated cron request returns 401.
-- [x] Settlement service smoke test returns zero historical backfill changes.
-- [x] Temporary-student integration test proves duplicate completion is idempotent and cancellation reverses XP.
-- [x] Student detail, Settings and display API/UI smoke tests pass on migrated DB.
-- [x] Production deployment verified at `teacher-workspace-five.vercel.app`.
+- [x] 本機 production build 通過。
+- [x] ESLint 通過。
+- [x] 既有養成系統測試通過（4/4）。
+- [x] Git 已忽略密鑰；本輪未發現被追蹤的連線字串。
+- [ ] 教師頁面與教師 API 需要已驗證的授權。
+- [ ] 大屏憑證不得由未驗證 API 回傳，且大屏寫入需具可驗證、受限的能力憑證。
+- [ ] 聯絡簿與紀錄／獎勵聚合寫入具 rollback／整合測試。
+- [ ] runtime 驗證與穩定、安全的錯誤碼涵蓋 API 輸入。
+- [ ] CI 執行 lint、測試與 production build。
+- [ ] 核心教師／大屏 UX 流程有鍵盤、觸控與瀏覽器 smoke coverage。
+- [ ] 已針對正式環境連線角色驗證 DB RLS／角色設定（不在儲存庫中）。
 
-**Gate: PASS**
+## 尚未完成的 `立即` 項目
 
-# Lite Gate — Passport / reading sidebar
+- P1 — 教師驗證與 API 授權邊界
+- P2 — 獨立且不外洩的大屏能力憑證
+- P3 — 聚合命令的交易原子性
+- P4 — 統一 API schema／錯誤與請求限制
 
-Date: 2026-08-09
+## 結論
 
-- [x]「護照與閱讀」remains one bottom navigation entry.
-- [x] Internal sidebar switches between full-size passport and reading views.
-- [x] Sidebar controls are bottom-aligned beside the bottom navigation.
-- [x] Full-class and seat-selected modes both preserve their original layouts and controls.
-- [x] ESLint, production build, both sidebar views, and selected-seat browser smoke pass.
-- [x] Production deployment and browser smoke pass.
+**不通過公開網路使用。**
 
-**Gate: PASS**
-
----
-
-# Lite Gate — Combined display progress page
-
-Date: 2026-08-09
-
-- [x] Passport and reading overview matrices render on one display page.
-- [x] Seat-selected passport and reading controls remain available on the same page.
-- [x] Display label changed from「學生養成」to「個人點數」.
-- [x] Navigation reduced from seven to six panels.
-- [x] ESLint, production build, overview browser smoke, and selected-seat browser smoke pass.
-- [x] Production deployment and browser smoke pass.
-
-**Gate: PASS**
-
----
-
-# Lite Gate — Student detail / Gamification overview
-
-Date: 2026-08-09
-
-- [x] Student detail passport and homework reads are consolidated.
-- [x] Gamification detail reads execute in one round.
-- [x] Serverless DB pool default is one connection per instance.
-- [x] Display has a separate seat-ordered page for all students' Level, XP, and coins.
-- [x] New display page reuses the existing batch payload; no N+1 query added.
-- [x] ESLint and production build pass.
-- [x] Local DB smoke: student detail completes in 1.46s including script startup.
-- [x] Browser smoke: all nine student cards and the seven-page navigation render correctly.
-- [x] Production deployment and browser smoke pass.
-- [x] Production student detail API: 0.49–0.70s (previously timed out beyond 20s).
-- [x] Production display API: 0.66–1.83s including cold request.
-
-**Gate: PASS**
-
----
-
-# Historical Gate — Display DB Performance
-
-Date: 2026-08-09
-
-- [x] Production build passes.
-- [x] Production deployment ready and aliased to `teacher-workspace-five.vercel.app`.
-- [x] `/api/display` returns HTTP 200.
-- [x] `/api/settings` returns HTTP 200.
-- [x] 首頁作業進度使用所選聯絡簿的繳交日，不再固定使用系統今天。
-- [x] Display API measured at 0.29–0.84s after deployment (previously ~9.6s).
-- [x] Settings API measured at 0.16–0.93s after deployment.
-- [x] At that checkpoint, no schema migration or destructive data operation.
-- [x] No open immediate-release blocker.
-
-**Gate: PASS**
-
-# Release Gate — Teacher Workspace
-
-**Version aspirational:** post-display MVP  
-**Date:** 2026-07-30  
-**Framework:** Architecture Review v1.0
-
----
-
-## Checklist
-
-- [ ] **功能完整性**：符合 PRD/TDD（含聯絡簿雙日期、教室大屏三面板、座號自助開關）
-- [ ] **架構健康度**：未在未批准下新增 God Component／重複邏輯；Inventory 已更新
-- [ ] **資料一致性**：migration `0003` 已上目標 DB；schema／API／docs 一致
-- [ ] **UI/UX**：老師端主流程與 `/display` 可操作；無明顯退步
-- [ ] **安全性**：符合**當前**威脅模型（自用）；若已公網 → 見 Proposal P1/P2
-- [ ] **效能**：大屏輪詢可接受；無明顯卡頓
-- [ ] **文件同步**：README／PRD／DATABASE／`docs/architecture/*` 已對齊
-
----
-
-## Open「立即」items（from Proposal）
-
-| ID  | Item                 | Status |
-| --- | -------------------- | ------ |
-| P1  | 部署暴露面防護       | OPEN   |
-| P2  | Supabase RLS         | OPEN   |
-| P3  | 拆 DisplayPageClient | OPEN   |
-| P8  | seat_number unique   | OPEN   |
-
----
-
-## Decision
-
-**FAIL（預設）** — 仍有未關閉的「立即」項。
-
-可選：
-
-- `PASS WITH WAIVER`：僅自用、URL 不外流，明確豁免 P1/P2，並接受風險。
-- External Review 批准並完成重構後改 `PASS`。
-
-**Waiver reason（若有）：**
-
-```text
-
-```
-
-**Signed off by:**
+若是私有、受網路限制的單一教師部署，擁有者可明確接受 P1／P2 風險後給予 **附帶豁免通過**。在日常資料輸入量提高前，仍建議完成 P3／P4。

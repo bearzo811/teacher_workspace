@@ -13,9 +13,13 @@ import { formatHomeworkTitle } from "@/types/homework";
 type HomeworkBook = {
   id: string;
   name: string;
+  subjectId: string | null;
+  subjectName: string | null;
   sortOrder: number;
   isActive: boolean;
 };
+
+type HomeworkSubject = { id: string; name: string };
 
 type AssignmentDraft = {
   bookId: string;
@@ -39,11 +43,13 @@ export function ContactBookPageClient() {
   const [assignments, setAssignments] = useState<AssignmentDraft[]>([]);
   const [notes, setNotes] = useState<string[]>([]);
   const [books, setBooks] = useState<HomeworkBook[]>([]);
+  const [subjects, setSubjects] = useState<HomeworkSubject[]>([]);
   const [dueDate, setDueDate] = useState(() => nextSchoolDay(todayDateString()));
   const [selectedBookId, setSelectedBookId] = useState<string>("");
   const [pageLabel, setPageLabel] = useState("");
   const [customNote, setCustomNote] = useState("");
   const [newBookName, setNewBookName] = useState("");
+  const [newBookSubjectId, setNewBookSubjectId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,14 +74,23 @@ export function ContactBookPageClient() {
   }, []);
 
   const loadBooks = useCallback(async () => {
-    const response = await fetch("/api/homework-books?activeOnly=1");
+    const [response, subjectResponse] = await Promise.all([
+      fetch("/api/homework-books?activeOnly=1"),
+      fetch("/api/homework-subjects?activeOnly=1"),
+    ]);
     const json = (await response.json()) as {
       data?: HomeworkBook[];
       error?: string;
     };
+    const subjectJson = (await subjectResponse.json()) as {
+      data?: HomeworkSubject[];
+      error?: string;
+    };
     if (!response.ok) throw new Error(json.error ?? "讀取簿本失敗");
+    if (!subjectResponse.ok) throw new Error(subjectJson.error ?? "讀取科目失敗");
     const list = json.data ?? [];
     setBooks(list);
+    setSubjects(subjectJson.data ?? []);
     setSelectedBookId((prev) => prev || list[0]?.id || "");
   }, []);
 
@@ -174,7 +189,7 @@ export function ContactBookPageClient() {
       const response = await fetch("/api/homework-books", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, subjectId: newBookSubjectId || null }),
       });
       const json = (await response.json()) as {
         data?: HomeworkBook;
@@ -182,6 +197,7 @@ export function ContactBookPageClient() {
       };
       if (!response.ok) throw new Error(json.error ?? "新增簿本失敗");
       setNewBookName("");
+      setNewBookSubjectId("");
       await loadBooks();
       if (json.data?.id) setSelectedBookId(json.data.id);
       setShowCreateBook(false);
@@ -312,7 +328,7 @@ export function ContactBookPageClient() {
                     : "rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
                 }
               >
-                {book.name}
+                {book.subjectName ? `${book.subjectName}／${book.name}` : book.name}
               </button>
             ))}
             <button
@@ -351,7 +367,17 @@ export function ContactBookPageClient() {
           </div>
 
           {showCreateBook ? (
-            <div className="mt-3 flex gap-2 rounded-lg border border-blue-100 bg-blue-50/50 p-3">
+            <div className="mt-3 flex flex-wrap gap-2 rounded-lg border border-blue-100 bg-blue-50/50 p-3">
+              <select
+                value={newBookSubjectId}
+                onChange={(event) => setNewBookSubjectId(event.target.value)}
+                className="h-10 rounded-lg border border-gray-200 bg-white px-2 text-sm"
+              >
+                <option value="">未分類科目</option>
+                {subjects.map((subject) => (
+                  <option key={subject.id} value={subject.id}>{subject.name}</option>
+                ))}
+              </select>
               <input
                 type="text"
                 value={newBookName}

@@ -1,12 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import {
-  formatDateInput,
   formatDisplayDate,
-  parseDateInput,
   todayDateString,
 } from "@/lib/dates";
 import { DUTY_SLOT_KEYS, type DutySlotKey } from "@/lib/dutyRoster";
@@ -33,6 +30,7 @@ type DutyRangeView = {
   from: string;
   to: string;
   termStart: string;
+  termName: string | null;
   studentCount: number;
   expectedStudentCount: number;
   warning: string | null;
@@ -40,20 +38,6 @@ type DutyRangeView = {
 };
 
 type CellRef = { date: string; slotKey: DutySlotKey };
-
-function addDays(dateStr: string, delta: number) {
-  const date = parseDateInput(dateStr);
-  date.setDate(date.getDate() + delta);
-  return formatDateInput(date);
-}
-
-function startOfWeekMonday(dateStr: string) {
-  const date = parseDateInput(dateStr);
-  const day = date.getDay();
-  const offset = day === 0 ? -6 : 1 - day;
-  date.setDate(date.getDate() + offset);
-  return formatDateInput(date);
-}
 
 const COLUMN_GROUPS: { title: string; slots: DutySlotKey[] }[] = [
   { title: "值日生・抬餐桶", slots: ["meal_bucket_1", "meal_bucket_2"] },
@@ -64,23 +48,20 @@ const COLUMN_GROUPS: { title: string; slots: DutySlotKey[] }[] = [
 ];
 
 export function DutyPageClient() {
-  const [anchor, setAnchor] = useState(() => startOfWeekMonday(todayDateString()));
   const [range, setRange] = useState<DutyRangeView | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<CellRef | null>(null);
 
-  const from = anchor;
-  const to = addDays(anchor, 6); // 週一～週日
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const response = await fetch(
-        `/api/duty?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+        "/api/duty?semester=active",
       );
       const json = (await response.json()) as {
         data?: DutyRangeView;
@@ -93,7 +74,7 @@ export function DutyPageClient() {
     } finally {
       setLoading(false);
     }
-  }, [from, to]);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -172,7 +153,29 @@ export function DutyPageClient() {
     }
   }
 
-  const dates = eachDateList(from, to);
+  const dates = useMemo(
+    () => range?.days.map((day) => day.date) ?? [],
+    [range?.days],
+  );
+  const months = useMemo(
+    () => [...new Set(dates.map((date) => date.slice(0, 7)))],
+    [dates],
+  );
+
+  useEffect(() => {
+    setSelectedMonth((previous) => {
+      if (previous && months.includes(previous)) return previous;
+      const currentMonth = todayDateString().slice(0, 7);
+      return months.includes(currentMonth) ? currentMonth : (months[0] ?? null);
+    });
+  }, [months]);
+
+  const displayedDates = selectedMonth
+    ? dates.filter((date) => date.startsWith(selectedMonth))
+    : [];
+  const selectedMonthLabel = selectedMonth
+    ? `${Number(selectedMonth.slice(0, 4))} 年 ${Number(selectedMonth.slice(5, 7))} 月`
+    : "";
 
   return (
     <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4">
@@ -180,40 +183,8 @@ export function DutyPageClient() {
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">值日表</h1>
           <p className="mt-1 text-sm text-gray-500">
-            上課日輪流分配・點兩格交換・六日／放假不排
+            依行事曆的上課日排完整學期・點兩格交換
           </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="secondary"
-            disabled={busy}
-            onClick={() => {
-              setAnchor(addDays(anchor, -7));
-              setSelected(null);
-            }}
-          >
-            上週
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={busy}
-            onClick={() => {
-              setAnchor(startOfWeekMonday(todayDateString()));
-              setSelected(null);
-            }}
-          >
-            本週
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={busy}
-            onClick={() => {
-              setAnchor(addDays(anchor, 7));
-              setSelected(null);
-            }}
-          >
-            下週
-          </Button>
         </div>
       </header>
 
@@ -230,14 +201,40 @@ export function DutyPageClient() {
 
       <Card className="overflow-auto !p-0">
         <div className="border-b border-gray-100 px-4 py-3">
-          <CardTitle>本週總表（一～日）</CardTitle>
+          <CardTitle>
+            {range?.termName ?? "目前學期"}{selectedMonthLabel ? `・${selectedMonthLabel}` : ""}值日表
+          </CardTitle>
           <CardDescription>
-            {formatDisplayDate(from)} ～ {formatDisplayDate(to)}
+            {range?.from && range?.to
+              ? `${formatDisplayDate(range.from)} ～ ${formatDisplayDate(range.to)}｜全學期共 ${dates.length} 個上課日`
+              : "建立啟用學期後，即會依行事曆自動排入所有上課日"}
             {selected
               ? ` ｜ 已選 ${selected.date} ${selected.slotKey}`
               : " ｜ 先點一格，再點另一格交換"}
           </CardDescription>
         </div>
+        {months.length > 0 ? (
+          <div className="flex gap-2 overflow-x-auto border-b border-gray-100 px-4 py-3">
+            {months.map((month) => (
+              <button
+                key={month}
+                type="button"
+                onClick={() => {
+                  setSelectedMonth(month);
+                  setSelected(null);
+                }}
+                className={cn(
+                  "shrink-0 rounded-lg border px-3 py-2 text-sm font-medium transition",
+                  selectedMonth === month
+                    ? "border-blue-600 bg-blue-600 text-white"
+                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50",
+                )}
+              >
+                {Number(month.slice(5, 7))} 月
+              </button>
+            ))}
+          </div>
+        ) : null}
         <table className="min-w-full border-collapse text-sm">
           <thead>
             <tr className="bg-gray-50 text-left text-xs text-gray-500">
@@ -256,7 +253,7 @@ export function DutyPageClient() {
             </tr>
           </thead>
           <tbody>
-            {dates.map((date) => {
+            {displayedDates.map((date) => {
               const day = dayMap.get(date);
               const isToday = date === today;
               return (
@@ -273,9 +270,6 @@ export function DutyPageClient() {
                     {isToday ? (
                       <span className="ml-1 text-xs text-blue-600">今天</span>
                     ) : null}
-                    {day?.isHoliday ? (
-                      <span className="ml-1 text-xs">放假</span>
-                    ) : null}
                   </td>
                   {DUTY_SLOT_KEYS.map((slotKey) => {
                     const slot = day?.slots.find((s) => s.slotKey === slotKey);
@@ -287,11 +281,8 @@ export function DutyPageClient() {
                         key={slotKey}
                         className="border-l border-gray-100 px-1 py-1 text-center"
                       >
-                        {day?.isHoliday ? (
-                          <span className="text-xs text-slate-300">—</span>
-                        ) : (
-                          <button
-                            type="button"
+                        <button
+                          type="button"
                             disabled={disabled || busy}
                             onClick={() => {
                               void handleSelect(date, slotKey);
@@ -318,8 +309,7 @@ export function DutyPageClient() {
                             )}
                           >
                             {slot?.name ?? "—"}
-                          </button>
-                        )}
+                        </button>
                       </td>
                     );
                   })}
@@ -328,22 +318,18 @@ export function DutyPageClient() {
             })}
           </tbody>
         </table>
+        {selectedMonth && displayedDates.length === 0 ? (
+          <p className="px-4 py-6 text-sm text-gray-500">這個月沒有上課日。</p>
+        ) : null}
       </Card>
+
+      {selectedMonthLabel ? (
+        <p className="text-sm text-gray-500">目前顯示：{selectedMonthLabel}（{displayedDates.length} 個上課日）</p>
+      ) : null}
 
       <p className="text-xs text-gray-400">
         提示：琥珀色格子＝手動交換過；在其上按右鍵可還原成自動輪排。
       </p>
     </div>
   );
-}
-
-function eachDateList(from: string, to: string) {
-  const out: string[] = [];
-  const cursor = parseDateInput(from);
-  const end = parseDateInput(to);
-  while (cursor <= end) {
-    out.push(formatDateInput(cursor));
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return out;
 }

@@ -15,6 +15,9 @@ export function StudentDetailClient({ studentId }: StudentDetailClientProps) {
   const [data, setData] = useState<StudentDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [adjustment, setAdjustment] = useState("");
+  const [reason, setReason] = useState("");
+  const [adjusting, setAdjusting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -39,6 +42,20 @@ export function StudentDetailClient({ studentId }: StudentDetailClientProps) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function adjustCoins() {
+    const amount = Number(adjustment);
+    if (!Number.isInteger(amount) || amount === 0 || !reason.trim()) {
+      setError("請填寫非 0 整數點數與原因"); return;
+    }
+    setAdjusting(true); setError(null);
+    try {
+      const response = await fetch("/api/points", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ studentId, amount, reason }) });
+      const json = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(json.error ?? "調整失敗");
+      setAdjustment(""); setReason(""); await load();
+    } catch (err) { setError(err instanceof Error ? err.message : "調整失敗"); } finally { setAdjusting(false); }
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
@@ -67,6 +84,16 @@ export function StudentDetailClient({ studentId }: StudentDetailClientProps) {
               {data.seatNumber}　{data.name}
             </CardTitle>
             <CardDescription>座號與姓名</CardDescription>
+          </Card>
+
+          <Card>
+            <CardTitle>手動調整點數</CardTitle>
+            <CardDescription>正數加點、負數扣點；原因會寫入不可變更的帳本。</CardDescription>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <input type="number" value={adjustment} onChange={(event) => setAdjustment(event.target.value)} placeholder="例如 +5 或 -2" className="h-10 w-36 rounded-lg border border-gray-200 px-3 text-sm" />
+              <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="調整原因（必填）" className="h-10 min-w-56 flex-1 rounded-lg border border-gray-200 px-3 text-sm" />
+              <button type="button" disabled={adjusting} onClick={() => void adjustCoins()} className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white disabled:opacity-50">{adjusting ? "處理中…" : "調整"}</button>
+            </div>
           </Card>
 
           <Card>

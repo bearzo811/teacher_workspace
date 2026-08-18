@@ -1,155 +1,71 @@
-# Architecture Proposal — Teacher Workspace
+# 架構改善提案 — Teacher Workspace
 
-## 2026-08-09 Gamification Proposal — Approved
+日期：2026-08-18
+排序規則：依（收益 − 成本）排序。在擁有者明確批准提案 ID 前，不得進行程式碼變更。
 
-The owner approved the attached `student-gamification` implementation plan.
+## 排名總覽
 
-| ID  | Item                                                    | Decision |
-| --- | ------------------------------------------------------- | -------- |
-| G1  | Effect table + immutable ledger + profile projection    | Approved |
-| G2  | Service-layer reward hooks with reversible deltas       | Approved |
-| G3  | Secured daily overdue cron in Asia/Taipei               | Approved |
-| G4  | Configurable rules in Settings                          | Approved |
-| G5  | Student detail + display personal card; no ranking/shop | Approved |
-| G6  | Start fresh; do not backfill historical records         | Approved |
+| ID | 提案 | 收益 | 成本 | 淨收益 | 標記 |
+| --- | --- | --- | ---: | ---: | --- |
+| P1 | 教師驗證與 API 授權邊界 | ★★★★★ | ★★★☆☆ | +2 | 立即 |
+| P2 | 獨立且不外洩的大屏能力憑證 | ★★★★★ | ★★☆☆☆ | +3 | 立即 |
+| P3 | 聚合命令的交易原子性 | ★★★★★ | ★★★☆☆ | +2 | 立即 |
+| P4 | 統一 API schema／錯誤與請求限制 | ★★★★☆ | ★★☆☆☆ | +2 | 立即 |
+| P5 | 拆分大屏資料與 `DisplayPageClient` | ★★★★☆ | ★★★☆☆ | +1 | 下一版 |
+| P6 | 測試金字塔與 CI 發版檢查 | ★★★★☆ | ★★★☆☆ | +1 | 下一版 |
+| P7 | 查詢／索引與輪詢的可觀測性 | ★★★☆☆ | ★★☆☆☆ | +1 | 下一版 |
+| P8 | 移除或真正採用 Zustand；共用 client resource hook | ★★☆☆☆ | ★★☆☆☆ | 0 | 可不改 |
+| P9 | 多班級租戶化 | ★★★★★ | ★★★★★ | 0 | 可不改（產品需要時再做） |
 
-### Deferred
+## 提案 P1 — 教師驗證與 API 授權邊界
 
-- Reward shop and spending transactions.
-- Class leaderboard.
-- Full teacher authentication / multi-class tenancy.
-- Extracting the now-larger Settings and Display client components.
+- 收益：★★★★★；成本：★★★☆☆；影響範圍：大；標記：`立即`
+- 做什麼：加入一套教師登入／session 機制；每個教師 API 集中使用 `requireTeacher()`，並保護教師頁面。定義最小角色模型：教師與大屏。
+- 不做什麼：本批不導入多教師／多班租戶化。
+- 驗收標準：未驗證者存取教師頁面及全部教師讀寫 API 會收到 401 或轉址；Cron 維持獨立驗證。
 
-**Date:** 2026-07-30  
-**Rule:** Sort by (收益 − 成本). Tags: `立即` | `下一版` | `可不改`  
-**Status:** Awaiting External Review approval — **no refactor until approved IDs listed below**
+## 提案 P2 — 獨立且不外洩的大屏能力憑證
 
----
+- 收益：★★★★★；成本：★★☆☆☆；影響範圍：中；標記：`立即`
+- 做什麼：停止從 settings 回傳原始 `displayToken`。儲存雜湊值並支援輪替；有效的大屏密碼可換取具範圍／效期的大屏 session 或簽章能力憑證。讀取與寫入都驗證該憑證。
+- 不做什麼：不在 query string 放長效密鑰，也不再信任 `X-Display-Mode`。
+- 驗收標準：settings 回應不含任何密鑰／token；偽造 header 無法寫入；無效或過期憑證會被拒絕。
 
-## Ranking summary
+## 提案 P3 — 聚合命令的交易原子性
 
-| ID  | Title                                                     | 收益  | 成本  | Net | Tag        |
-| --- | --------------------------------------------------------- | ----- | ----- | --- | ---------- |
-| P1  | 部署暴露面防護（Vercel Protection 或簡易 Auth）           | ★★★★★ | ★★☆☆☆ | +3  | 立即       |
-| P2  | 確認／啟用 Supabase RLS（deny-by-default + service role） | ★★★★★ | ★★★☆☆ | +2  | 立即       |
-| P3  | 拆 `DisplayPageClient`（hooks + panels）                  | ★★★★☆ | ★★☆☆☆ | +2  | 立即       |
-| P4  | 接線或刪除 Zustand；抽 `useApiResource`                   | ★★★★☆ | ★★★☆☆ | +1  | 下一版     |
-| P5  | 拆 `SettingsPageClient`＋共用 Form Field                  | ★★★☆☆ | ★★☆☆☆ | +1  | 下一版     |
-| P6  | `passportService` 分檔（query / commands / dashboard）    | ★★★☆☆ | ★★☆☆☆ | +1  | 下一版     |
-| P7  | API 錯誤碼結構化（取代 message.includes）                 | ★★★☆☆ | ★★☆☆☆ | +1  | 下一版     |
-| P8  | `seat_number` DB unique（per class later）                | ★★★☆☆ | ★☆☆☆☆ | +2  | 立即（小） |
-| P9  | React Query／SWR                                          | ★★★★★ | ★★★★☆ | +1  | 下一版     |
-| P10 | 假日／校曆表                                              | ★★★☆☆ | ★★★☆☆ | 0   | 下一版     |
-| P11 | Supabase Realtime 取代 polling                            | ★★★☆☆ | ★★★★☆ | −1  | 可不改     |
-| P12 | 完整 shadcn UI kit                                        | ★★☆☆☆ | ★★★☆☆ | −1  | 可不改     |
+- 收益：★★★★★；成本：★★★☆☆；影響範圍：中；標記：`立即`
+- 做什麼：以明確 DB transaction 包覆聯絡簿對帳（備註、作業刪除／新增、相關紀錄／效果）與紀錄／獎勵對帳。讓養成效果寫入可接收 transaction context。
+- 不做什麼：不重新設計既有的養成帳本；保留目前冪等策略。
+- 驗收標準：在每個寫入步驟注入失敗時，所有相關資料列都會 rollback；重複請求仍保持冪等。
 
----
+## 提案 P4 — 統一 API schema／錯誤與請求限制
 
-## Proposal 1 — 部署暴露面防護
+- 收益：★★★★☆；成本：★★☆☆☆；影響範圍：大；標記：`立即`
+- 做什麼：以單一 runtime schema 層處理 params、query、body、UUID／日期範圍與字串長度。定義穩定的錯誤碼與安全的公開錯誤轉譯；加入符合部署環境的 payload size／rate 限制。
+- 不做什麼：不在同一改動重寫所有 UI 狀態管理。
+- 驗收標準：畸形 JSON／輸入產生一致的 4xx 錯誤碼；內部／資料庫錯誤原因不會回傳客戶端；路由測試涵蓋授權與輸入驗證矩陣。
 
-- **收益:** ★★★★★
-- **成本:** ★★☆☆☆
-- **影響:** 小（設定）／中（若上 Auth）
-- **Tag:** `立即`
-- **做什麼:** Vercel Deployment Protection（密碼）或極簡老師密碼 gate；文件寫明威脅模型＝「URL 不公開」。
-- **不做什麼:** 先不上完整多使用者 Auth。
-- **驗收:** 未授權無法開 `/` 與 `/api/*`（或至少 Production）。
+## 提案 P5 — 拆分大屏資料與 client
 
-## Proposal 2 — Supabase RLS
+- 收益：★★★★☆；成本：★★★☆☆；影響範圍：中；標記：`下一版`
+- 做什麼：抽出大屏 loader、寫入與座位狀態；將六個面板拆為專用元件；按需取得面板資料，或提供帶版本的輕量端點。頁面隱藏時暫停／降低輪詢，並取消過期請求。
+- 不做什麼：尚未量測需求前，不導入 realtime 基礎設施。
+- 驗收標準：大屏根 client 小於 250 行；核心面板契約具測試；預設大屏刷新不再重抓未使用的歷史矩陣資料。
 
-- **收益:** ★★★★★
-- **成本:** ★★★☆☆
-- **影響:** 中（DB policies；App 已用 connection string）
-- **Tag:** `立即`
-- **做什麼:** 盤點目前用的 DB role；anon 全拒；僅 server connection 可寫。寫入 `DATABASE.md`。
-- **驗收:** 用 anon key 無法讀寫業務表（若專案有暴露 anon）。
+## 提案 P6 — 測試金字塔與 CI 發版檢查
 
-## Proposal 3 — 拆 DisplayPageClient
+- 收益：★★★★☆；成本：★★★☆☆；影響範圍：中；標記：`下一版`
+- 做什麼：為 P1–P4 加入 service／route 整合測試、migration journal 檢查與 Playwright 核心流程（教師登入、聯絡簿儲存、大屏能力憑證）。在 CI 跑 lint、測試與 build。
+- 不做什麼：不以追求全面覆蓋率為目標。
+- 驗收標準：CI 在 lint／型別／build／授權／交易回歸時阻擋合併；核心教室流程有瀏覽器 smoke test。
 
-- **收益:** ★★★★☆
-- **成本:** ★★☆☆☆
-- **影響:** 小–中（僅 display）
-- **Tag:** `立即`
-- **做什麼:** `useDisplayData`（poll）、`useSeatLock`、mutation helpers；Page 只組裝。
-- **驗收:** `DisplayPageClient` &lt; ~150 行；行為不變。
+## 提案 P7 — 查詢／索引與輪詢的可觀測性
 
-## Proposal 4 — Zustand 決策 + useApiResource
+- 收益：★★★☆☆；成本：★★☆☆☆；影響範圍：小至中；標記：`下一版`
+- 做什麼：量測大屏端點 p50／p95 與查詢數。僅加入有量測依據的索引（可能是 calendar date 與 homework date／contact-book-date 路徑），保留 `EXPLAIN` 證據，並設定大屏刷新預算。
+- 不做什麼：不盲目加入快取或 Realtime。
+- 驗收標準：儀表板記錄 p50／p95 與查詢數；遷移附上索引量測理由；教室規模下大屏符合約定的延遲預算。
 
-- **收益:** ★★★★☆
-- **成本:** ★★★☆☆
-- **影響:** 中（多 PageClient）
-- **Tag:** `下一版`
-- **做什麼:** 刪未用 store **或** 真正接搜尋／選週／選日；新增共用 fetch hook。
-- **驗收:** 無死 store；至少 3 個 PageClient 共用 hook。
+## 建議批准批次
 
-## Proposal 5 — 拆 SettingsPageClient
-
-- **收益:** ★★★☆☆
-- **成本:** ★★☆☆☆
-- **Tag:** `下一版`
-- **做什麼:** Basics / Passport weeks / Display settings 三塊元件。
-- **驗收:** 主檔 &lt; 200 行。
-
-## Proposal 6 — 拆 passportService
-
-- **收益:** ★★★☆☆
-- **成本:** ★★☆☆☆
-- **Tag:** `下一版`
-- **做什麼:** `passportQueries` / `passportCommands` / types 分檔。
-- **驗收:** 單檔 &lt; 200 行；API 行為不變。
-
-## Proposal 7 — API 錯誤碼
-
-- **收益:** ★★★☆☆
-- **成本:** ★★☆☆☆
-- **Tag:** `下一版`
-- **做什麼:** `{ error: { code, message } }`；route 用 code map status。
-- **驗收:** 不再用 `message.includes("座號")` 決定 400。
-
-## Proposal 8 — seat_number unique
-
-- **收益:** ★★★☆☆
-- **成本:** ★☆☆☆☆
-- **Tag:** `立即`
-- **做什麼:** unique index on `seat_number`（單班 MVP）；migration。
-- **驗收:** 重複座號 insert 失敗且 UI 有訊息。
-
-## Proposal 9 — React Query
-
-- **收益:** ★★★★★
-- **成本:** ★★★★☆
-- **Tag:** `下一版`
-- **做什麼:** 統一 cache／retry；display 可縮短與 mutation invalidate。
-- **驗收:** Dashboard/Homework/Passport 用 query hooks。
-
-## Proposal 10 — 校曆／假日
-
-- **收益:** ★★★☆☆
-- **成本:** ★★★☆☆
-- **Tag:** `下一版`
-- **做什麼:** `non_school_days` 或 settings JSON；`nextSchoolDay` 讀取。
-- **驗收:** 連假不會把繳交日算在放假日。
-
-## Proposal 11 — Realtime
-
-- **Tag:** `可不改`（polling 對 9 人班夠用；等痛再上）
-
-## Proposal 12 — Full UI kit
-
-- **Tag:** `可不改`（Button/Card 夠 MVP）
-
----
-
-## Recommended batch（請 External Review 勾選）
-
-建議第一刀（若你同意「立即」）：
-
-- [ ] **P1** 部署防護
-- [ ] **P2** RLS 盤點／啟用
-- [ ] **P8** seat unique
-- [ ] **P3** 拆 DisplayPageClient
-
-下一版預設：P4 P5 P6 P7（P9 看你是否想一次換 data layer）
-
-**Cursor 重構啟動口令範例：**  
-`批准 Proposal P1 P3 P8，開始 Refactor`
+先批准 **P1 + P2 + P3 + P4**，作為安全性與資料一致性版本；再執行 **P5 + P6**，作為可維護性版本。P7 應在量測後進行；P8／P9 等出現明確產品需求再處理。

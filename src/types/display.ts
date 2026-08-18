@@ -21,6 +21,8 @@ export type DisplayPersonalRow = {
   noonCleaning: boolean;
   chinesePassport: PassportStatus;
   englishPassport: PassportStatus;
+  termChinesePassportCompleted: boolean;
+  termEnglishPassportCompleted: boolean;
   homeworkAllDone: boolean;
   homeworkMissing: string[];
   gamification: GamificationView;
@@ -110,6 +112,10 @@ export type DisplayData = {
     leaders: { name: string; seatNumber: number }[];
   };
   personal: DisplayPersonalRow[];
+  shop: {
+    open: boolean;
+    items: { id: string; name: string; icon: string; price: number; stock: number }[];
+  };
   displaySettings: {
     allowStudentHomeworkToggle: boolean;
     allowStudentPassportToggle: boolean;

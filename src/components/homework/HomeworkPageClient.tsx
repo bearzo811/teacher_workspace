@@ -24,7 +24,7 @@ type HomeworkDayView = {
     studentId: string;
     name: string;
     seatNumber: number;
-    cells: { homeworkId: string; title: string; completed: boolean }[];
+    cells: { homeworkId: string; title: string; completed: boolean; status: "unsubmitted" | "pending_confirmation" | "correction_required" | "completed" }[];
     allDone: boolean;
     missingTitles: string[];
   }[];
@@ -119,7 +119,15 @@ export function HomeworkPageClient() {
       const students = prev.students.map((student) => {
         if (student.studentId !== studentId) return student;
         const cells = student.cells.map((cell) =>
-          cell.homeworkId === homeworkId ? { ...cell, completed } : cell,
+          cell.homeworkId === homeworkId
+            ? {
+                ...cell,
+                completed,
+                status: completed
+                  ? ("completed" as const)
+                  : ("unsubmitted" as const),
+              }
+            : cell,
         );
         const missingTitles = cells
           .filter((cell) => !cell.completed)
@@ -137,6 +145,59 @@ export function HomeworkPageClient() {
         completedStudentCount: students.filter((s) => s.allDone).length,
       };
     });
+  }
+
+  async function handleSetStatus(
+    studentId: string,
+    homeworkId: string,
+    status: "unsubmitted" | "pending_confirmation" | "correction_required" | "completed",
+  ) {
+    const key = `${studentId}:${homeworkId}`;
+    setBusyKey(key);
+    setError(null);
+    try {
+      const response = await fetch("/api/homework-record", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId, homeworkId, status }),
+      });
+      const json = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(json.error ?? "更新失敗");
+      await load(date);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "更新失敗");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function handleBatchSetStatus(
+    studentIds: string[],
+    status: "correction_required" | "completed",
+  ) {
+    if (!view || view.items.length === 0) return;
+    setError(null);
+    try {
+      const responses = await Promise.all(
+        studentIds.flatMap((studentId) =>
+          view.items.map(async (item) => {
+            const response = await fetch("/api/homework-record", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ studentId, homeworkId: item.id, status }),
+            });
+            if (!response.ok) {
+              const json = (await response.json()) as { error?: string };
+              throw new Error(json.error ?? "批次更新失敗");
+            }
+          }),
+        ),
+      );
+      await Promise.all(responses);
+      await load(date);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "批次更新失敗");
+    }
   }
 
   function applyBookMatrixToggle(
@@ -272,9 +333,6 @@ export function HomeworkPageClient() {
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">作業管理</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            作業＝簿本＋頁數；聯絡簿建立，這裡打勾。簿本進度以「份數」計算。
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
@@ -455,6 +513,12 @@ export function HomeworkPageClient() {
               busyKey={busyKey}
               onToggle={(studentId, homeworkId, nextCompleted) => {
                 void handleToggle(studentId, homeworkId, nextCompleted);
+              }}
+              onSetStatus={(studentId, homeworkId, status) => {
+                void handleSetStatus(studentId, homeworkId, status);
+              }}
+              onBatchSetStatus={(studentIds, status) => {
+                void handleBatchSetStatus(studentIds, status);
               }}
               onDeleteItem={(homeworkId) => {
                 void handleDeleteItem(homeworkId);

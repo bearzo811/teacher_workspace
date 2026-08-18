@@ -6,7 +6,6 @@ import {
   homeworkBooks,
   homeworkRecords,
 } from "@/db/schema";
-import { nextSchoolDay } from "@/lib/dates";
 import { getClassSettings } from "@/services/classSettingsService";
 import { clearGamificationEffectsForSource } from "@/services/gamificationService";
 import { normalizeAssignments } from "@/services/homeworkService";
@@ -15,6 +14,10 @@ import {
   formatHomeworkTitle,
   type HomeworkAssignmentInput,
 } from "@/types/homework";
+import {
+  isActiveTermSchoolDay,
+  nextActiveTermSchoolDay,
+} from "@/services/termService";
 
 export type ContactBookAssignment = {
   bookId: string;
@@ -81,7 +84,7 @@ export function serializeNotes(notes: string[]): string {
 
 export async function getContactBook(date: string): Promise<ContactBookView> {
   const day = normalizeDate(date);
-  const dueDate = nextSchoolDay(day);
+  const dueDate = await nextActiveTermSchoolDay(day);
   const [settings, noteRow, items] = await Promise.all([
     getClassSettings(),
     db
@@ -148,7 +151,10 @@ export async function saveContactBook(input: {
   assignments: HomeworkAssignmentInput[];
 }): Promise<ContactBookView> {
   const day = normalizeDate(input.date);
-  const dueDate = nextSchoolDay(day);
+  if (!(await isActiveTermSchoolDay(day))) {
+    throw new Error("聯絡簿只能建立在目前學期的上課日");
+  }
+  const dueDate = await nextActiveTermSchoolDay(day);
   const desired = normalizeAssignments(input.assignments);
   const notes =
     input.notes !== undefined
@@ -202,6 +208,14 @@ export async function saveContactBook(input: {
     (item) => !desiredSet.has(assignmentKey(item.bookId, item.pageLabel)),
   );
   if (toDelete.length > 0) {
+    const history = await db
+      .select({ homeworkId: homeworkRecords.homeworkId })
+      .from(homeworkRecords)
+      .where(inArray(homeworkRecords.homeworkId, toDelete.map((item) => item.id)))
+      .limit(1);
+    if (history.length > 0) {
+      throw new Error("此聯絡簿已有學生作業紀錄，請複製到新日期後再調整");
+    }
     for (const item of toDelete) {
       await clearGamificationEffectsForSource("homework", item.id);
     }
@@ -261,4 +275,14 @@ export async function saveContactBook(input: {
     })),
     items: orderedItems,
   };
+}
+
+/** 複製任一日期的內容到另一個未來上課日；不複製學生作業狀態。 */
+export async function copyContactBook(input: { fromDate: string; toDate: string }) {
+  const source = await getContactBook(input.fromDate);
+  return saveContactBook({
+    date: input.toDate,
+    notes: source.notes,
+    assignments: source.assignments.map((item) => ({ bookId: item.bookId, pageLabel: item.pageLabel })),
+  });
 }

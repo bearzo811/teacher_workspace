@@ -23,6 +23,13 @@ export function nextPassportStatus(current: PassportStatus): PassportStatus {
   return PASSPORT_STATUS_ORDER[(index + 1) % PASSPORT_STATUS_ORDER.length];
 }
 
+/** 國語／英語護照只使用未開始、已完成兩種狀態。 */
+export function nextBinaryPassportStatus(
+  current: PassportStatus,
+): "not_started" | "completed" {
+  return current === "completed" ? "not_started" : "completed";
+}
+
 export function isPassportStatus(value: unknown): value is PassportStatus {
   return (
     value === "not_started" ||

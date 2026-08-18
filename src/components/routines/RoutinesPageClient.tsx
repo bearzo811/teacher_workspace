@@ -17,6 +17,7 @@ type RoutineView = {
       name: string;
       seatNumber: number;
       completed: boolean;
+      absent: boolean;
     }[];
   }[];
 };
@@ -76,13 +77,23 @@ export function RoutinesPageClient() {
     }
   }
 
+  async function toggleAbsence(studentId: string, absent: boolean) {
+    setBusyKey(`absence:${studentId}`);
+    try {
+      const response = await fetch("/api/routines", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ studentId, taskDate: date, absence: !absent }) });
+      const json = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(json.error ?? "更新缺席失敗");
+      await load(date);
+    } catch (err) { setError(err instanceof Error ? err.message : "更新缺席失敗"); } finally { setBusyKey(null); }
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">每日任務</h1>
           <p className="mt-1 text-sm text-gray-500">
-            打掃、刷牙；也可在大屏讓學生自助勾
+            抄聯絡簿、打掃、刷牙；也可在大屏讓學生自助勾
           </p>
         </div>
         <label className="text-sm text-gray-600">
@@ -114,7 +125,7 @@ export function RoutinesPageClient() {
                 <li key={student.studentId}>
                   <button
                     type="button"
-                    disabled={busyKey === key}
+                    disabled={busyKey === key || student.absent}
                     onClick={() =>
                       void toggle(
                         student.studentId,
@@ -133,6 +144,11 @@ export function RoutinesPageClient() {
                     <span className="flex-1">{student.name}</span>
                     <span>{student.completed ? "✓" : ""}</span>
                   </button>
+                  {task.taskKey === "contact_book_copied" ? (
+                    <button type="button" disabled={busyKey === `absence:${student.studentId}`} onClick={() => void toggleAbsence(student.studentId, student.absent)} className="mt-1 w-full text-xs text-gray-500 underline">
+                      {student.absent ? "取消缺席" : "標記缺席"}
+                    </button>
+                  ) : null}
                 </li>
               );
             })}

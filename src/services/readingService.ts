@@ -5,7 +5,6 @@ import { getClassSettings } from "@/services/classSettingsService";
 import type { PassportStatus } from "@/types/passport";
 import {
   isReadingMonth,
-  isReadingSemester,
   READING_SEMESTER_MONTHS,
   suggestReadingSemester,
   type ReadingMatrixView,
@@ -29,14 +28,9 @@ export async function resolveReadingTerm(): Promise<{
   semester: ReadingSemester;
 }> {
   const settings = await getClassSettings();
-  const configured = settings.readingSchoolYear.trim().length > 0;
-  const schoolYear =
-    settings.readingSchoolYear.trim() || settings.schoolYear.trim() || "115";
-  // 未明確設定閱讀學年時，依月份自動推上下學期
-  const semester =
-    configured && isReadingSemester(settings.readingSemester)
-      ? settings.readingSemester
-      : suggestReadingSemester();
+  // 閱讀／讀報一律依目前月份判定學期，不使用手動覆寫。
+  const schoolYear = settings.schoolYear.trim() || "115";
+  const semester = suggestReadingSemester();
   return { schoolYear, semester };
 }
 
@@ -139,8 +133,8 @@ export async function upsertReadingStatus(input: {
   if (!isReadingMonth(semester, input.month)) {
     throw new Error(
       semester === "first"
-        ? "上學期月份須為 9–12 月"
-        : "下學期月份須為 3–6 月",
+        ? "上學期月份須為 9–1 月"
+        : "下學期月份須為 2–6 月",
     );
   }
 

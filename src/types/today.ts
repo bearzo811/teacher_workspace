@@ -21,6 +21,7 @@ export const DAILY_STUDENT_TASK_LABEL: Record<DailyStudentTaskKey, string> = {
 };
 
 export const ROUTINE_TASK_KEYS = [
+  "contact_book_copied",
   "morning_cleaning",
   "lunch_brushing",
   "noon_cleaning",

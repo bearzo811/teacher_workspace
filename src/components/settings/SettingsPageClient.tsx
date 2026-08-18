@@ -2,21 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { TermManagerCard } from "@/components/calendar/TermManagerCard";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 
 type SettingsForm = {
   schoolYear: string;
   grade: string;
   className: string;
-  currentWeek: string;
-  weekOneStartDate: string;
-  termEndDate: string;
   chineseStartWeek: string;
   chineseEndWeek: string;
   englishStartWeek: string;
   englishEndWeek: string;
-  readingSchoolYear: string;
-  readingSemester: "first" | "second";
   allowDisplayHomeworkToggle: boolean;
   allowDisplayPassportToggle: boolean;
   allowDisplayRoutineToggle: boolean;
@@ -38,15 +34,10 @@ const emptyForm: SettingsForm = {
   schoolYear: "",
   grade: "",
   className: "",
-  currentWeek: "",
-  weekOneStartDate: "",
-  termEndDate: "",
   chineseStartWeek: "",
   chineseEndWeek: "",
   englishStartWeek: "",
   englishEndWeek: "",
-  readingSchoolYear: "",
-  readingSemester: "first",
   allowDisplayHomeworkToggle: false,
   allowDisplayPassportToggle: false,
   allowDisplayRoutineToggle: false,
@@ -66,9 +57,6 @@ const emptyForm: SettingsForm = {
 
 export function SettingsPageClient() {
   const [form, setForm] = useState<SettingsForm>(emptyForm);
-  const [weekProgressLabel, setWeekProgressLabel] = useState<string | null>(
-    null,
-  );
   const [activeCount, setActiveCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -88,19 +76,13 @@ export function SettingsPageClient() {
           schoolYear: string;
           grade: number;
           className: string;
-          currentWeek: number;
-          weekOneStartDate: string;
-          termEndDate: string;
           chineseStartWeek: number;
           chineseEndWeek: number;
           englishStartWeek: number;
           englishEndWeek: number;
-          weekProgressLabel: string;
           allowDisplayHomeworkToggle: boolean;
           allowDisplayPassportToggle: boolean;
           allowDisplayRoutineToggle: boolean;
-          readingSchoolYear: string;
-          readingSemester: string;
           allowDisplayReadingToggle: boolean;
           displayCarouselEnabled: boolean;
           displayToken: string;
@@ -131,20 +113,14 @@ export function SettingsPageClient() {
       }
 
       const data = settingsJson.data!;
-      setWeekProgressLabel(data.weekProgressLabel);
       setForm({
         schoolYear: data.schoolYear,
         grade: String(data.grade),
         className: data.className,
-        currentWeek: String(data.currentWeek),
-        weekOneStartDate: data.weekOneStartDate ?? "",
-        termEndDate: data.termEndDate ?? "",
         chineseStartWeek: String(data.chineseStartWeek),
         chineseEndWeek: String(data.chineseEndWeek),
         englishStartWeek: String(data.englishStartWeek),
         englishEndWeek: String(data.englishEndWeek),
-        readingSchoolYear: data.readingSchoolYear ?? "",
-        readingSemester: data.readingSemester === "second" ? "second" : "first",
         allowDisplayHomeworkToggle: data.allowDisplayHomeworkToggle,
         allowDisplayPassportToggle: data.allowDisplayPassportToggle,
         allowDisplayRoutineToggle: data.allowDisplayRoutineToggle,
@@ -186,14 +162,11 @@ export function SettingsPageClient() {
     setMessage(null);
     try {
       const grade = Number(form.grade);
-      const currentWeek = Number(form.currentWeek);
       const chineseStartWeek = Number(form.chineseStartWeek);
       const chineseEndWeek = Number(form.chineseEndWeek);
       const englishStartWeek = Number(form.englishStartWeek);
       const englishEndWeek = Number(form.englishEndWeek);
       const displayRefreshSeconds = Number(form.displayRefreshSeconds);
-      const weekOneStartDate = form.weekOneStartDate.trim();
-      const termEndDate = form.termEndDate.trim();
       const gameNumbers = {
         homeworkOnTimeCoins: Number(form.homeworkOnTimeCoins),
         homeworkLateCoins: Number(form.homeworkLateCoins),
@@ -209,7 +182,6 @@ export function SettingsPageClient() {
         !form.schoolYear.trim() ||
         !form.className.trim() ||
         !Number.isInteger(grade) ||
-        !Number.isInteger(currentWeek) ||
         !Number.isInteger(chineseStartWeek) ||
         !Number.isInteger(chineseEndWeek) ||
         !Number.isInteger(englishStartWeek) ||
@@ -218,9 +190,6 @@ export function SettingsPageClient() {
         Object.values(gameNumbers).some((value) => !Number.isInteger(value))
       ) {
         throw new Error("請檢查欄位，數字須為整數");
-      }
-      if (currentWeek < 1 || currentWeek > 25) {
-        throw new Error("手動目前週數須為 1～25");
       }
       if (
         chineseStartWeek < 1 ||
@@ -236,22 +205,6 @@ export function SettingsPageClient() {
       ) {
         throw new Error("起週不可大於迄週");
       }
-      if (
-        weekOneStartDate !== "" &&
-        !/^\d{4}-\d{2}-\d{2}$/.test(weekOneStartDate)
-      ) {
-        throw new Error("第一週開啟日格式須為 YYYY-MM-DD");
-      }
-      if (termEndDate !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(termEndDate)) {
-        throw new Error("學期結束日格式須為 YYYY-MM-DD");
-      }
-      if (
-        weekOneStartDate !== "" &&
-        termEndDate !== "" &&
-        termEndDate < weekOneStartDate
-      ) {
-        throw new Error("學期結束日不可早於第一週開啟日");
-      }
       if (displayRefreshSeconds < 5) {
         throw new Error("大屏刷新秒數至少 5 秒");
       }
@@ -263,15 +216,10 @@ export function SettingsPageClient() {
           schoolYear: form.schoolYear.trim(),
           grade,
           className: form.className.trim(),
-          currentWeek,
-          weekOneStartDate,
-          termEndDate,
           chineseStartWeek,
           chineseEndWeek,
           englishStartWeek,
           englishEndWeek,
-          readingSchoolYear: form.readingSchoolYear.trim(),
-          readingSemester: form.readingSemester,
           allowDisplayHomeworkToggle: form.allowDisplayHomeworkToggle,
           allowDisplayPassportToggle: form.allowDisplayPassportToggle,
           allowDisplayRoutineToggle: form.allowDisplayRoutineToggle,
@@ -301,14 +249,12 @@ export function SettingsPageClient() {
   const displayLabel = form.displayToken.trim()
     ? `/display?token=${form.displayToken.trim()}`
     : "/display";
-  const hasWeekOne = form.weekOneStartDate.trim() !== "";
-
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <header>
         <h1 className="text-2xl font-semibold text-gray-900">系統設定</h1>
         <p className="mt-1 text-sm text-gray-500">
-          班級資料、學期週次、護照起迄週、教室大屏
+          班級資料、學期設定、護照起迄週、教室大屏
         </p>
       </header>
 
@@ -342,118 +288,31 @@ export function SettingsPageClient() {
         </div>
       </Card>
 
-      <Card>
-        <CardTitle>學期週次</CardTitle>
-        <CardDescription>
-          填開啟日／結束日後系統自動推算目前週。早於開啟日：7／8＝暑假、1／2＝寒假。
-          晚於結束日：學期結束（寒暑假月改標寒暑假）。結束日當天仍算學期中。未填開啟日則用手動週數。
-        </CardDescription>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Field
-            label="第一週開啟日"
-            type="date"
-            value={form.weekOneStartDate}
-            onChange={(value) => updateField("weekOneStartDate", value)}
-          />
-          <Field
-            label="學期結束日"
-            type="date"
-            value={form.termEndDate}
-            onChange={(value) => updateField("termEndDate", value)}
-          />
-          <Field
-            label={
-              hasWeekOne ? "手動備援週數（未設開啟日時用）" : "目前週數（手動）"
-            }
-            type="number"
-            value={form.currentWeek}
-            onChange={(value) => updateField("currentWeek", value)}
-            className="sm:col-span-2"
-          />
-        </div>
-        {weekProgressLabel ? (
-          <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            系統判定：
-            <span className="font-semibold">{weekProgressLabel}</span>
-          </p>
-        ) : null}
-      </Card>
+      <TermManagerCard />
 
-      <Card>
-        <CardTitle>國語護照</CardTitle>
-        <CardDescription>
-          完成區間建議第 3～16 週（可改，範圍 1～25）
-        </CardDescription>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Field
-            label="開始週"
-            type="number"
-            value={form.chineseStartWeek}
-            onChange={(value) => updateField("chineseStartWeek", value)}
-          />
-          <Field
-            label="結束週"
-            type="number"
-            value={form.chineseEndWeek}
-            onChange={(value) => updateField("chineseEndWeek", value)}
-          />
-        </div>
-      </Card>
-
-      <Card>
-        <CardTitle>英語護照</CardTitle>
-        <CardDescription>
-          完成區間建議第 3～16 週（可改，範圍 1～25）
-        </CardDescription>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Field
-            label="開始週"
-            type="number"
-            value={form.englishStartWeek}
-            onChange={(value) => updateField("englishStartWeek", value)}
-          />
-          <Field
-            label="結束週"
-            type="number"
-            value={form.englishEndWeek}
-            onChange={(value) => updateField("englishEndWeek", value)}
-          />
-        </div>
-      </Card>
-
-      <Card>
-        <CardTitle>閱讀總表</CardTitle>
-        <CardDescription>
-          上學期 9–12 月、下學期 3–6 月（1、2、7、8
-          月除外）。空白學年＝依月份自動建議。
-        </CardDescription>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Field
-            label="閱讀學年度（可空白＝跟班級學年＋自動學期）"
-            value={form.readingSchoolYear}
-            onChange={(value) => updateField("readingSchoolYear", value)}
-          />
-          <div className="flex flex-col gap-2 text-sm text-gray-700">
-            <span>學期</span>
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                checked={form.readingSemester === "first"}
-                onChange={() => updateField("readingSemester", "first")}
-              />
-              上學期（9–12）
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                checked={form.readingSemester === "second"}
-                onChange={() => updateField("readingSemester", "second")}
-              />
-              下學期（3–6）
-            </label>
+      <details className="rounded-xl border border-gray-200 bg-white px-6 py-4 shadow-sm">
+        <summary className="cursor-pointer text-sm font-medium text-gray-600">
+          護照週次進階設定（平時不需調整）
+        </summary>
+        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">國語護照</h2>
+            <p className="mt-1 text-sm text-gray-500">完成區間第 3～16 週</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Field label="開始週" type="number" value={form.chineseStartWeek} onChange={(value) => updateField("chineseStartWeek", value)} />
+              <Field label="結束週" type="number" value={form.chineseEndWeek} onChange={(value) => updateField("chineseEndWeek", value)} />
+            </div>
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">英語護照</h2>
+            <p className="mt-1 text-sm text-gray-500">完成區間第 3～16 週</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Field label="開始週" type="number" value={form.englishStartWeek} onChange={(value) => updateField("englishStartWeek", value)} />
+              <Field label="結束週" type="number" value={form.englishEndWeek} onChange={(value) => updateField("englishEndWeek", value)} />
+            </div>
           </div>
         </div>
-      </Card>
+      </details>
 
       <Card>
         <CardTitle>學生養成</CardTitle>
@@ -570,6 +429,24 @@ export function SettingsPageClient() {
             value={form.displayToken}
             onChange={(value) => updateField("displayToken", value)}
           />
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle>學期資料匯出</CardTitle>
+        <CardDescription>下載 UTF-8 CSV，可直接以 Excel 或試算表開啟。</CardDescription>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {[
+            ["students", "名冊"],
+            ["homework", "作業狀態"],
+            ["daily-tasks", "每日任務"],
+            ["points", "點數紀錄"],
+            ["shop", "商店紀錄"],
+          ].map(([type, label]) => (
+            <a key={type} href={`/api/export?type=${type}`} className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+              匯出{label}
+            </a>
+          ))}
         </div>
       </Card>
 

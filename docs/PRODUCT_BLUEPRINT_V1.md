@@ -1,5 +1,7 @@
 # Teacher Workspace — Product Blueprint v1
 
+> **已被取代：** 2026-08-18 已確認的 [`PRODUCT_SPEC_V2.md`](./PRODUCT_SPEC_V2.md) 是目前唯一產品實作基準。本文件保留作為歷史決策紀錄；其中三態護照、大屏存取碼、舊 Today 與舊閱讀規則均不得作為新功能依據。
+
 **Status:** Locked（2026-07-30 老闆拍板）  
 **取代：** 舊「Dashboard＝三勾選待辦」心智；實作應對齊本文件，而非僅對齊 PRD v1.0 舊 Module 1。  
 **相關：** `PRD.md`（歷史＋模組細節）、`docs/architecture/*`
