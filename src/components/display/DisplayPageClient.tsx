@@ -577,14 +577,9 @@ export function DisplayPageClient() {
     >
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-4 md:gap-8">
-          <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
-              Classroom Display
-            </p>
-            <h1 className="text-2xl font-semibold md:text-3xl">
-              {data.className}
-            </h1>
-          </div>
+          <h1 className="text-2xl font-semibold md:text-3xl">
+            {data.className}
+          </h1>
           <DisplayHeaderClock />
         </div>
         <div className="text-right">
@@ -843,9 +838,6 @@ function GamificationOverviewPanel({
     <section className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="shrink-0">
         <h2 className="text-3xl font-semibold">個人點數</h2>
-        <p className="mt-1 text-base text-slate-400">
-          依座號顯示全班 Level、XP 與金幣
-        </p>
       </div>
       <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-1 gap-3 overflow-auto sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {sorted.map((row) => (
@@ -1330,13 +1322,10 @@ function TodayPanel({
 
 function TodayProgressOverview({ data }: { data: DisplayData }) {
   return (
-    <div className="grid min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-2 self-stretch overflow-hidden">
+    <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2 self-stretch overflow-hidden">
       <h2 className="text-2xl font-semibold leading-tight text-slate-200">
         今日進度
       </h2>
-      <p className="text-sm leading-tight text-slate-500">
-        選座號後改為個人打勾
-      </p>
       <div className="grid min-h-0 grid-rows-3 gap-2 overflow-hidden">
         {data.progress.map((item) => {
           const pct =
@@ -1474,7 +1463,7 @@ function LunchPanel({
           </h2>
           <div className="mt-2 min-h-0 flex-1 overflow-hidden">
             {data.dutyToday.isHoliday ? (
-              <p className="text-lg text-slate-400">當天放假，無值日排程</p>
+              <p className="text-lg text-slate-400">今天放假，無值日排程</p>
             ) : (
               <div className="grid h-full min-h-0 grid-cols-2 gap-2">
                 <div className="flex min-h-0 flex-col gap-2">
@@ -2035,9 +2024,6 @@ function PassportStudentFocus({
     <section className="flex h-full min-h-0 flex-col justify-end gap-4 overflow-hidden">
       <div className="rounded-2xl border border-sky-400/50 bg-slate-900/90 p-4">
         <h2 className="text-3xl font-semibold text-sky-100">{studentLabel}</h2>
-        <p className="mt-1 text-base text-slate-400">
-          只顯示你的橫欄 · 點週數循環（未開始／缺／完成）
-        </p>
       </div>
       {rows.map(({ label, matrix, type }) => {
         const student = matrix.students.find(
@@ -2197,7 +2183,7 @@ function CompactReadingMatrix({
   return (
     <section className="shrink-0 rounded-xl border border-slate-700 bg-slate-900/80 p-3">
       <h2 className="whitespace-nowrap px-1 text-lg font-semibold">
-        {title} · {matrix.overallCompleted}/{matrix.overallTotal}
+        {title}
       </h2>
       <table className="mt-2 w-max border-collapse text-center text-xs leading-none">
         <thead>
