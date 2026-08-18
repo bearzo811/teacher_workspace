@@ -196,6 +196,29 @@ export async function setGamificationEffect(input: SetEffectInput) {
   });
 }
 
+/** 老師手動加／扣金幣：每次是一筆不可變更帳本紀錄，原因必填。 */
+export async function addManualCoins(input: {
+  studentId: string;
+  amount: number;
+  reason: string;
+}) {
+  const reason = input.reason.trim();
+  if (!reason) throw new Error("手動調整必須填寫原因");
+  if (!Number.isInteger(input.amount) || input.amount === 0) {
+    throw new Error("調整點數必須是非 0 整數");
+  }
+  return setGamificationEffect({
+    effectKey: `manual:${crypto.randomUUID()}`,
+    studentId: input.studentId,
+    currency: "coins",
+    sourceType: "manual",
+    sourceId: crypto.randomUUID(),
+    effectType: "adjustment",
+    amount: input.amount,
+    reason,
+  });
+}
+
 export async function getEffectAmount(key: string) {
   const [row] = await db
     .select({ amount: gamificationEffects.amount })
@@ -320,6 +343,29 @@ export async function reconcilePassportReward(input: {
   });
 }
 
+/** v2 學期護照完成／退回的點數效果。 */
+export async function reconcileTermPassportReward(input: {
+  studentId: string;
+  termId: string;
+  type: "Chinese" | "English";
+  completed: boolean;
+}) {
+  const settings = await getGamificationSettings();
+  const sourceId = `${input.termId}:${input.type}`;
+  return setGamificationEffect({
+    effectKey: effectKey("term-passport", input.termId, input.type, input.studentId),
+    studentId: input.studentId,
+    currency: "coins",
+    sourceType: "term-passport",
+    sourceId,
+    effectType: "completion",
+    amount: input.completed ? settings.passportOnTimeCoins : 0,
+    reason: input.completed ? "完成學期護照" : "學期護照退回",
+    ruleSnapshot: { completed: settings.passportOnTimeCoins },
+    metadata: { termId: input.termId, type: input.type },
+  });
+}
+
 export async function reconcileRoutineReward(input: {
   studentId: string;
   taskDate: string;
@@ -343,6 +389,19 @@ export async function reconcileRoutineReward(input: {
     amount: input.completed ? settings.routineXp : 0,
     reason: input.completed ? "完成生活習慣" : "生活習慣回沖",
     ruleSnapshot: { xp: settings.routineXp },
+    metadata: { taskDate: input.taskDate, taskKey: input.taskKey },
+  });
+  // 同一完成事件同時提供可用點數，讓每日任務可用於商店；XP 仍用來計算等級。
+  await setGamificationEffect({
+    effectKey: effectKey("routine-coins", input.taskDate, input.taskKey, input.studentId),
+    studentId: input.studentId,
+    currency: "coins",
+    sourceType: "routine-coins",
+    sourceId: `${input.taskDate}:${input.taskKey}`,
+    effectType: "completion",
+    amount: input.completed ? settings.routineXp : 0,
+    reason: input.completed ? "完成每日任務" : "每日任務退回",
+    ruleSnapshot: { coins: settings.routineXp },
     metadata: { taskDate: input.taskDate, taskKey: input.taskKey },
   });
 }

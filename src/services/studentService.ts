@@ -5,10 +5,12 @@ import {
   homeworkRecords,
   passportRecords,
   students,
+  termRosterEntries,
   type NewStudent,
   type Student,
 } from "@/db/schema";
 import { getClassSettings } from "@/services/classSettingsService";
+import { getActiveTerm } from "@/services/termService";
 import {
   ensureStudentGameProfile,
   getStudentGamification,
@@ -37,7 +39,27 @@ function assertValidInput({ name, seatNumber }: StudentInput) {
 }
 
 export async function listStudents(searchQuery?: string): Promise<Student[]> {
+  const activeTerm = await getActiveTerm();
   const q = searchQuery?.trim();
+  if (activeTerm) {
+    const where = q
+      ? and(
+          eq(termRosterEntries.termId, activeTerm.id),
+          eq(termRosterEntries.isActive, true),
+          ilike(students.name, `%${q}%`),
+        )
+      : and(
+          eq(termRosterEntries.termId, activeTerm.id),
+          eq(termRosterEntries.isActive, true),
+        );
+    const rows = await db
+      .select({ student: students, seatNumber: termRosterEntries.seatNumber })
+      .from(termRosterEntries)
+      .innerJoin(students, eq(termRosterEntries.studentId, students.id))
+      .where(where)
+      .orderBy(asc(termRosterEntries.seatNumber));
+    return rows.map(({ student, seatNumber }) => ({ ...student, seatNumber }));
+  }
   const where = q
     ? and(eq(students.isActive, true), ilike(students.name, `%${q}%`))
     : eq(students.isActive, true);
@@ -84,6 +106,15 @@ export async function createStudent(input: StudentInput): Promise<Student> {
 
   const rows = await db.insert(students).values(values).returning();
   await ensureStudentGameProfile(rows[0].id);
+  const activeTerm = await getActiveTerm();
+  if (activeTerm) {
+    await db.insert(termRosterEntries).values({
+      termId: activeTerm.id,
+      studentId: rows[0].id,
+      seatNumber: rows[0].seatNumber,
+      isActive: true,
+    });
+  }
   return rows[0];
 }
 
@@ -128,6 +159,19 @@ export async function updateStudent(
     .where(eq(students.id, id))
     .returning();
 
+  const activeTerm = await getActiveTerm();
+  if (activeTerm) {
+    await db
+      .update(termRosterEntries)
+      .set({ seatNumber: data.seatNumber })
+      .where(
+        and(
+          eq(termRosterEntries.termId, activeTerm.id),
+          eq(termRosterEntries.studentId, id),
+        ),
+      );
+  }
+
   return rows[0];
 }
 
@@ -143,6 +187,19 @@ export async function softDeleteStudent(id: string): Promise<Student> {
     .set({ isActive: false })
     .where(eq(students.id, id))
     .returning();
+
+  const activeTerm = await getActiveTerm();
+  if (activeTerm) {
+    await db
+      .update(termRosterEntries)
+      .set({ isActive: false })
+      .where(
+        and(
+          eq(termRosterEntries.termId, activeTerm.id),
+          eq(termRosterEntries.studentId, id),
+        ),
+      );
+  }
 
   return rows[0];
 }

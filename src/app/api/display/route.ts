@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
-import {
-  assertDisplayToken,
-  getDisplayData,
-} from "@/services/displayService";
+import { isDisplayKeyRequest, isTeacherRequest } from "@/lib/access";
+import { getDisplayData } from "@/services/displayService";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    await assertDisplayToken(searchParams.get("token"));
+    if (!(await isTeacherRequest()) && !(await isDisplayKeyRequest(request))) {
+      return NextResponse.json({ error: "未授權" }, { status: 401 });
+    }
     const contactBookDate = searchParams.get("contactBookDate") ?? undefined;
     if (
       contactBookDate &&
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "讀取教室大屏失敗";
-    const status = message.includes("存取碼") ? 401 : 500;
+    const status = message.includes("未授權") ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

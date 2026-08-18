@@ -15,6 +15,7 @@ import {
 } from "@/lib/dutyRoster";
 import { getClassSettings } from "@/services/classSettingsService";
 import { listHolidayOverridesInRange } from "@/services/calendarService";
+import { getActiveTerm } from "@/services/termService";
 import { resolveIsHoliday } from "@/types/calendar";
 
 export type DutySlotView = {
@@ -39,6 +40,7 @@ export type DutyRangeView = {
   from: string;
   to: string;
   termStart: string;
+  termName: string | null;
   studentCount: number;
   expectedStudentCount: number;
   warning: string | null;
@@ -156,7 +158,9 @@ export async function getDutyRange(
   to: string,
 ): Promise<DutyRangeView> {
   const settings = await getClassSettings();
-  const termStart = settings.weekOneStartDate.trim();
+  const activeTerm = await getActiveTerm();
+  // 學期設定是正式來源；保留舊設定作為尚未建立學期時的相容後備。
+  const termStart = activeTerm?.startsOn ?? settings.weekOneStartDate.trim();
   const roster = await listActiveDutyStudents();
   const holidayFrom =
     termStart && termStart < from ? termStart : from;
@@ -168,7 +172,7 @@ export async function getDutyRange(
   const studentById = new Map(roster.map((s) => [s.studentId, s]));
 
   const warning = !termStart
-    ? "請先在設定填「第一週開啟日」，值日表才會開始輪排。"
+    ? "請先在行事曆建立並啟用學期，值日表才會開始輪排。"
     : roster.length !== DUTY_EXPECTED_STUDENTS
       ? `目前在籍 ${roster.length} 人（建議 ${DUTY_EXPECTED_STUDENTS} 人）。人數不等於 9 時仍會輪，但每人每職的週期會變。`
       : null;
@@ -188,10 +192,36 @@ export async function getDutyRange(
     from,
     to,
     termStart,
+    termName: activeTerm?.name ?? null,
     studentCount: roster.length,
     expectedStudentCount: DUTY_EXPECTED_STUDENTS,
     warning,
     days,
+  };
+}
+
+/**
+ * 完整學期值日表：依啟用學期與行事曆的放假／補課設定，只回傳實際上課日。
+ */
+export async function getActiveTermDutySchedule(): Promise<DutyRangeView> {
+  const activeTerm = await getActiveTerm();
+  if (!activeTerm) {
+    return {
+      from: "",
+      to: "",
+      termStart: "",
+      termName: null,
+      studentCount: 0,
+      expectedStudentCount: DUTY_EXPECTED_STUDENTS,
+      warning: "請先到行事曆建立並啟用學期，才能排出整個學期的值日表。",
+      days: [],
+    };
+  }
+
+  const range = await getDutyRange(activeTerm.startsOn, activeTerm.endsOn);
+  return {
+    ...range,
+    days: range.days.filter((day) => !day.isHoliday),
   };
 }
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { parseDateInput } from "@/lib/dates";
 import {
   clearDutyOverride,
+  getActiveTermDutySchedule,
   getDutyDay,
   getDutyRange,
   swapDutySlots,
@@ -15,6 +16,11 @@ export async function GET(request: Request) {
     const date = searchParams.get("date");
     const from = searchParams.get("from");
     const to = searchParams.get("to");
+
+    if (searchParams.get("semester") === "active") {
+      const data = await getActiveTermDutySchedule();
+      return NextResponse.json({ data });
+    }
 
     if (date) {
       parseDateInput(date);

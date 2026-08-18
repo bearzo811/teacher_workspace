@@ -1,51 +1,41 @@
-# External Tech Lead Review — Teacher Workspace
+# 外部技術主管審查 — Teacher Workspace
 
-## 2026-08-09 Gamification Approval
+## 2026-08-09 養成系統批准紀錄
 
-- Reviewer: Product owner
-- Decision: Approved implementation plan G1–G6
-- Product choices: reversible immediate rewards, automatic deadline penalties,
-  configurable defaults, no backfill, no shop, no leaderboard.
-- Grade: Not supplied by reviewer.
+- 審查者：產品擁有者
+- 決定：批准實作計畫 G1–G6
+- 產品選擇：可逆的即時獎勵、自動截止日扣點、可設定的預設規則、不回填歷史資料、無商店、無排行榜。
+- 等級：審查者未提供。
 
-**Reviewer:** （老闆／ChatGPT）  
-**Date:**  
-**Grade:**
+## 2026-08-18 架構審查回覆
 
-> 填完後把「立即改善」對應到 `Architecture_Proposal.md` 的 Proposal ID。  
-> Cursor **只實作你勾選批准的 ID**。
+**審查者：** （擁有者／ChatGPT）
+**日期：**
+**等級：**
+
+> 請在「立即改善」填入對應的 `Architecture_Proposal.md` 提案 ID。Codex 僅會實作你明確批准的 ID。
 
 ---
 
 ## 產品
 
-（需求漏洞？老師真實流程？）
-
----
+（需求漏洞？是否符合老師真實流程？）
 
 ## 架構
 
-（Boundary / Dependency / Responsibility）
+（邊界／依賴／責任）
 
----
+## 資料庫
 
-## Database
+（ERD／索引／遷移）
 
-（ERD / Index / Migration）
+## 使用者體驗
 
----
+（大屏／聯絡簿／勾選操作是否真實可用？）
 
-## UX
+## 維護性
 
-（大屏／聯絡簿／打勾是否真的會這樣用？）
-
----
-
-## 維護
-
-（半年／一年）
-
----
+（半年／一年後的維護成本）
 
 ## 立即改善
 
@@ -55,16 +45,16 @@
 
 -
 
-## 可以不用改
+## 可以不改
 
 -
 
-## Approved Proposal IDs for refactor
+## 批准實作的提案 ID
 
 ```text
-（例：P1 P3 P8）
+（例如：P1 P3 P8）
 ```
 
-## Notes
+## 備註
 
 -

@@ -33,8 +33,6 @@ function cellClass(status: PassportStatus) {
   switch (status) {
     case "completed":
       return "border-green-600 bg-green-600 text-white";
-    case "missing_parent":
-      return "border-red-500 bg-red-50 text-red-600";
     default:
       return "border-gray-300 bg-white text-gray-400";
   }
@@ -44,8 +42,6 @@ function cellMark(status: PassportStatus) {
   switch (status) {
     case "completed":
       return "✓";
-    case "missing_parent":
-      return "缺";
     default:
       return "";
   }

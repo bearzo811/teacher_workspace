@@ -25,7 +25,11 @@ import type {
   DisplayPersonalRow,
 } from "@/types/display";
 import { formatCountdownLabel, type CalendarEventView } from "@/types/calendar";
-import { nextPassportStatus, type PassportStatus } from "@/types/passport";
+import {
+  nextBinaryPassportStatus,
+  nextPassportStatus,
+  type PassportStatus,
+} from "@/types/passport";
 import type { PassportMatrixView } from "@/services/passportService";
 import {
   READING_SEMESTER_LABEL,
@@ -34,23 +38,122 @@ import {
   type ReadingType,
 } from "@/types/reading";
 
+function updatePassportMatrix(
+  matrix: PassportMatrixView,
+  studentId: string,
+  week: number,
+  status: PassportStatus,
+): PassportMatrixView {
+  const students = matrix.students.map((student) => {
+    if (student.studentId !== studentId) return student;
+    const cells = student.cells.map((cell) =>
+      cell.week === week ? { ...cell, status } : cell,
+    );
+    return {
+      ...student,
+      cells,
+      completedCount: cells.filter((cell) => cell.status === "completed").length,
+    };
+  });
+  const weekTotals = matrix.weekTotals.map((total) => {
+    if (total.week !== week) return total;
+    const cells = students.flatMap((student) =>
+      student.cells.filter((cell) => cell.week === week),
+    );
+    return {
+      ...total,
+      completed: cells.filter((cell) => cell.status === "completed").length,
+      missingParent: cells.filter((cell) => cell.status === "missing_parent").length,
+      notStarted: cells.filter((cell) => cell.status === "not_started").length,
+    };
+  });
+  return {
+    ...matrix,
+    students,
+    weekTotals,
+    overallCompleted: students.reduce((sum, student) => sum + student.completedCount, 0),
+  };
+}
+
+function updateReadingMatrix(
+  matrix: ReadingMatrixView,
+  studentId: string,
+  month: number,
+  status: PassportStatus,
+): ReadingMatrixView {
+  const students = matrix.students.map((student) => {
+    if (student.studentId !== studentId) return student;
+    const cells = student.cells.map((cell) =>
+      cell.month === month ? { ...cell, status } : cell,
+    );
+    return {
+      ...student,
+      cells,
+      completedCount: cells.filter((cell) => cell.status === "completed").length,
+    };
+  });
+  const monthTotals = matrix.monthTotals.map((total) => {
+    if (total.month !== month) return total;
+    const cells = students.flatMap((student) =>
+      student.cells.filter((cell) => cell.month === month),
+    );
+    return {
+      ...total,
+      completed: cells.filter((cell) => cell.status === "completed").length,
+      missingParent: cells.filter((cell) => cell.status === "missing_parent").length,
+      notStarted: cells.filter((cell) => cell.status === "not_started").length,
+    };
+  });
+  return {
+    ...matrix,
+    students,
+    monthTotals,
+    overallCompleted: students.reduce((sum, student) => sum + student.completedCount, 0),
+  };
+}
+
+function updateHomeworkStatus(
+  homework: DisplayData["homework"],
+  studentId: string,
+  homeworkId: string,
+  status: "unsubmitted" | "pending_confirmation",
+) {
+  const students = homework.students.map((student) => {
+    if (student.studentId !== studentId) return student;
+    const cells = student.cells.map((cell) =>
+      cell.homeworkId === homeworkId
+        ? { ...cell, status, completed: false }
+        : cell,
+    );
+    const missingTitles = cells
+      .filter((cell) => cell.status !== "completed")
+      .map((cell) => cell.title);
+    return { ...student, cells, missingTitles, allDone: missingTitles.length === 0 };
+  });
+  return {
+    ...homework,
+    students,
+    completedStudentCount: students.filter((student) => student.allDone).length,
+  };
+}
+
 type PanelKey =
-  "today" | "gamification" | "lunch" | "debts" | "passport" | "calendar";
+  "today" | "passport" | "lunch" | "student" | "debts" | "calendar";
 
 const PANEL_ORDER: PanelKey[] = [
   "today",
-  "gamification",
   "passport",
-  "debts",
   "lunch",
+  "student",
+  "debts",
   "calendar",
 ];
 const PANEL_LABEL: Record<PanelKey, string> = {
-  today: "首頁",
-  gamification: "個人點數",
-  lunch: "午餐",
-  debts: "欠繳作業名單",
+  today: "聯絡簿",
   passport: "護照與閱讀",
+  lunch: "午餐",
+  student: "學生資訊",
+  debts: "欠繳作業",
   calendar: "行事曆",
 };
 const SEAT_IDLE_MS = 30_000;
@@ -58,27 +161,34 @@ const CAROUSEL_MS = 60_000;
 
 export function DisplayPageClient() {
   const searchParams = useSearchParams();
-  const token = searchParams.get("token") ?? "";
-
+  const displayKey = searchParams.get("key") ?? "";
+  const displayHeaders = useMemo<Record<string, string>>(
+    () => {
+      const headers: Record<string, string> = {};
+      if (displayKey) headers["X-Display-Key"] = displayKey;
+      return headers;
+    },
+    [displayKey],
+  );
   const [data, setData] = useState<DisplayData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState("");
   const [panel, setPanel] = useState<PanelKey>("today");
+  const [studentView, setStudentView] = useState<"overview" | "shop">("overview");
   const [progressPanel, setProgressPanel] = useState<"passport" | "reading">(
     "passport",
   );
   const [activeStudentId, setActiveStudentId] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [shopRequests, setShopRequests] = useState<Set<string>>(() => new Set());
   const [needsScroll, setNeedsScroll] = useState(false);
-  const [savingContactDate, setSavingContactDate] = useState(false);
-  const [editingContactDate, setEditingContactDate] = useState(false);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contentScrollRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     try {
-      const qs = token ? `?token=${encodeURIComponent(token)}` : "";
-      const response = await fetch(`/api/display${qs}`);
+      const response = await fetch("/api/display", { headers: displayHeaders });
       const json = (await response.json()) as {
         data?: DisplayData;
         error?: string;
@@ -93,49 +203,33 @@ export function DisplayPageClient() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "讀取失敗");
     }
-  }, [token]);
-
-  async function setContactBookDate(next: string) {
-    setSavingContactDate(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayContactBookDate: next }),
-      });
-      const json = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(json.error ?? "更新聯絡簿日期失敗");
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "更新聯絡簿日期失敗");
-    } finally {
-      setSavingContactDate(false);
-    }
-  }
-
-  // 大屏無鍵盤時，用按鈕直接換日更穩
-  function shiftContactBookDate(delta: number) {
-    if (!data) return;
-    const next = new Date(`${data.contactBook.date}T00:00:00`);
-    next.setDate(next.getDate() + delta);
-    const nextStr = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
-    void setContactBookDate(nextStr === data.today ? "" : nextStr);
-  }
+  }, [displayHeaders]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   useEffect(() => {
-    if (!data) return;
-    // 正在選日期時暫停輪詢，否則原生日曆會被重繪關掉
-    if (editingContactDate) return;
-    const id = setInterval(() => {
+    return () => {
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    };
+  }, []);
+
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => {
+      refreshTimer.current = null;
       void load();
+    }, 800);
+  }, [load]);
+
+  useEffect(() => {
+    if (!data) return;
+    const id = setInterval(() => {
+      scheduleRefresh();
     }, data.displaySettings.refreshSeconds * 1000);
     return () => clearInterval(id);
-  }, [data?.displaySettings.refreshSeconds, load, data, editingContactDate]);
+  }, [data?.displaySettings.refreshSeconds, data, scheduleRefresh]);
 
   useEffect(() => {
     if (!data?.displaySettings.carouselEnabled || activeStudentId) return;
@@ -151,31 +245,28 @@ export function DisplayPageClient() {
   function bumpIdle() {
     if (idleTimer.current) clearTimeout(idleTimer.current);
     idleTimer.current = setTimeout(
-      () => setActiveStudentId(null),
+      () => {
+        setActiveStudentId(null);
+      },
       SEAT_IDLE_MS,
     );
   }
 
   function selectStudent(studentId: string) {
-    setActiveStudentId((prev) => (prev === studentId ? null : studentId));
+    setActiveStudentId(studentId);
     bumpIdle();
-    // 護照與閱讀／欠繳／午餐留當頁；其餘選座後回「首頁」點個人項
-    setPanel((prev) =>
-      prev === "passport" || prev === "debts" ? prev : "today",
-    );
+    setPanel((prev) => (prev === "passport" || prev === "student" ? prev : "today"));
   }
 
   const activePersonal = useMemo(
     () => data?.personal.find((p) => p.studentId === activeStudentId) ?? null,
     [data, activeStudentId],
   );
-
   async function patchRoutine(
     studentId: string,
     taskKey: string,
     completed: boolean,
   ) {
-    if (!data?.displaySettings.allowStudentRoutineToggle) return;
     if (activeStudentId !== studentId) return;
     await patchRoutineRequest(studentId, taskKey, completed);
   }
@@ -185,28 +276,46 @@ export function DisplayPageClient() {
     taskKey: string,
     completed: boolean,
   ) {
-    if (!data?.displaySettings.allowStudentRoutineToggle) return;
+    if (!data) return;
     const taskDate = data.today;
     setBusyKey(`${studentId}:${taskKey}`);
     bumpIdle();
     try {
       const response = await fetch("/api/routines", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Display-Mode": "1",
-        },
+        headers: { "Content-Type": "application/json", ...displayHeaders },
         body: JSON.stringify({
           studentId,
           taskKey,
           completed,
-          displayMode: true,
           taskDate,
         }),
       });
       const json = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(json.error ?? "更新失敗");
-      await load();
+      // 先立即反映按鈕狀態，再在背景同步完整大屏資料，避免每次操作都卡住。
+      setData((previous) => {
+        if (!previous) return previous;
+        const personal = previous.personal.map((row) => {
+          if (row.studentId !== studentId) return row;
+          if (taskKey === "morning_cleaning") return { ...row, morningCleaning: completed };
+          if (taskKey === "contact_book_copied") return { ...row, contactBookCopied: completed };
+          if (taskKey === "lunch_brushing") return { ...row, lunchBrushing: completed };
+          if (taskKey === "noon_cleaning") return { ...row, noonCleaning: completed };
+          return row;
+        });
+        const updateProgress = (items: DisplayData["progress"], key: string) =>
+          items.map((item) => item.key === key
+            ? { ...item, completed: Math.max(0, item.completed + (completed ? 1 : -1)) }
+            : item);
+        return {
+          ...previous,
+          personal,
+          progress: updateProgress(previous.progress, taskKey),
+          lunchProgress: updateProgress(previous.lunchProgress, taskKey),
+        };
+      });
+      scheduleRefresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "更新失敗");
     } finally {
@@ -222,27 +331,45 @@ export function DisplayPageClient() {
   ) {
     if (!data?.displaySettings.allowStudentPassportToggle) return;
     if (activeStudentId !== studentId) return;
+    const previousData = data;
     setBusyKey(`${studentId}:${type}:${week}`);
     bumpIdle();
+    setData((current) => {
+      if (!current) return current;
+      const matrixKey = type === "Chinese" ? "chineseMatrix" : "englishMatrix";
+      return {
+        ...current,
+        passport: {
+          ...current.passport,
+          [matrixKey]: updatePassportMatrix(
+            current.passport[matrixKey], studentId, week, status,
+          ),
+        },
+        personal: current.personal.map((row) =>
+          row.studentId !== studentId
+            ? row
+            : type === "Chinese"
+              ? { ...row, chinesePassport: status }
+              : { ...row, englishPassport: status },
+        ),
+      };
+    });
     try {
       const response = await fetch("/api/passport", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Display-Mode": "1",
-        },
+        headers: { "Content-Type": "application/json", ...displayHeaders },
         body: JSON.stringify({
           studentId,
           type,
           week,
           status,
-          displayMode: true,
         }),
       });
       const json = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(json.error ?? "更新失敗");
-      await load();
+      scheduleRefresh();
     } catch (err) {
+      setData(previousData);
       setError(err instanceof Error ? err.message : "更新失敗");
     } finally {
       setBusyKey(null);
@@ -256,30 +383,79 @@ export function DisplayPageClient() {
   ) {
     if (!data?.displaySettings.allowStudentHomeworkToggle) return;
     if (activeStudentId !== studentId) return;
+    const previousData = data;
     setBusyKey(`${studentId}:${homeworkId}`);
     bumpIdle();
+    setData((current) => current
+      ? { ...current, homework: updateHomeworkStatus(current.homework, studentId, homeworkId, next ? "pending_confirmation" : "unsubmitted") }
+      : current);
     try {
       const response = await fetch("/api/homework-record", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Display-Mode": "1",
-        },
+        headers: { "Content-Type": "application/json", ...displayHeaders },
         body: JSON.stringify({
           studentId,
           homeworkId,
-          completed: next,
-          displayMode: true,
+          status: next ? "pending_confirmation" : "unsubmitted",
         }),
       });
       const json = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(json.error ?? "更新失敗");
-      await load();
+      scheduleRefresh();
     } catch (err) {
+      setData(previousData);
       setError(err instanceof Error ? err.message : "更新失敗");
     } finally {
       setBusyKey(null);
     }
+  }
+
+  async function requestShopItem(studentId: string, itemId: string) {
+    if (!data?.shop.open || activeStudentId !== studentId) return;
+    const requestKey = `${studentId}:${itemId}`;
+    setBusyKey(`shop:${itemId}`);
+    setShopRequests((previous) => new Set(previous).add(requestKey));
+    try {
+      const response = await fetch("/api/shop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...displayHeaders },
+        body: JSON.stringify({ action: "request", studentId, itemId }),
+      });
+      const json = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(json.error ?? "申請兌換失敗");
+      scheduleRefresh();
+    } catch (err) {
+      setShopRequests((previous) => {
+        const next = new Set(previous);
+        next.delete(requestKey);
+        return next;
+      });
+      setError(err instanceof Error ? err.message : "申請兌換失敗");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function toggleTermPassport(studentId: string, type: "Chinese" | "English", completed: boolean) {
+    if (!data?.displaySettings.allowStudentPassportToggle || activeStudentId !== studentId) return;
+    const previousData = data;
+    setBusyKey(`term-passport:${type}`);
+    setData((current) => current
+      ? {
+          ...current,
+          personal: current.personal.map((row) => row.studentId !== studentId
+            ? row
+            : type === "Chinese"
+              ? { ...row, termChinesePassportCompleted: !completed }
+              : { ...row, termEnglishPassportCompleted: !completed }),
+        }
+      : current);
+    try {
+      const response = await fetch("/api/term-passports", { method: "PATCH", headers: { "Content-Type": "application/json", ...displayHeaders }, body: JSON.stringify({ studentId, type, completed: !completed }) });
+      const json = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(json.error ?? "更新護照失敗");
+      scheduleRefresh();
+    } catch (err) { setData(previousData); setError(err instanceof Error ? err.message : "更新護照失敗"); } finally { setBusyKey(null); }
   }
 
   async function setReading(
@@ -290,27 +466,35 @@ export function DisplayPageClient() {
   ) {
     if (!data?.displaySettings.allowStudentReadingToggle) return;
     if (activeStudentId !== studentId) return;
+    const previousData = data;
     setBusyKey(`${studentId}:${type}:${month}`);
     bumpIdle();
+    setData((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        reading: {
+          ...current.reading,
+          [type]: updateReadingMatrix(current.reading[type], studentId, month, status),
+        },
+      };
+    });
     try {
       const response = await fetch("/api/reading", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Display-Mode": "1",
-        },
+        headers: { "Content-Type": "application/json", ...displayHeaders },
         body: JSON.stringify({
           studentId,
           type,
           month,
           status,
-          displayMode: true,
         }),
       });
       const json = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(json.error ?? "更新失敗");
-      await load();
+      scheduleRefresh();
     } catch (err) {
+      setData(previousData);
       setError(err instanceof Error ? err.message : "更新失敗");
     } finally {
       setBusyKey(null);
@@ -319,7 +503,7 @@ export function DisplayPageClient() {
 
   const showSeatPicker = Boolean(
     data &&
-    (panel === "today" || panel === "passport") &&
+    panel !== "calendar" && panel !== "lunch" && panel !== "debts" &&
     data.students.length > 0,
   );
 
@@ -378,52 +562,8 @@ export function DisplayPageClient() {
           </div>
           <DisplayHeaderClock />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2 text-sm text-slate-300">
-            <span className="whitespace-nowrap">聯絡簿日期</span>
-            <button
-              type="button"
-              disabled={savingContactDate}
-              onClick={() => shiftContactBookDate(-1)}
-              aria-label="前一天"
-              className="h-10 w-10 rounded-lg border border-slate-600 text-slate-200 transition hover:bg-slate-800 disabled:opacity-40"
-            >
-              ‹
-            </button>
-            <input
-              type="date"
-              value={data.contactBook.date}
-              disabled={savingContactDate}
-              onFocus={() => setEditingContactDate(true)}
-              onBlur={() => setEditingContactDate(false)}
-              onChange={(event) => {
-                const next = event.target.value;
-                if (!next) return;
-                // 選今天＝改回跟系統今天
-                void setContactBookDate(next === data.today ? "" : next);
-              }}
-              className="h-10 rounded-lg border border-slate-600 bg-slate-900 px-3 text-base text-slate-100 outline-none ring-sky-500 focus:ring-2"
-            />
-            <button
-              type="button"
-              disabled={savingContactDate}
-              onClick={() => shiftContactBookDate(1)}
-              aria-label="後一天"
-              className="h-10 w-10 rounded-lg border border-slate-600 text-slate-200 transition hover:bg-slate-800 disabled:opacity-40"
-            >
-              ›
-            </button>
-          </label>
-          <button
-            type="button"
-            disabled={savingContactDate || data.contactBook.followsSystemToday}
-            onClick={() => {
-              void setContactBookDate("");
-            }}
-            className="h-10 rounded-lg border border-slate-600 px-3 text-sm text-slate-200 transition hover:bg-slate-800 disabled:cursor-default disabled:opacity-40"
-          >
-            {data.contactBook.followsSystemToday ? "跟今天" : "改回今天"}
-          </button>
+        <div className="text-right">
+          <p className="text-sm text-slate-300">聯絡簿：{formatDisplayDate(data.contactBook.date)}</p>
           <span className="text-sm text-slate-500">更新 {updatedAt}</span>
         </div>
       </header>
@@ -443,7 +583,7 @@ export function DisplayPageClient() {
             row={activePersonal}
             busyKey={busyKey}
             canRoutine={Boolean(
-              activeStudentId && data.displaySettings.allowStudentRoutineToggle,
+              activeStudentId,
             )}
             canHomework={Boolean(
               activeStudentId &&
@@ -457,29 +597,50 @@ export function DisplayPageClient() {
               if (!activeStudentId) return;
               void toggleHomeworkCell(activeStudentId, homeworkId, next);
             }}
+            canTermPassport={Boolean(activeStudentId && data.displaySettings.allowStudentPassportToggle)}
+            onTermPassport={(type, completed) => {
+              if (activeStudentId) void toggleTermPassport(activeStudentId, type, completed);
+            }}
           />
         ) : null}
+
+        {panel === "calendar" ? <CalendarOverviewPanel data={data} /> : null}
 
         {panel === "lunch" ? (
           <LunchPanel
             data={data}
             busyKey={busyKey}
-            canRoutine={data.displaySettings.allowStudentRoutineToggle}
+            canRoutine
             onRoutineCell={(studentId, taskKey, completed) => {
               void patchRoutineRequest(studentId, taskKey, completed);
             }}
           />
         ) : null}
 
-        {panel === "debts" ? (
-          <DebtsPanel debts={data.debts} activeStudentId={activeStudentId} />
+        {panel === "student" ? (
+          studentView === "shop" ? (
+            <ShopDisplayPanel
+              data={data}
+              row={activePersonal}
+              hasDebt={Boolean(activePersonal && data.debts.find((debt) => debt.studentId === activePersonal.studentId)?.hasDebt)}
+              busyKey={busyKey}
+              requestedItems={shopRequests}
+              onBack={() => setStudentView("overview")}
+              onRequest={(itemId) => {
+                if (activeStudentId) void requestShopItem(activeStudentId, itemId);
+              }}
+            />
+          ) : (
+            <GamificationOverviewPanel
+              rows={data.personal}
+              debts={data.debts}
+              shopOpen={data.shop.open}
+              onOpenShop={() => setStudentView("shop")}
+            />
+          )
         ) : null}
 
-        {panel === "calendar" ? <CalendarOverviewPanel data={data} /> : null}
-
-        {panel === "gamification" ? (
-          <GamificationOverviewPanel rows={data.personal} />
-        ) : null}
+        {panel === "debts" ? <DebtsPanel debts={data.debts} /> : null}
 
         {panel === "passport" ? (
           <div className="flex h-full min-h-0 gap-3">
@@ -530,7 +691,7 @@ export function DisplayPageClient() {
                         activeStudentId,
                         type,
                         week,
-                        nextPassportStatus(current),
+                        nextBinaryPassportStatus(current),
                       );
                     }}
                   />
@@ -577,7 +738,7 @@ export function DisplayPageClient() {
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-700 bg-slate-950/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_30px_rgba(0,0,0,0.35)] backdrop-blur">
         <div className="mx-auto flex max-w-[1600px] items-end gap-3">
           <nav
-            className="grid shrink-0 grid-cols-6 gap-2"
+            className="flex shrink-0 gap-2 overflow-x-auto"
             aria-label="大屏頁面"
           >
             {PANEL_ORDER.map((key) => (
@@ -586,7 +747,6 @@ export function DisplayPageClient() {
                 type="button"
                 onClick={() => {
                   setPanel(key);
-                  if (key === "debts") setActiveStudentId(null);
                 }}
                 className={cn(
                   "min-h-14 min-w-20 rounded-xl border px-4 text-base font-semibold transition",
@@ -627,16 +787,45 @@ export function DisplayPageClient() {
               </div>
             </div>
           ) : null}
+          {activePersonal ? (
+            <button
+              type="button"
+              disabled={Boolean(data.debts.find((debt) => debt.studentId === activePersonal.studentId)?.hasDebt)}
+              onClick={() => {
+                setActiveStudentId(null);
+                bumpIdle();
+              }}
+              className="min-h-14 rounded-xl bg-amber-400 px-5 text-lg font-bold text-slate-950 disabled:cursor-not-allowed disabled:bg-rose-900 disabled:text-rose-100"
+            >
+              {data.debts.find((debt) => debt.studentId === activePersonal.studentId)?.hasDebt
+                ? "有欠繳，不能下課"
+                : "我完成了／換下一位"}
+            </button>
+          ) : null}
         </div>
       </div>
     </div>
   );
 }
 
-function GamificationOverviewPanel({ rows }: { rows: DisplayPersonalRow[] }) {
+function GamificationOverviewPanel({
+  rows,
+  debts,
+  shopOpen,
+  onOpenShop,
+}: {
+  rows: DisplayPersonalRow[];
+  debts: DisplayDebtRow[];
+  shopOpen: boolean;
+  onOpenShop: () => void;
+}) {
   const sorted = useMemo(
     () => [...rows].sort((a, b) => a.seatNumber - b.seatNumber),
     [rows],
+  );
+  const debtStudentIds = useMemo(
+    () => new Set(debts.filter((debt) => debt.hasDebt).map((debt) => debt.studentId)),
+    [debts],
   );
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-3">
@@ -657,9 +846,14 @@ function GamificationOverviewPanel({ rows }: { rows: DisplayPersonalRow[] }) {
                 <p className="text-sm text-slate-400">{row.seatNumber} 號</p>
                 <h3 className="mt-1 text-2xl font-semibold">{row.name}</h3>
               </div>
-              <span className="rounded-full border border-violet-400/50 bg-violet-500/20 px-3 py-1 font-semibold text-violet-200">
-                Lv.{row.gamification.level}
-              </span>
+              <div className="flex items-center gap-2">
+                {debtStudentIds.has(row.studentId) ? (
+                  <span className="rounded-full border border-rose-400/60 bg-rose-500/20 px-2.5 py-1 text-sm font-semibold text-rose-100">欠繳</span>
+                ) : null}
+                <span className="rounded-full border border-violet-400/50 bg-violet-500/20 px-3 py-1 font-semibold text-violet-200">
+                  Lv.{row.gamification.level}
+                </span>
+              </div>
             </div>
             <div className="mt-4">
               <div className="flex justify-between text-sm text-slate-400">
@@ -681,6 +875,118 @@ function GamificationOverviewPanel({ rows }: { rows: DisplayPersonalRow[] }) {
             </div>
           </article>
         ))}
+        <button
+          type="button"
+          disabled={!shopOpen}
+          onClick={onOpenShop}
+          className={cn(
+            "flex min-h-36 flex-col items-center justify-center rounded-2xl border p-4 text-center transition",
+            shopOpen
+              ? "border-amber-300 bg-amber-500/15 text-amber-100 active:scale-[0.98]"
+              : "cursor-not-allowed border-slate-700 bg-slate-900/50 text-slate-500",
+          )}
+        >
+          <span className="text-4xl">🛍️</span>
+          <span className="mt-3 text-2xl font-semibold">班級商店</span>
+          <span className="mt-1 text-base">{shopOpen ? "點此進入" : "尚未開放"}</span>
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function ShopDisplayPanel({
+  data,
+  row,
+  hasDebt,
+  busyKey,
+  requestedItems,
+  onBack,
+  onRequest,
+}: {
+  data: DisplayData;
+  row: DisplayPersonalRow | null;
+  hasDebt: boolean;
+  busyKey: string | null;
+  requestedItems: Set<string>;
+  onBack: () => void;
+  onRequest: (itemId: string) => void;
+}) {
+  return (
+    <section className="flex min-h-0 flex-1 flex-col gap-4 rounded-2xl border border-amber-400/40 bg-slate-900/80 p-5">
+      <div className="flex shrink-0 items-center justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-semibold text-amber-100">班級商店</h2>
+          <p className="mt-1 text-base text-slate-400">
+            {row
+              ? hasDebt
+                ? "你有尚未完成的項目，完成前不能使用商店"
+                : "確認你的點數後，點選想兌換的商品"
+              : "請先從下方選擇自己的座號"}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onBack}
+          className="min-h-12 rounded-xl border border-slate-600 bg-slate-800 px-4 text-lg font-semibold text-slate-100"
+        >
+          返回個人點數
+        </button>
+      </div>
+
+      {row ? (
+        <div className="shrink-0 rounded-2xl border border-violet-400/50 bg-violet-500/10 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-slate-400">目前兌換者</p>
+              <p className="text-3xl font-semibold">{row.seatNumber} 號 {row.name}</p>
+            </div>
+            <div className="flex gap-3 text-xl font-semibold">
+              <span className="rounded-full border border-violet-400/50 px-4 py-2 text-violet-200">Lv.{row.gamification.level}</span>
+              <span className="rounded-full border border-amber-400/50 bg-amber-500/10 px-4 py-2 text-amber-200">{row.gamification.coins} 金幣</span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex min-h-28 shrink-0 items-center justify-center rounded-2xl border border-dashed border-slate-600 text-2xl text-slate-400">
+          請點下方自己的座號
+        </div>
+      )}
+
+      {row && hasDebt ? (
+        <p className="shrink-0 rounded-xl border border-rose-400/50 bg-rose-500/15 px-4 py-3 text-lg font-semibold text-rose-100">
+          尚有欠繳項目，請先到「欠繳作業」頁確認並完成，暫時不能兌換商品。
+        </p>
+      ) : null}
+
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-auto sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {data.shop.items.map((item) => {
+          const requested = row
+            ? requestedItems.has(`${row.studentId}:${item.id}`)
+            : false;
+          const affordable = Boolean(row && row.gamification.coins >= item.price);
+          return (
+            <button
+              key={item.id}
+              type="button"
+              disabled={!row || hasDebt || requested || !affordable || busyKey === `shop:${item.id}`}
+              onClick={() => onRequest(item.id)}
+              className={cn(
+                "flex min-h-36 flex-col rounded-2xl border p-4 text-left transition disabled:cursor-default disabled:opacity-45",
+                requested
+                  ? "border-emerald-400 bg-emerald-500/15 text-emerald-100"
+                  : "border-amber-300/50 bg-slate-950/50 text-amber-50 enabled:active:scale-[0.98]",
+              )}
+            >
+              <span className="text-4xl">{item.icon}</span>
+              <span className="mt-3 text-xl font-semibold">{item.name}</span>
+              <span className="mt-auto text-lg text-amber-200">
+                {requested ? "✓ 已送出兌換申請" : `${item.price} 金幣`}
+              </span>
+              {item.stock >= 0 ? <span className="mt-1 text-sm text-slate-400">庫存 {item.stock}</span> : null}
+            </button>
+          );
+        })}
       </div>
     </section>
   );
@@ -688,23 +994,15 @@ function GamificationOverviewPanel({ rows }: { rows: DisplayPersonalRow[] }) {
 
 function DebtsPanel({
   debts,
-  activeStudentId,
 }: {
   debts: DisplayDebtRow[];
-  activeStudentId: string | null;
 }) {
-  const rows = useMemo(() => {
-    const withDebt = debts.filter((row) => row.hasDebt);
-    if (!activeStudentId) return withDebt;
-    return withDebt.filter((row) => row.studentId === activeStudentId);
-  }, [activeStudentId, debts]);
-
   const debtCount = debts.filter((row) => row.hasDebt).length;
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
       <div className="shrink-0">
-        <h2 className="text-3xl font-semibold">欠繳作業名單</h2>
+        <h2 className="text-3xl font-semibold">欠繳作業</h2>
         <p className="mt-1 text-base text-slate-400">
           作業（繳交日已到未交）· 護照（本週以前未完成）·
           讀報／心得（本學期未完成）
@@ -712,33 +1010,44 @@ function DebtsPanel({
         </p>
       </div>
 
-      {rows.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-600">
-          <p className="text-2xl text-emerald-300">
-            {activeStudentId ? "這位同學沒有欠繳" : "全班沒有欠繳"}
-          </p>
-        </div>
-      ) : (
-        <div className="min-h-0 flex-1 overflow-auto">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {rows.map((row) => (
+      <div className="min-h-0 flex-1 overflow-auto">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {debts.map((row) => (
               <article
                 key={row.studentId}
-                className="rounded-2xl border border-rose-400/40 bg-slate-900/90 p-4"
+                className={cn(
+                  "rounded-2xl border bg-slate-900/90 p-4",
+                  row.hasDebt ? "border-rose-400/40" : "border-emerald-400/40",
+                )}
               >
-                <h3 className="text-2xl font-semibold text-rose-100">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-2xl font-semibold">
                   {row.seatNumber} {row.name}
-                </h3>
-                <DebtGroup label="作業" items={row.homework} />
-                <DebtGroup label="國語護照" items={row.chinesePassport} />
-                <DebtGroup label="英語護照" items={row.englishPassport} />
-                <DebtGroup label="讀報" items={row.newspaper} />
-                <DebtGroup label="閱讀心得" items={row.reflection} />
+                  </h3>
+                  <span className={cn(
+                    "rounded-full px-3 py-1 text-base font-semibold",
+                    row.hasDebt
+                      ? "border border-rose-400/60 bg-rose-500/20 text-rose-100"
+                      : "border border-emerald-400/60 bg-emerald-500/20 text-emerald-100",
+                  )}>
+                    {row.hasDebt ? "不能下課" : "可以下課／兌換商品"}
+                  </span>
+                </div>
+                {row.hasDebt ? (
+                  <>
+                    <DebtGroup label="作業" items={row.homework} />
+                    <DebtGroup label="國語護照" items={row.chinesePassport} />
+                    <DebtGroup label="英語護照" items={row.englishPassport} />
+                    <DebtGroup label="讀報" items={row.newspaper} />
+                    <DebtGroup label="閱讀心得" items={row.reflection} />
+                  </>
+                ) : (
+                  <p className="mt-4 text-lg text-emerald-200">所有需要完成的項目都已完成。</p>
+                )}
               </article>
-            ))}
-          </div>
+          ))}
         </div>
-      )}
+      </div>
     </section>
   );
 }
@@ -779,6 +1088,8 @@ function TodayPanel({
   canHomework,
   onRoutine,
   onHomework,
+  canTermPassport,
+  onTermPassport,
 }: {
   data: DisplayData;
   row: DisplayPersonalRow | null;
@@ -787,6 +1098,8 @@ function TodayPanel({
   canHomework: boolean;
   onRoutine: (taskKey: string, completed: boolean) => void;
   onHomework: (homeworkId: string, next: boolean) => void;
+  canTermPassport: boolean;
+  onTermPassport: (type: "Chinese" | "English", completed: boolean) => void;
 }) {
   const boardViewportRef = useRef<HTMLDivElement>(null);
   const boardContentRef = useRef<HTMLDivElement>(null);
@@ -926,6 +1239,8 @@ function TodayPanel({
           canHomework={canHomework}
           onRoutine={onRoutine}
           onHomework={onHomework}
+          canTermPassport={canTermPassport}
+          onTermPassport={onTermPassport}
         />
       ) : (
         <TodayProgressOverview data={data} />
@@ -966,13 +1281,9 @@ function TodayProgressOverview({ data }: { data: DisplayData }) {
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              {item.missingNames.length > 0 ? (
-                <p className="mt-1.5 break-words text-base leading-snug text-rose-300">
-                  未完成：{item.missingNames.join("、")}
-                </p>
-              ) : (
-                <p className="mt-1.5 text-base text-slate-500">全部完成</p>
-              )}
+              <p className="mt-1.5 text-base text-slate-500">
+                {item.completed === item.total ? "全部完成" : "還有人尚未完成"}
+              </p>
             </div>
           );
         })}
@@ -1169,14 +1480,8 @@ function LunchRoutineMatrix({
 
   return (
     <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950/50 px-2 pb-2 pt-1">
-      {!canRoutine ? (
-        <p className="shrink-0 truncate text-right text-xs text-slate-500">
-          未開放自行打勾
-        </p>
-      ) : null}
-
       <div
-        className={cn("grid min-h-0 flex-1 gap-0.5", !canRoutine ? "" : "mt-0")}
+        className="grid min-h-0 flex-1 gap-0.5"
         style={{
           gridTemplateColumns: `2.75rem repeat(${rows.length}, minmax(0, 1fr))`,
           gridTemplateRows: `auto repeat(${LUNCH_MATRIX_TASKS.length}, minmax(0, 1fr))`,
@@ -1211,6 +1516,7 @@ function LunchRoutineMatrix({
                     ? row.lunchBrushing
                     : row.noonCleaning;
                 const cellKey = `${row.studentId}:${task.key}`;
+                const canToggle = canRoutine;
                 return (
                   <div
                     key={`${row.studentId}-${task.key}`}
@@ -1218,7 +1524,7 @@ function LunchRoutineMatrix({
                   >
                     <button
                       type="button"
-                      disabled={!canRoutine || busyKey === cellKey}
+                      disabled={!canToggle || busyKey === cellKey}
                       aria-label={`${row.seatNumber} ${row.name} ${task.label}${done ? " 已完成" : " 未完成"}`}
                       onClick={() =>
                         onRoutineCell(row.studentId, task.key, !done)
@@ -1228,8 +1534,8 @@ function LunchRoutineMatrix({
                         done
                           ? "border-emerald-300 bg-emerald-500 text-white"
                           : "border-slate-600 bg-slate-800/90 text-slate-500",
-                        canRoutine && "hover:brightness-110",
-                        !canRoutine && "cursor-default opacity-90",
+                        canToggle && "hover:brightness-110",
+                        !canToggle && "cursor-default opacity-50",
                       )}
                     >
                       {done ? "✓" : ""}
@@ -1940,6 +2246,8 @@ function PersonalChecklist({
   canHomework,
   onRoutine,
   onHomework,
+  canTermPassport,
+  onTermPassport,
 }: {
   data: DisplayData;
   row: DisplayPersonalRow | null;
@@ -1948,6 +2256,8 @@ function PersonalChecklist({
   canHomework: boolean;
   onRoutine: (taskKey: string, completed: boolean) => void;
   onHomework: (homeworkId: string, next: boolean) => void;
+  canTermPassport: boolean;
+  onTermPassport: (type: "Chinese" | "English", completed: boolean) => void;
 }) {
   if (!row) {
     return (
@@ -2022,6 +2332,16 @@ function PersonalChecklist({
                 key={cell.homeworkId}
                 label={cell.title}
                 done={cell.completed}
+                note={
+                  cell.status === "pending_confirmation"
+                    ? "已送出，待老師確認"
+                    : cell.status === "correction_required"
+                      ? "請訂正後再交"
+                      : undefined
+                }
+                noteTone={
+                  cell.status === "correction_required" ? "warning" : "success"
+                }
                 disabled={
                   !canHomework ||
                   busyKey === `${row.studentId}:${cell.homeworkId}`
@@ -2032,6 +2352,10 @@ function PersonalChecklist({
           )}
         </ul>
       </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        <button type="button" disabled={!canTermPassport || busyKey === "term-passport:Chinese"} onClick={() => onTermPassport("Chinese", row.termChinesePassportCompleted)} className={cn("rounded-xl border px-4 py-3 text-left text-lg", row.termChinesePassportCompleted ? "border-emerald-400 bg-emerald-500/20" : "border-slate-600 bg-slate-950/40")}>國語護照 <span className="float-right">{row.termChinesePassportCompleted ? "已完成 ✓" : "我完成了"}</span></button>
+        <button type="button" disabled={!canTermPassport || busyKey === "term-passport:English"} onClick={() => onTermPassport("English", row.termEnglishPassportCompleted)} className={cn("rounded-xl border px-4 py-3 text-left text-lg", row.termEnglishPassportCompleted ? "border-emerald-400 bg-emerald-500/20" : "border-slate-600 bg-slate-950/40")}>英語護照 <span className="float-right">{row.termEnglishPassportCompleted ? "已完成 ✓" : "我完成了"}</span></button>
+      </div>
     </div>
   );
 }
@@ -2040,12 +2364,14 @@ function CheckRow({
   label,
   done,
   note,
+  noteTone = "warning",
   disabled,
   onToggle,
 }: {
   label: string;
   done: boolean;
   note?: string;
+  noteTone?: "warning" | "success";
   disabled: boolean;
   onToggle: () => void;
 }) {
@@ -2077,7 +2403,10 @@ function CheckRow({
         <span className="flex-1">
           {label}
           {note ? (
-            <span className="ml-2 text-base text-rose-300">{note}</span>
+            <span className={cn(
+              "ml-2 text-base",
+              noteTone === "success" ? "text-emerald-300" : "text-amber-300",
+            )}>{note}</span>
           ) : null}
         </span>
       </button>

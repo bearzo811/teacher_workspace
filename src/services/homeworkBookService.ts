@@ -1,18 +1,25 @@
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { homeworkBooks, type HomeworkBook } from "@/db/schema";
+import { homeworkBooks, homeworkSubjects, type HomeworkBook } from "@/db/schema";
 
 export type HomeworkBookView = {
   id: string;
   name: string;
+  subjectId: string | null;
+  subjectName: string | null;
   sortOrder: number;
   isActive: boolean;
 };
 
-function toView(row: HomeworkBook): HomeworkBookView {
+function toView(
+  row: HomeworkBook,
+  subjectName: string | null = null,
+): HomeworkBookView {
   return {
     id: row.id,
     name: row.name,
+    subjectId: row.subjectId,
+    subjectName,
     sortOrder: row.sortOrder,
     isActive: row.isActive,
   };
@@ -23,19 +30,22 @@ export async function listHomeworkBooks(options?: {
 }): Promise<HomeworkBookView[]> {
   const rows = options?.activeOnly
     ? await db
-        .select()
+        .select({ book: homeworkBooks, subjectName: homeworkSubjects.name })
         .from(homeworkBooks)
+        .leftJoin(homeworkSubjects, eq(homeworkBooks.subjectId, homeworkSubjects.id))
         .where(eq(homeworkBooks.isActive, true))
         .orderBy(asc(homeworkBooks.sortOrder), asc(homeworkBooks.name))
     : await db
-        .select()
+        .select({ book: homeworkBooks, subjectName: homeworkSubjects.name })
         .from(homeworkBooks)
+        .leftJoin(homeworkSubjects, eq(homeworkBooks.subjectId, homeworkSubjects.id))
         .orderBy(asc(homeworkBooks.sortOrder), asc(homeworkBooks.name));
-  return rows.map(toView);
+  return rows.map((row) => toView(row.book, row.subjectName));
 }
 
 export async function createHomeworkBook(input: {
   name: string;
+  subjectId?: string | null;
   sortOrder?: number;
 }): Promise<HomeworkBookView> {
   const name = input.name.trim();
@@ -52,6 +62,7 @@ export async function createHomeworkBook(input: {
     .insert(homeworkBooks)
     .values({
       name,
+      subjectId: input.subjectId ?? null,
       sortOrder: input.sortOrder ?? 0,
       isActive: true,
     })
@@ -62,6 +73,7 @@ export async function createHomeworkBook(input: {
 export async function updateHomeworkBook(input: {
   id: string;
   name?: string;
+  subjectId?: string | null;
   sortOrder?: number;
   isActive?: boolean;
 }): Promise<HomeworkBookView> {
@@ -89,6 +101,7 @@ export async function updateHomeworkBook(input: {
     patch.name = name;
   }
   if (input.sortOrder !== undefined) patch.sortOrder = input.sortOrder;
+  if (input.subjectId !== undefined) patch.subjectId = input.subjectId;
   if (input.isActive !== undefined) patch.isActive = input.isActive;
 
   const [row] = await db

@@ -7,7 +7,7 @@ import {
 } from "@/components/passport/PassportMatrix";
 import { ProgressBar } from "@/components/passport/ProgressBar";
 import {
-  nextPassportStatus,
+  nextBinaryPassportStatus,
   PASSPORT_STATUS_LABEL,
   type PassportStatus,
 } from "@/types/passport";
@@ -99,7 +99,7 @@ export function PassportPageClient({ type, title }: PassportPageClientProps) {
         return {
           week: w,
           completed: statuses.filter((s) => s === "completed").length,
-          missingParent: statuses.filter((s) => s === "missing_parent").length,
+          missingParent: 0,
           notStarted: statuses.filter((s) => s === "not_started").length,
           total: students.length,
         };
@@ -123,7 +123,7 @@ export function PassportPageClient({ type, title }: PassportPageClientProps) {
     week: number,
     current: PassportStatus,
   ) {
-    const next = nextPassportStatus(current);
+    const next = nextBinaryPassportStatus(current);
     const key = `${studentId}:${week}`;
     setBusyKey(key);
     setError(null);
@@ -169,12 +169,6 @@ export function PassportPageClient({ type, title }: PassportPageClientProps) {
           {PASSPORT_STATUS_LABEL.not_started}
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="flex h-5 w-5 items-center justify-center rounded border border-red-500 bg-red-50 text-[10px] font-medium text-red-600">
-            缺
-          </span>
-          {PASSPORT_STATUS_LABEL.missing_parent}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
           <span className="flex h-5 w-5 items-center justify-center rounded border border-green-600 bg-green-600 text-[10px] text-white">
             ✓
           </span>
@@ -204,7 +198,7 @@ export function PassportPageClient({ type, title }: PassportPageClientProps) {
             }}
           />
           <p className="text-xs text-gray-400">
-            點格子輪轉：未開始 → 缺家長 → 已完成 → 未開始。目前週由設定「第一週開啟日」自動推算。
+            點格子切換：未開始 ↔ 已完成。目前週由設定「第一週開啟日」自動推算。
           </p>
         </>
       ) : null}

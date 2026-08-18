@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server";
-import { assertDisplayReadingToggleEnabled } from "@/services/displayService";
 import {
   getReadingMatrix,
   upsertReadingStatus,
 } from "@/services/readingService";
 import { isPassportStatus } from "@/types/passport";
 import { isReadingType } from "@/types/reading";
+import { isDisplayKeyRequest, isTeacherRequest } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    if (!(await isTeacherRequest())) {
+      return NextResponse.json({ error: "未授權" }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
     if (!isReadingType(type)) {
@@ -52,11 +55,14 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const isDisplay =
-      body.displayMode === true ||
-      request.headers.get("X-Display-Mode") === "1";
+    const teacher = await isTeacherRequest();
+    const isDisplay = !teacher && (await isDisplayKeyRequest(request));
+    if (!teacher && !isDisplay) {
+      return NextResponse.json({ error: "未授權" }, { status: 401 });
+    }
     if (isDisplay) {
-      await assertDisplayReadingToggleEnabled();
+      // 閱讀心得與讀報僅由老師檢核；大屏不可代學生完成。
+      return NextResponse.json({ error: "閱讀心得與讀報僅能由老師更新" }, { status: 403 });
     }
 
     const data = await upsertReadingStatus({

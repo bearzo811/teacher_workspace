@@ -2,16 +2,18 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   dailyStudentTasks,
+  dailyAbsences,
+  contactBookDays,
   students,
   todayManualCompletions,
 } from "@/db/schema";
 import { todayDateString } from "@/lib/dates";
 import { reconcileRoutineReward } from "@/services/gamificationService";
+import { isActiveTermSchoolDay } from "@/services/termService";
 import {
   DAILY_STUDENT_TASK_LABEL,
   ROUTINE_TASK_KEYS,
   type DailyStudentTaskKey,
-  type RoutineTaskKey,
 } from "@/types/today";
 
 export async function listActiveStudents() {
@@ -27,11 +29,15 @@ export async function listActiveStudents() {
 }
 
 export async function getRoutineDayView(date = todayDateString()) {
-  const active = await listActiveStudents();
-  const rows = await db
+  const [active, rows, absences] = await Promise.all([
+    listActiveStudents(),
+    db
     .select()
     .from(dailyStudentTasks)
-    .where(eq(dailyStudentTasks.taskDate, date));
+    .where(eq(dailyStudentTasks.taskDate, date)),
+    db.select({ studentId: dailyAbsences.studentId }).from(dailyAbsences).where(eq(dailyAbsences.taskDate, date)),
+  ]);
+  const absentIds = new Set(absences.map((row) => row.studentId));
 
   const map = new Map(
     rows.map(
@@ -42,19 +48,34 @@ export async function getRoutineDayView(date = todayDateString()) {
   const tasks = ROUTINE_TASK_KEYS.map((taskKey) => {
     const studentsView = active.map((student) => ({
       ...student,
+      absent: absentIds.has(student.studentId),
       completed: map.get(`${student.studentId}:${taskKey}`) ?? false,
     }));
-    const completedCount = studentsView.filter((s) => s.completed).length;
+    const completedCount = studentsView.filter((s) => !s.absent && s.completed).length;
+    const totalCount = studentsView.filter((s) => !s.absent).length;
     return {
       taskKey,
       label: DAILY_STUDENT_TASK_LABEL[taskKey],
       completedCount,
-      totalCount: active.length,
+      totalCount,
       students: studentsView,
     };
   });
 
   return { date, tasks, students: active };
+}
+
+export async function getAbsentStudentIds(taskDate: string) {
+  const rows = await db.select({ studentId: dailyAbsences.studentId }).from(dailyAbsences).where(eq(dailyAbsences.taskDate, taskDate));
+  return new Set(rows.map((row) => row.studentId));
+}
+
+export async function setDailyAbsence(input: { studentId: string; taskDate: string; absent: boolean }) {
+  if (input.absent) {
+    await db.insert(dailyAbsences).values({ taskDate: input.taskDate, studentId: input.studentId }).onConflictDoNothing();
+  } else {
+    await db.delete(dailyAbsences).where(and(eq(dailyAbsences.taskDate, input.taskDate), eq(dailyAbsences.studentId, input.studentId)));
+  }
 }
 
 export async function getStudentTaskMap(
@@ -152,6 +173,13 @@ export async function upsertDailyStudentTask(input: {
   taskDate?: string;
 }) {
   const taskDate = input.taskDate ?? todayDateString();
+  if (!(await isActiveTermSchoolDay(taskDate))) {
+    throw new Error("每日任務只能建立在目前學期的上課日");
+  }
+  if (input.taskKey === "contact_book_copied" && input.completed) {
+    const [contactBook] = await db.select({ id: contactBookDays.id }).from(contactBookDays).where(eq(contactBookDays.date, taskDate)).limit(1);
+    if (!contactBook) throw new Error("今天尚未建立聯絡簿，不能勾選已抄聯絡簿");
+  }
   const [existing] = await db
     .select()
     .from(dailyStudentTasks)
@@ -209,7 +237,11 @@ export async function upsertDailyStudentTask(input: {
 }
 
 export async function upsertTodayManual(input: {
-  taskKey: "contact_book_confirm" | RoutineTaskKey;
+  taskKey:
+    | "contact_book_confirm"
+    | "morning_cleaning"
+    | "lunch_brushing"
+    | "noon_cleaning";
   completed: boolean;
   taskDate?: string;
 }) {

@@ -4,6 +4,7 @@ import {
   homework,
   homeworkBooks,
   homeworkRecords,
+  homeworkRecordHistory,
   students,
   type Homework,
   type HomeworkRecord,
@@ -31,6 +32,7 @@ export type HomeworkStudentCell = {
   homeworkId: string;
   title: string;
   completed: boolean;
+  status: "unsubmitted" | "pending_confirmation" | "correction_required" | "completed";
 };
 
 export type HomeworkStudentRow = {
@@ -171,18 +173,15 @@ export async function getHomeworkDayView(
       );
   }
 
-  const completedSet = new Set(
-    records
-      .filter((row) => row.completed)
-      .map((row) => `${row.studentId}:${row.homeworkId}`),
+  const statusMap = new Map(
+    records.map((row) => [`${row.studentId}:${row.homeworkId}`, row.status] as const),
   );
 
   const studentRows: HomeworkStudentRow[] = activeStudents.map((student) => {
-    const cells = itemViews.map((item) => ({
-      homeworkId: item.id,
-      title: item.title,
-      completed: completedSet.has(`${student.studentId}:${item.id}`),
-    }));
+    const cells = itemViews.map((item) => {
+      const status = statusMap.get(`${student.studentId}:${item.id}`) ?? "unsubmitted";
+      return { homeworkId: item.id, title: item.title, status, completed: status === "completed" };
+    });
     const missingTitles = cells
       .filter((cell) => !cell.completed)
       .map((cell) => cell.title);
@@ -471,7 +470,9 @@ export async function deleteHomeworkItem(id: string): Promise<void> {
 export async function upsertHomeworkRecord(input: {
   homeworkId: string;
   studentId: string;
-  completed: boolean;
+  completed?: boolean;
+  status?: "unsubmitted" | "pending_confirmation" | "correction_required" | "completed";
+  actor?: "teacher" | "student";
 }): Promise<HomeworkRecord> {
   const [hw] = await db
     .select()
@@ -502,7 +503,9 @@ export async function upsertHomeworkRecord(input: {
     )
     .limit(1);
 
-  const completedAt = input.completed
+  const nextStatus = input.status ?? (input.completed ? "completed" : "unsubmitted");
+  const completed = nextStatus === "completed";
+  const completedAt = completed
     ? existing[0]?.completed && existing[0].completedAt
       ? existing[0].completedAt
       : new Date()
@@ -513,7 +516,8 @@ export async function upsertHomeworkRecord(input: {
     const rows = await db
       .update(homeworkRecords)
       .set({
-        completed: input.completed,
+        completed,
+        status: nextStatus,
         completedAt,
       })
       .where(eq(homeworkRecords.id, existing[0].id))
@@ -525,18 +529,29 @@ export async function upsertHomeworkRecord(input: {
       .values({
         homeworkId: input.homeworkId,
         studentId: input.studentId,
-        completed: input.completed,
+        completed,
+        status: nextStatus,
         completedAt,
       })
       .returning();
     result = rows[0];
   }
 
+  if (!existing[0] || existing[0].status !== nextStatus) {
+    await db.insert(homeworkRecordHistory).values({
+      homeworkId: input.homeworkId,
+      studentId: input.studentId,
+      previousStatus: existing[0]?.status ?? null,
+      nextStatus,
+      actor: input.actor ?? "teacher",
+    });
+  }
+
   await reconcileHomeworkReward({
     studentId: input.studentId,
     homeworkId: input.homeworkId,
     dueDate: String(hw.date),
-    completed: input.completed,
+    completed,
     completedAt,
   });
   return result;

@@ -14,6 +14,7 @@ import {
   NotebookPen,
   Settings,
   Sparkles,
+  ShoppingBag,
   Users,
   UserRound,
 } from "lucide-react";
@@ -30,6 +31,7 @@ const navItems = [
   { href: "/reading", label: "閱讀總表", icon: Newspaper },
   { href: "/routines", label: "每日任務", icon: Sparkles },
   { href: "/students", label: "學生", icon: Users },
+  { href: "/shop", label: "商店", icon: ShoppingBag },
   { href: "/settings", label: "設定", icon: Settings },
 ] as const;
 

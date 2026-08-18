@@ -20,6 +20,19 @@ export const passportStatusEnum = pgEnum("passport_status", [
   "completed",
 ]);
 
+export const homeworkStatusEnum = pgEnum("homework_status", [
+  "unsubmitted",
+  "pending_confirmation",
+  "correction_required",
+  "completed",
+]);
+export const shopOrderStatusEnum = pgEnum("shop_order_status", [
+  "pending",
+  "approved",
+  "rejected",
+  "cancelled",
+]);
+
 export const dailyTaskKeyEnum = pgEnum("daily_task_key", [
   "chinese_passport",
   "english_passport",
@@ -84,8 +97,45 @@ export const passportRecords = pgTable(
   ],
 );
 
+/** v2 護照：每學期每位學生、國語／英語各一筆完成任務。 */
+export const termPassportRecords = pgTable(
+  "term_passport_records",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    termId: uuid("term_id").notNull().references(() => terms.id),
+    studentId: uuid("student_id").notNull().references(() => students.id),
+    type: passportTypeEnum("type").notNull(),
+    completed: boolean("completed").notNull().default(false),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("term_passport_records_term_student_type_uidx").on(table.termId, table.studentId, table.type)],
+);
+export const termPassportHistory = pgTable("term_passport_history", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  passportRecordId: uuid("passport_record_id").notNull().references(() => termPassportRecords.id),
+  previousCompleted: boolean("previous_completed"),
+  nextCompleted: boolean("next_completed").notNull(),
+  actor: text("actor").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const homeworkBooks = pgTable(
   "homework_books",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    subjectId: uuid("subject_id").references(() => homeworkSubjects.id),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex("homework_books_name_uidx").on(table.name)],
+);
+
+/** 作業科目；簿本／教材可隸屬於一個科目。 */
+export const homeworkSubjects = pgTable(
+  "homework_subjects",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     name: text("name").notNull(),
@@ -93,7 +143,7 @@ export const homeworkBooks = pgTable(
     isActive: boolean("is_active").notNull().default(true),
     ...timestamps,
   },
-  (table) => [uniqueIndex("homework_books_name_uidx").on(table.name)],
+  (table) => [uniqueIndex("homework_subjects_name_uidx").on(table.name)],
 );
 
 export const homework = pgTable("homework", {
@@ -123,6 +173,7 @@ export const homeworkRecords = pgTable(
       .notNull()
       .references(() => students.id),
     completed: boolean("completed").notNull().default(false),
+    status: homeworkStatusEnum("status").notNull().default("unsubmitted"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
   },
   (table) => [
@@ -133,11 +184,64 @@ export const homeworkRecords = pgTable(
   ],
 );
 
+export const homeworkRecordHistory = pgTable(
+  "homework_record_history",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    homeworkId: uuid("homework_id").notNull().references(() => homework.id),
+    studentId: uuid("student_id").notNull().references(() => students.id),
+    previousStatus: homeworkStatusEnum("previous_status"),
+    nextStatus: homeworkStatusEnum("next_status").notNull(),
+    actor: text("actor").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("homework_record_history_record_idx").on(table.homeworkId, table.studentId)],
+);
+
+/** 學期主檔；歷史學期保留，僅一個可啟用。 */
+export const terms = pgTable(
+  "terms",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    schoolYear: text("school_year").notNull(),
+    startsOn: date("starts_on").notNull(),
+    endsOn: date("ends_on").notNull(),
+    isActive: boolean("is_active").notNull().default(false),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("terms_school_year_name_uidx").on(table.schoolYear, table.name),
+  ],
+);
+
+/** 每學期的名冊與座號快照，避免新學期調整覆蓋舊學期。 */
+export const termRosterEntries = pgTable(
+  "term_roster_entries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    termId: uuid("term_id")
+      .notNull()
+      .references(() => terms.id),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => students.id),
+    seatNumber: integer("seat_number").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("term_roster_entries_term_student_uidx").on(table.termId, table.studentId),
+    uniqueIndex("term_roster_entries_term_seat_uidx").on(table.termId, table.seatNumber),
+  ],
+);
+
 export const classSettings = pgTable("class_settings", {
   id: uuid("id").defaultRandom().primaryKey(),
   schoolYear: text("school_year").notNull(),
   grade: integer("grade").notNull(),
   className: text("class_name").notNull(),
+  activeTermId: uuid("active_term_id").references(() => terms.id),
   currentWeek: integer("current_week").notNull(),
   chineseStartWeek: integer("chinese_start_week").notNull().default(3),
   chineseEndWeek: integer("chinese_end_week").notNull().default(16),
@@ -171,8 +275,10 @@ export const classSettings = pgTable("class_settings", {
   displayCarouselEnabled: boolean("display_carousel_enabled")
     .notNull()
     .default(false),
-  /** 大屏存取 token（空字串＝不驗證） */
+  /** 舊版大屏明文 token；啟動時遷移為雜湊後清空 */
   displayToken: text("display_token").notNull().default(""),
+  /** 大屏存取碼 SHA-256 雜湊（空字串＝尚未設定） */
+  displayTokenHash: text("display_token_hash").notNull().default(""),
   /** 大屏輪詢秒數 */
   displayRefreshSeconds: integer("display_refresh_seconds")
     .notNull()
@@ -181,6 +287,7 @@ export const classSettings = pgTable("class_settings", {
   displayContactBookDate: text("display_contact_book_date")
     .notNull()
     .default(""),
+  shopOpen: boolean("shop_open").notNull().default(false),
   ...timestamps,
 });
 
@@ -214,6 +321,19 @@ export const contactBookDays = pgTable(
   (table) => [uniqueIndex("contact_book_days_date_uidx").on(table.date)],
 );
 
+/** 週一至週五的聯絡簿範本，內容可於套用後繼續調整。 */
+export const contactBookTemplates = pgTable(
+  "contact_book_templates",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    weekday: integer("weekday").notNull(),
+    notes: text("notes").notNull().default("[]"),
+    assignments: text("assignments").notNull().default("[]"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("contact_book_templates_weekday_uidx").on(table.weekday)],
+);
+
 /** 學生當日例行勾選（已抄／打掃／刷牙） */
 export const dailyStudentTasks = pgTable(
   "daily_student_tasks",
@@ -235,6 +355,17 @@ export const dailyStudentTasks = pgTable(
       table.taskKey,
     ),
   ],
+);
+
+/** 當日缺席；僅從每日任務的待完成名單排除，不影響作業繳交。 */
+export const dailyAbsences = pgTable(
+  "daily_absences",
+  {
+    taskDate: date("task_date").notNull(),
+    studentId: uuid("student_id").notNull().references(() => students.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("daily_absences_date_student_uidx").on(table.taskDate, table.studentId)],
 );
 
 /** 老師 Today 手動確認（打掃等；聯絡簿亦可手動收工） */
@@ -316,7 +447,7 @@ export const readingRecords = pgTable(
       .references(() => students.id),
     type: readingTypeEnum("type").notNull(),
     schoolYear: text("school_year").notNull(),
-    /** first=上學期(9–12)｜second=下學期(3–6) */
+    /** first=上學期(9–1)｜second=下學期(2–6) */
     semester: text("semester").notNull(),
     month: integer("month").notNull(),
     status: passportStatusEnum("status").notNull().default("not_started"),
@@ -418,10 +549,36 @@ export const gamificationLedger = pgTable(
   ],
 );
 
+export const shopItems = pgTable("shop_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  icon: text("icon").notNull().default("🎁"),
+  price: integer("price").notNull(),
+  stock: integer("stock").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  ...timestamps,
+});
+
+export const shopOrders = pgTable(
+  "shop_orders",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    itemId: uuid("item_id").notNull().references(() => shopItems.id),
+    studentId: uuid("student_id").notNull().references(() => students.id),
+    price: integer("price").notNull(),
+    status: shopOrderStatusEnum("status").notNull().default("pending"),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedBy: text("resolved_by"),
+  },
+  (table) => [index("shop_orders_status_idx").on(table.status, table.requestedAt)],
+);
+
 export type Student = typeof students.$inferSelect;
 export type NewStudent = typeof students.$inferInsert;
 export type PassportRecord = typeof passportRecords.$inferSelect;
 export type HomeworkBook = typeof homeworkBooks.$inferSelect;
+export type HomeworkSubject = typeof homeworkSubjects.$inferSelect;
 export type Homework = typeof homework.$inferSelect;
 export type HomeworkRecord = typeof homeworkRecords.$inferSelect;
 export type ClassSettings = typeof classSettings.$inferSelect;
@@ -432,9 +589,13 @@ export type TodayManualCompletion = typeof todayManualCompletions.$inferSelect;
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
 export type NewCalendarEvent = typeof calendarEvents.$inferInsert;
 export type CalendarDayOverride = typeof calendarDayOverrides.$inferSelect;
+export type Term = typeof terms.$inferSelect;
+export type TermRosterEntry = typeof termRosterEntries.$inferSelect;
 export type DutyOverride = typeof dutyOverrides.$inferSelect;
 export type ReadingRecord = typeof readingRecords.$inferSelect;
 export type GamificationSettings = typeof gamificationSettings.$inferSelect;
 export type StudentGameProfile = typeof studentGameProfiles.$inferSelect;
 export type GamificationEffect = typeof gamificationEffects.$inferSelect;
 export type GamificationLedgerEntry = typeof gamificationLedger.$inferSelect;
+export type ShopItem = typeof shopItems.$inferSelect;
+export type ShopOrder = typeof shopOrders.$inferSelect;

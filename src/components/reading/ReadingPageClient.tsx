@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
@@ -12,9 +11,7 @@ import {
 import {
   READING_SEMESTER_LABEL,
   READING_TYPE_LABEL,
-  suggestReadingSemester,
   type ReadingMatrixView,
-  type ReadingSemester,
   type ReadingType,
 } from "@/types/reading";
 
@@ -118,31 +115,18 @@ function ReadingMatrixTable({
 export function ReadingPageClient() {
   const [newspaper, setNewspaper] = useState<ReadingMatrixView | null>(null);
   const [reflection, setReflection] = useState<ReadingMatrixView | null>(null);
-  const [schoolYear, setSchoolYear] = useState("");
-  const [semester, setSemester] = useState<ReadingSemester>("first");
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [savingTerm, setSavingTerm] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [settingsRes, newsRes, refRes] = await Promise.all([
-        fetch("/api/settings"),
+      const [newsRes, refRes] = await Promise.all([
         fetch("/api/reading?type=newspaper"),
         fetch("/api/reading?type=reflection"),
       ]);
-      const settingsJson = (await settingsRes.json()) as {
-        data?: {
-          schoolYear: string;
-          readingSchoolYear: string;
-          readingSemester: string;
-        };
-        error?: string;
-      };
       const newsJson = (await newsRes.json()) as {
         data?: ReadingMatrixView;
         error?: string;
@@ -151,22 +135,8 @@ export function ReadingPageClient() {
         data?: ReadingMatrixView;
         error?: string;
       };
-      if (!settingsRes.ok) throw new Error(settingsJson.error ?? "讀取設定失敗");
       if (!newsRes.ok) throw new Error(newsJson.error ?? "讀取讀報失敗");
       if (!refRes.ok) throw new Error(refJson.error ?? "讀取心得失敗");
-
-      const settings = settingsJson.data!;
-      const configured = Boolean(settings.readingSchoolYear.trim());
-      setSchoolYear(
-        settings.readingSchoolYear.trim() || settings.schoolYear.trim(),
-      );
-      setSemester(
-        configured && settings.readingSemester === "second"
-          ? "second"
-          : configured && settings.readingSemester === "first"
-            ? "first"
-            : suggestReadingSemester(),
-      );
       setNewspaper(newsJson.data ?? null);
       setReflection(refJson.data ?? null);
     } catch (err) {
@@ -179,30 +149,6 @@ export function ReadingPageClient() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  async function saveTerm() {
-    setSavingTerm(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const response = await fetch("/api/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          readingSchoolYear: schoolYear.trim(),
-          readingSemester: semester,
-        }),
-      });
-      const json = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(json.error ?? "儲存學期失敗");
-      setMessage("已更新學期");
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "儲存學期失敗");
-    } finally {
-      setSavingTerm(false);
-    }
-  }
 
   async function toggleCell(
     type: ReadingType,
@@ -244,59 +190,15 @@ export function ReadingPageClient() {
       <header>
         <h1 className="text-2xl font-semibold text-gray-900">閱讀總表</h1>
         <p className="mt-1 text-sm text-gray-500">
-          每月一篇讀報＋一篇閱讀心得（1、2、7、8 月除外）；三態：未開始／缺家長／已完成
+          每個上課月各一篇讀報與閱讀心得（7、8 月除外）；三態：未開始／缺家長／已完成
         </p>
       </header>
 
-      <Card>
-        <CardTitle>學期設定</CardTitle>
-        <CardDescription>
-          上學期顯示 9–12 月；下學期顯示 3–6 月。大屏會跟此設定同步。
-        </CardDescription>
-        <div className="mt-4 flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1 text-sm text-gray-700">
-            學年度
-            <input
-              value={schoolYear}
-              onChange={(event) => setSchoolYear(event.target.value)}
-              className="h-10 w-28 rounded-lg border border-gray-200 px-3 outline-none ring-blue-500 focus:ring-2"
-              placeholder="115"
-            />
-          </label>
-          <div className="flex gap-4 pb-2 text-sm text-gray-700">
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                checked={semester === "first"}
-                onChange={() => setSemester("first")}
-              />
-              上學期（9–12）
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                checked={semester === "second"}
-                onChange={() => setSemester("second")}
-              />
-              下學期（3–6）
-            </label>
-          </div>
-          <Button
-            disabled={savingTerm || !schoolYear.trim()}
-            onClick={() => {
-              void saveTerm();
-            }}
-          >
-            {savingTerm ? "儲存中…" : "套用學期"}
-          </Button>
-        </div>
-        {termLabel ? (
-          <p className="mt-3 text-sm text-gray-600">目前顯示：{termLabel}</p>
-        ) : null}
-      </Card>
+      {termLabel ? (
+        <p className="text-sm text-gray-500">目前自動顯示：{termLabel}</p>
+      ) : null}
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      {message ? <p className="text-sm text-green-600">{message}</p> : null}
       {loading ? <p className="text-sm text-gray-400">載入中…</p> : null}
 
       <div className="grid gap-6 xl:grid-cols-2">

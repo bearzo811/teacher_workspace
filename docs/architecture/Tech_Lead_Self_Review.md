@@ -1,142 +1,48 @@
-# Tech Lead Self Review — Student Gamification
+# 技術主管自我審查 — Teacher Workspace
 
-Date: 2026-08-09
-Grade: **B+**
+角色：Google L6 等級技術主管
+日期：2026-08-18
 
-## What is solid
+## 自評等級
 
-- One service-layer settlement path covers teacher, display and cron writers.
-- Deterministic effect keys, advisory locks and delta reconciliation prevent duplicate rewards.
-- Immutable ledger preserves auditability; profile projection keeps display reads cheap.
-- Historical records start at zero and rule changes do not reprice active effects.
+**B-** — 單一受信任教室下，產品模型與 service 分層一致，養成系統對冪等性也格外謹慎。但正式環境的安全性依賴「網址不公開」：教師 API 沒有授權、大屏 token 已外洩，且重要寫入缺少原子性。
 
-## Top smells / risks
+## 架構異味
 
-1. Teacher APIs still have the repo's existing no-auth boundary; gamification does not solve it.
-2. `gamificationService.ts` owns commands, reads and overdue scans and should split if the domain grows.
-3. `DisplayPageClient.tsx` and `SettingsPageClient.tsx` became larger; extraction remains deferred.
-4. Deleting a homework reverses effects before domain deletion, but the two operations are not one shared DB transaction.
-5. Cron integration depends on a production `CRON_SECRET` and migration `0013`; release is blocked until both are verified.
+| 異味 | 位置 | 嚴重度 | 證據 |
+| --- | --- | --- | --- |
+| 缺少授權邊界 | 所有教師 API | 嚴重 | 15 個可寫入端點檔沒有 session／角色檢查；任何訪客都可改動名冊、設定與紀錄。 |
+| 大屏密鑰無效 | `/api/settings`、`/api/display` | 嚴重 | 未驗證的 settings GET 回傳 `displayToken`，明文 query token 因此可被取得。 |
+| 可偽造的大屏權限 | 大屏寫入路由 | 高 | `X-Display-Mode: 1` 完全由客戶端控制；寫入時未驗證綁定的大屏 session／token。 |
+| 聚合寫入非原子性 | 聯絡簿、作業／護照＋獎勵 | 高 | 多筆相依更新與獎勵對帳發生在交易之外。 |
+| God Client | `DisplayPageClient.tsx` | 高 | 2,086 行混合六個面板、輪詢、座位控制、時鐘與寫入。 |
+| 無界的聚合輪詢 | display service／client | 中 | 每 5 秒以上傳回完整跨領域資料；學生與歷史資料增加後成本會提高。 |
+| 脆弱的 API 邊界 | Route Handler | 中 | 重複的型別轉換／驗證，並以 `message.includes` 判斷 HTTP 狀態。 |
+| 隱含的單班模型 | schema／services | 中 | `limit(1)` 設定與無 class ID，使驗證／多班重構成為橫切式改動。 |
+| 測試缺口 | 整個儲存庫 | 中 | 只有 4 個純函式測試；缺少 auth、API、整合、遷移與 E2E 覆蓋。 |
+| 無效狀態層 | `src/store` | 低 | 4 個 Zustand store 在各自檔案之外沒有引用。 |
 
-## Immediate assessment
+## 擴展性（1 → 10 → 100）
 
-No unapproved adjacent refactor was performed. G1–G6 match the owner-approved plan.
+- **1 班：** 修正存取控制後可正常使用。現行 DB pool 與同步大屏聚合對約 30 位學生可接受，但 5 秒輪詢仍有浪費。
+- **10 班：** 若沒有 `teacher`、`class`、成員關係與租戶範圍查詢，便不安全。全域設定與唯一約束會產生歧義，所有 API 都要帶入身分範圍。
+- **100 班：** 完整大屏聚合＋輪詢需要請求分片、快取／再驗證、可觀測性與租戶隔離。2,086 行的大屏 client 也會使功能開發與迴歸測試變慢。
 
-# Lite Tech Lead Self Review — Display DB Performance
+## 可維護性
 
-Date: 2026-08-09
+資料與 service 的分層、以及 Drizzle 遷移均容易理解。真正的限制是橫切關注點分散：加入授權會影響每個 Route Handler；重構大屏行為則有大型、未受測元件的風險。六個月後，若沒有標準化 API／client 介面，下個功能很可能再次複製一套直接 fetch 的狀態機。
 
-## Scope
+## 重構成本
 
-- Vercel Functions pinned to Tokyo (`hnd1`) near Supabase Tokyo.
-- Daily routine reads changed from per-student/per-task queries to one daily batch query.
-- No data contract or UI behavior changes.
+- **身分驗證／角色：** 高，但若先在 API 邊界實作單一教師 session 與獨立大屏能力，範圍仍可控。
+- **多租戶／多班：** 高；需修改 schema、所有查詢範圍、唯一索引與路由／session 模型。不要與初次驗證強化混在同一批。
+- **大屏拆分：** 中；先抽出資料載入、寫入與座位狀態 hook，再以不變的契約拆分面板。
+- **交易安全：** 中；應逐一處理聚合命令，並加上 rollback 測試。
 
-## Grade
+## 前五大問題（依優先順序）
 
-**A-**
-
-## Top smells
-
-1. `getDisplayData` still aggregates many service queries; acceptable at current sub-second warm latency.
-2. Several services independently read settings and active students; future optimization can pass request-scoped snapshots.
-3. No response cache was added because immediate post-toggle refresh must not return stale data.
-
-# Tech Lead Self Review — Teacher Workspace
-
-**Persona:** Google L6-style Tech Lead  
-**Date:** 2026-07-30  
-**Based on:** `Architecture_Inventory.md`
-
----
-
-## Self Grade
-
-**B**
-
-產品流程（聯絡簿→繳交日→大屏）想得清楚，Service 聚合方向正確；但公網部署卻零認證、Zustand 名實不符、PageClient／passportService 已開始變胖。以「自用 MVP」可活；以「可給別班老師用的產品」還不夠。
-
----
-
-## Architecture Smells
-
-| Smell               | Where                                     | Severity | Evidence                                   |
-| ------------------- | ----------------------------------------- | -------- | ------------------------------------------ |
-| God Component       | `DisplayPageClient`, `SettingsPageClient` | High     | 350–380 行；polling＋mutation＋UI 一鍋     |
-| God Service         | `passportService.ts`                      | Med      | ~413 行；矩陣／摘要／upsert 全塞           |
-| Dead Code           | `src/store/*`, empty `hooks/`, `utils/`   | Med      | Zustand 零引用；目錄謊言                   |
-| Duplicate Logic     | `*PageClient` fetch/error/busy            | Med      | 同構樣板複製 7 次                          |
-| Primitive Obsession | API errors                                | Med      | 用中文 `message.includes` 決定 HTTP status |
-| Feature Envy        | Display mutations via teacher APIs        | Low–Med  | 靠 header／flag 旁路，權限模型未成形       |
-| Long Method         | `saveContactBook`, display handlers       | Low–Med  | 可讀但難測                                 |
-| Tight Coupling      | UI ↔ fetch shapes                         | Med      | View types 散落 Client／Service            |
-| Missing Boundary    | Auth / tenancy                            | **High** | 單班假設寫死在 settings 單列               |
-
-無明顯 circular dependency（層級仍是 UI→API→Service→DB）。
-
----
-
-## Scalability（1 → 10 → 100 班）
-
-| Scale  | What breaks                                                                            |
-| ------ | -------------------------------------------------------------------------------------- |
-| 1 班   | 現況可接受（~9 生、polling 20s）                                                       |
-| 10 班  | `class_settings` 單列炸；需 teacher/class 模型；API 無隔離＝資料串班災難               |
-| 100 班 | Dashboard/Display 全量聚合＋輪詢不可接受；需 cache/Realtime、權限、觀測、多租戶 schema |
-
-座號／護照矩陣在 10 班×30 生×15 週會開始痛，但遠小於「無租戶隔離」的問題。
-
----
-
-## Maintainability（半年後還敢改嗎？）
-
-- **敢改：** contact book dual-date、display route group、drizzle migrations — 邊界清楚。
-- **不敢大改：** DisplayPageClient／Settings 肥檔；任意加 Auth 會碰到每個 API。
-- **文件尚可：** PRD/TDD/Rules 在；但實作已超前部分文件，靠 Inventory 補洞。
-
-半年後若沒拆 PageClient、沒清死碼，新功能會優先往神元件堆，債會指數成長。
-
----
-
-## Refactoring cost（若今天加登入／權限／多教師）
-
-| Change                   | Blast radius                                                        |
-| ------------------------ | ------------------------------------------------------------------- |
-| Login（Supabase Auth）   | 全 API + layout + display middleware；**大**                        |
-| 角色（老師 vs 大屏唯讀） | display 寫入路徑、settings；中                                      |
-| 多教師／多班             | schema 幾乎全表加 `class_id`、settings 重寫、所有 queries；**極大** |
-| React Query              | 所有 PageClient；中，但是線性可拆                                   |
-
-結論：Auth／多租戶不是「加一個 provider」；現在的單租戶捷徑會變成遷移稅。
-
----
-
-## Top 5 issues（ordered）
-
-1. **公網零認證／無 RLS** — 安全邊界不存在。
-2. **God Components（Display／Settings）** — 下一輪功能的主要摩擦。
-3. **Zustand dead + 無 data-fetching 層** — 架構故事與實作分裂。
-4. **passportService 過肥 + 型別分散** — domain 核心難測。
-5. **seat_number 無 DB unique／假日未建模** — 真實教室 edge case。
-
----
-
-## What I would praise in a promo doc
-
-- Contact book vs due date split matches real teacher days.
-- Dashboard/Display SSOT services prevent divergent completion math.
-- Single deploy, dual layout is the right MVP tradeoff.
-
----
-
-## Lite Self Review — Student detail latency / Gamification overview
-
-Date: 2026-08-09
-
-- Student detail now reads passport records once and aggregates homework totals in SQL, instead of issuing four full-row queries.
-- Gamification profile, settings, and ledger reads execute in one query round.
-- Serverless DB pool default is one connection per instance to prevent aggregate Supabase pool exhaustion.
-- Display reuses the existing batched `data.personal` payload; the new overview page adds no API or DB query.
-- The overview is ordered by seat number and intentionally does not introduce leaderboard semantics.
-
-**Grade: A-** — Query fan-out and connection pressure are reduced without changing API contracts. Remaining debt: `DisplayPageClient` grew further and should only be split after Proposal approval.
+1. 關閉未驗證的教師 API，並停止回傳大屏憑證。
+2. 為大屏寫入建立可驗證、受限的能力憑證，不再信任 `X-Display-Mode`。
+3. 讓聯絡簿對帳與紀錄／獎勵更新具備交易原子性。
+4. 依面板拆分大屏資料與 `DisplayPageClient`，降低輪詢與迴歸風險。
+5. 在大型重構前補足 API／整合／E2E smoke coverage，並放入 CI。

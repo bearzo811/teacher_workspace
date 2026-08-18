@@ -1,10 +1,10 @@
 # PRD｜Teacher Workspace（MVP v1.0 → Blueprint v1）
 
 **Version:** 1.0（實作基準）＋ **Product Blueprint v1 Locked 2026-07-30**  
-**Status:** 產品藍圖已鎖定，見 [`docs/PRODUCT_BLUEPRINT_V1.md`](./docs/PRODUCT_BLUEPRINT_V1.md)  
+**Status:** v1 為歷史規格；目前已確認的實作基準見 [`docs/PRODUCT_SPEC_V2.md`](./docs/PRODUCT_SPEC_V2.md)。
 **Product:** Teacher Workspace（導師工作台）
 
-> **實作與 IA 以 Blueprint v1 為準。** 下文 Module 1「Dashboard 三勾選」為歷史 MVP 描述，已被 **Today 工作狀態儀表板** 取代；遷移完成前兩套並存於文件，程式應逐步對齊 Blueprint。
+> **實作與 IA 以 Product Spec v2 為準。** 下文保留歷史 MVP 描述，若與 v2 衝突，一律採 v2。
 
 ---
 
@@ -31,7 +31,7 @@ Teacher Workspace 是一套提供國小導師每日使用的工作台，將班�
 
 國小導師（目前以四年級為主）
 
-MVP：單一教師、單一班級、自用工具（無登入）。
+MVP：單一教師、單一班級、自用工具。教師需以密碼登入；教室大屏使用獨立、可撤銷的存取碼，不具教師管理權限。
 
 ---
 
@@ -199,7 +199,8 @@ Teacher Workspace
 
 | 項目 | 決策 |
 |------|------|
-| Auth | MVP 不登入（Mock Teacher） |
+| 教師驗證 | 單一教師密碼登入；安全 session cookie |
+| 大屏存取 | 獨立存取碼換取受限 session；僅可讀大屏與使用已開放的自助操作 |
 | 本週 | 手動設定 `current_week` |
 | 今日工作 | 手動勾選；狀態入 DB |
 | 作業建立 | 預設模板 + 可自由新增 |
@@ -251,7 +252,7 @@ Teacher Workspace
 * AI 評語／家長通知／學習分析／風險提醒
 * 月報／學期報表
 * 多班級切換
-* 雲端同步與備份、Supabase Auth
+* 雲端同步與備份、Supabase Auth／多教師帳號
 
 ---
 
@@ -263,3 +264,4 @@ Teacher Workspace
 | 2026-07-29 | 今日工作勾選採 `daily_task_completions`（正式 Domain Data，不用 localStorage） |
 | 2026-07-29 | 聯絡簿主導作業建立；可選日、預設明天→後改預設今天＋繳交日＝下個上課日 |
 | 2026-07-30 | **Product Blueprint v1 鎖定**：Today Hybrid 狀態儀表板；大屏護照學生僅未開始→完成；作業獨立 nav＋深鏈；每日任務域；點擊預算硬規則 → `docs/PRODUCT_BLUEPRINT_V1.md` |
+| 2026-08-18 | 安全強化：單一教師改為密碼登入；大屏採獨立、受限且可撤銷的存取碼 session，不導入多教師或多班級。 |

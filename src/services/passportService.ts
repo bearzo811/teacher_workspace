@@ -110,13 +110,10 @@ function buildWeekList(startWeek: number, endWeek: number) {
 }
 
 function asStatus(value: string | null | undefined): PassportStatus {
-  if (
-    value === "not_started" ||
-    value === "missing_parent" ||
-    value === "completed"
-  ) {
+  if (value === "completed") {
     return value;
   }
+  // 舊版「缺家長」資料在護照改為兩態後，一律視為未開始。
   return "not_started";
 }
 
@@ -167,9 +164,7 @@ export async function getPassportWeekView(
   const completedCount = studentsView.filter(
     (s) => s.status === "completed",
   ).length;
-  const missingParentCount = studentsView.filter(
-    (s) => s.status === "missing_parent",
-  ).length;
+  const missingParentCount = 0;
   const notStartedCount = studentsView.filter(
     (s) => s.status === "not_started",
   ).length;
@@ -200,9 +195,7 @@ export async function getPassportSummary(
     remainingNames: view.students
       .filter((s) => s.status !== "completed")
       .map((s) => s.name),
-    missingParentNames: view.students
-      .filter((s) => s.status === "missing_parent")
-      .map((s) => s.name),
+    missingParentNames: [],
   };
 }
 
@@ -229,13 +222,7 @@ export async function getPassportDashboardSummary(
     );
     if (owedCells.length === 0) continue;
 
-    const detail = owedCells
-      .map((cell) =>
-        cell.status === "missing_parent"
-          ? `W${cell.week}缺家長`
-          : `W${cell.week}`,
-      )
-      .join("、");
+    const detail = owedCells.map((cell) => `W${cell.week}`).join("、");
 
     owedStudents.push({
       name: student.name,
@@ -314,7 +301,7 @@ export async function getPassportMatrix(
     return {
       week,
       completed: statuses.filter((s) => s === "completed").length,
-      missingParent: statuses.filter((s) => s === "missing_parent").length,
+      missingParent: 0,
       notStarted: statuses.filter((s) => s === "not_started").length,
       total: matrixStudents.length,
     };
@@ -346,6 +333,9 @@ export async function upsertPassportStatus(input: {
   week: number;
   status: PassportStatus;
 }): Promise<PassportRecord> {
+  if (input.status !== "not_started" && input.status !== "completed") {
+    throw new Error("護照狀態只能是未開始或已完成");
+  }
   const settings = await getClassSettings();
   const { startWeek, endWeek } = weekBounds(input.type, settings);
 

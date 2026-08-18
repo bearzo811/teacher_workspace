@@ -6,6 +6,7 @@ import {
   type PassportType,
 } from "@/services/passportService";
 import { assertDisplayPassportToggleEnabled } from "@/services/displayService";
+import { isDisplayKeyRequest, isTeacherRequest } from "@/lib/access";
 import { isPassportStatus } from "@/types/passport";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,9 @@ function parseType(value: string | null): PassportType | null {
 
 export async function GET(request: Request) {
   try {
+    if (!(await isTeacherRequest())) {
+      return NextResponse.json({ error: "未授權" }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
     const type = parseType(searchParams.get("type"));
     const weekParam = searchParams.get("week");
@@ -60,33 +64,25 @@ export async function PATCH(request: Request) {
       !body.studentId ||
       !type ||
       typeof body.week !== "number" ||
-      !isPassportStatus(body.status)
+      !isPassportStatus(body.status) ||
+      (body.status !== "not_started" && body.status !== "completed")
     ) {
       return NextResponse.json(
         {
           error:
-            "請提供 studentId、type（Chinese|English）、week（數字）、status（not_started|missing_parent|completed）",
+            "請提供 studentId、type（Chinese|English）、week（數字）、status（not_started|completed）",
         },
         { status: 400 },
       );
     }
 
-    const isDisplay =
-      body.displayMode === true ||
-      request.headers.get("X-Display-Mode") === "1";
+    const teacher = await isTeacherRequest();
+    const isDisplay = !teacher && (await isDisplayKeyRequest(request));
+    if (!teacher && !isDisplay) {
+      return NextResponse.json({ error: "未授權" }, { status: 401 });
+    }
     if (isDisplay) {
       await assertDisplayPassportToggleEnabled(body.week);
-      // 大屏學生可設：未開始／缺家長／已完成（僅自己的格子，由前端座號鎖）
-      if (
-        body.status !== "completed" &&
-        body.status !== "missing_parent" &&
-        body.status !== "not_started"
-      ) {
-        return NextResponse.json(
-          { error: "大屏護照狀態無效" },
-          { status: 400 },
-        );
-      }
     }
 
     const data = await upsertPassportStatus({

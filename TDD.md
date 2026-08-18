@@ -1,5 +1,27 @@
 # Teacher Workspace — Technical Design Document（TDD v1.0）
 
+> **文件狀態：** 本文件的既有技術細節為歷史基線。所有新功能的產品行為、存取模型與資料需求必須先遵循 [`docs/PRODUCT_SPEC_V2.md`](./docs/PRODUCT_SPEC_V2.md)；若本文件與 v2 衝突，以 v2 為準，並在實作該階段時更新相應技術設計與 migration。
+
+## v2 Task 2：學期與上課日曆基礎
+
+- 新增 `terms`：單一班級的學期主檔，含名稱、學年度、開始／結束日與啟用狀態。日期以 `YYYY-MM-DD` 儲存。
+- `class_settings.active_term_id` 指向目前啟用學期；舊資料不強制回填，避免在 migration 中猜測既有學期。
+- 一次只能有一個啟用學期；啟用新學期時，服務層會停用其他學期並更新 `active_term_id`。
+- 上課日不另建全學期逐日資料：以週一至週五為基準，讀取既有 `calendar_day_overrides` 處理放假與補課，且必須落在目前學期範圍內。
+- API：`GET /api/terms`、`POST /api/terms`、`PATCH /api/terms`；皆需教師 session。建立／啟用學期的名冊複製與任務生成留待後續 Task。
+
+## v2 Task 3：學期名冊快照
+
+- 新增 `term_roster_entries`，以 `(term_id, student_id)` 保存該學期的在籍狀態與座號快照；同一學期座號唯一。
+- 建立學期時：優先複製目前啟用學期的名冊快照；若沒有任何舊學期快照，則複製現有 `students.is_active = true` 的名冊。
+- 本 Task 不改既有學生中心讀寫流程，也不做視覺座位圖；後續 Task 會把學生管理與大屏改為使用啟用學期名冊。
+
+## v2 Task 4：聯絡簿／作業四態資料底座
+
+- 新增 `homework_subjects`；`homework_books.subject_id` 讓簿本／教材隸屬科目，仍保留現有簿本資料的相容性。
+- `homework_records.status` 為 `unsubmitted`、`pending_confirmation`、`correction_required`、`completed`；既有 `completed=true` 資料遷移為 `completed`，其餘為 `unsubmitted`。
+- 新增不可變的 `homework_record_history`，保存前後狀態、操作來源與時間。後續操作 API 必須寫入此表。
+
 > **Version:** 1.0（已併入 2026-07-29 Errata 決策）  
 > **Product:** Teacher Workspace  
 > **Target:** Cursor AI Developer  
@@ -32,7 +54,7 @@ dashboardStore
 ### Database
 
 Supabase PostgreSQL（正式）  
-本機開發可用相同 schema 連線；MVP 無 Auth。
+本機開發可用相同 schema 連線；單一教師採應用程式 session 驗證。
 
 ### ORM
 
@@ -42,9 +64,14 @@ Drizzle ORM
 
 Vercel
 
-### Auth（MVP）
+### 驗證與大屏存取（MVP 安全強化）
 
-不登入。資料綁定單一 Mock Teacher／單一班級。預留未來接 Supabase Auth，不影響現有 Domain 表結構。
+- 教師以 `TEACHER_PASSWORD` 登入；成功後取得簽章、HttpOnly、Secure、SameSite=Lax 的教師 session cookie。
+- `AUTH_SESSION_SECRET` 用於簽章；兩者只存在伺服器端環境變數，不得回傳客戶端。
+- 所有教師頁面及教師 API 都由 middleware／route guard 驗證教師 session。
+- 大屏使用儲存在資料庫中的雜湊存取碼；成功驗證後取得獨立、短效、HttpOnly 的 display session。大屏 session 僅能讀取 `/api/display` 與呼叫已開放的大屏自助寫入端點。
+- settings API 不得回傳原始大屏存取碼或雜湊值；不再使用 query string token 或 `X-Display-Mode` 作為權限依據。
+- 不導入 Supabase Auth、OAuth、多教師或多班級模型。
 
 ---
 
@@ -359,6 +386,18 @@ GET    /api/students/:id    # 含統計
 GET  /api/settings
 PATCH /api/settings
 ```
+
+### 驗證與大屏
+
+```text
+POST /api/auth/login       # 教師密碼 → 教師 session cookie
+POST /api/auth/logout      # 清除教師 session
+POST /api/display/login    # 大屏存取碼 → display session cookie
+POST /api/display/logout   # 清除 display session
+GET  /api/display          # 僅教師或 display session
+```
+
+大屏自助寫入路由必須在 Route Handler 中驗證 display session 與對應功能開關，不能只依賴 middleware。
 
 ---
 
