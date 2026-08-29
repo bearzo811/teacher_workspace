@@ -35,6 +35,10 @@ export const shopOrderStatusEnum = pgEnum("shop_order_status", [
 export const rewardKindEnum = pgEnum("reward_kind", ["physical", "privilege"]);
 export const rewardStatusEnum = pgEnum("reward_status", ["available", "requested", "redeemed", "revoked"]);
 export const rewardSourceEnum = pgEnum("reward_source", ["purchase", "gift"]);
+export const coursePlanSubjectEnum = pgEnum("course_plan_subject", [
+  "chinese",
+  "math",
+]);
 
 export const dailyTaskKeyEnum = pgEnum("daily_task_key", [
   "chinese_passport",
@@ -46,6 +50,7 @@ export const dailyTaskKeyEnum = pgEnum("daily_task_key", [
 export const dailyStudentTaskKeyEnum = pgEnum("daily_student_task_key", [
   "contact_book_copied",
   "morning_cleaning",
+  "summer_homework_submitted",
   "lunch_brushing",
   "noon_cleaning",
 ]);
@@ -226,6 +231,63 @@ export const terms = pgTable(
   ],
 );
 
+/** 每日、每科一筆預定教學內容。 */
+export const coursePlans = pgTable(
+  "course_plans",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    termId: uuid("term_id")
+      .notNull()
+      .references(() => terms.id),
+    date: date("date").notNull(),
+    subject: coursePlanSubjectEnum("subject").notNull(),
+    unit: text("unit").notNull().default(""),
+    plannedContent: text("planned_content").notNull().default(""),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("course_plans_term_date_subject_uidx").on(
+      table.termId,
+      table.date,
+      table.subject,
+    ),
+    index("course_plans_date_subject_idx").on(table.date, table.subject),
+  ],
+);
+
+/** 課程計劃內的預定作業；發布後只保留正式作業連結，不連動刪除。 */
+export const coursePlanAssignments = pgTable(
+  "course_plan_assignments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    coursePlanId: uuid("course_plan_id")
+      .notNull()
+      .references(() => coursePlans.id, { onDelete: "cascade" }),
+    bookId: uuid("book_id")
+      .notNull()
+      .references(() => homeworkBooks.id),
+    pageLabel: text("page_label").notNull(),
+    note: text("note").notNull().default(""),
+    sortOrder: integer("sort_order").notNull().default(0),
+    publishedHomeworkId: uuid("published_homework_id").references(
+      () => homework.id,
+      { onDelete: "set null" },
+    ),
+    ...timestamps,
+  },
+  (table) => [
+    index("course_plan_assignments_plan_idx").on(
+      table.coursePlanId,
+      table.sortOrder,
+    ),
+    uniqueIndex("course_plan_assignments_plan_book_page_uidx").on(
+      table.coursePlanId,
+      table.bookId,
+      table.pageLabel,
+    ),
+  ],
+);
+
 /** 每學期的名冊與座號快照，避免新學期調整覆蓋舊學期。 */
 export const termRosterEntries = pgTable(
   "term_roster_entries",
@@ -294,6 +356,10 @@ export const classSettings = pgTable("class_settings", {
   displayRefreshSeconds: integer("display_refresh_seconds")
     .notNull()
     .default(20),
+  /** 大屏整體字級：小／標準／大 */
+  displayFontScale: text("display_font_scale").notNull().default("medium"),
+  /** 大屏整體基準字級（px） */
+  displayFontSize: integer("display_font_size").notNull().default(16),
   /** 大屏聯絡簿顯示日（空白＝跟系統今天） */
   displayContactBookDate: text("display_contact_book_date")
     .notNull()
@@ -421,6 +487,8 @@ export const calendarDayOverrides = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     date: date("date").notNull(),
     isHoliday: boolean("is_holiday").notNull(),
+    /** 返校日：僅開放指定任務，不列入正式上課日／週次。 */
+    isReturnDay: boolean("is_return_day").notNull().default(false),
     ...timestamps,
   },
   (table) => [uniqueIndex("calendar_day_overrides_date_uidx").on(table.date)],
@@ -651,6 +719,8 @@ export type NewCalendarEvent = typeof calendarEvents.$inferInsert;
 export type CalendarDayOverride = typeof calendarDayOverrides.$inferSelect;
 export type Term = typeof terms.$inferSelect;
 export type TermRosterEntry = typeof termRosterEntries.$inferSelect;
+export type CoursePlan = typeof coursePlans.$inferSelect;
+export type CoursePlanAssignment = typeof coursePlanAssignments.$inferSelect;
 export type DutyOverride = typeof dutyOverrides.$inferSelect;
 export type ReadingRecord = typeof readingRecords.$inferSelect;
 export type StudentReward = typeof studentRewards.$inferSelect;

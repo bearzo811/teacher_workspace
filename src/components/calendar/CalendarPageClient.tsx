@@ -46,8 +46,10 @@ export function CalendarPageClient() {
   const [holidayOverrides, setHolidayOverrides] = useState<
     Record<string, boolean>
   >({});
+  const [returnDays, setReturnDays] = useState<Record<string, boolean>>({});
   const [dayEvents, setDayEvents] = useState<CalendarEventView[]>([]);
   const [dayIsHoliday, setDayIsHoliday] = useState(false);
+  const [dayIsReturnDay, setDayIsReturnDay] = useState(false);
   const [countdown, setCountdown] = useState<CalendarCountdownItem[]>([]);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -59,8 +61,8 @@ export function CalendarPageClient() {
 
   const cells = useMemo(
     () =>
-      buildMonthGrid(cursor.year, cursor.month, monthEvents, holidayOverrides),
-    [cursor.month, cursor.year, holidayOverrides, monthEvents],
+      buildMonthGrid(cursor.year, cursor.month, monthEvents, holidayOverrides, returnDays),
+    [cursor.month, cursor.year, holidayOverrides, monthEvents, returnDays],
   );
 
   const loadMonth = useCallback(async (year: number, month: number) => {
@@ -71,11 +73,13 @@ export function CalendarPageClient() {
     const json = (await response.json()) as {
       data?: CalendarEventView[];
       holidayOverrides?: Record<string, boolean>;
+      returnDays?: Record<string, boolean>;
       error?: string;
     };
     if (!response.ok) throw new Error(json.error ?? "讀取月曆失敗");
     setMonthEvents(json.data ?? []);
     setHolidayOverrides(json.holidayOverrides ?? {});
+    setReturnDays(json.returnDays ?? {});
   }, []);
 
   const loadDay = useCallback(async (selectedDate: string) => {
@@ -85,6 +89,7 @@ export function CalendarPageClient() {
     const json = (await response.json()) as {
       data?: CalendarEventView[];
       isHoliday?: boolean;
+      isReturnDay?: boolean;
       holidayOverrides?: Record<string, boolean>;
       error?: string;
     };
@@ -95,6 +100,7 @@ export function CalendarPageClient() {
         ? json.isHoliday
         : resolveIsHoliday(selectedDate, json.holidayOverrides ?? {}),
     );
+    setDayIsReturnDay(json.isReturnDay ?? false);
   }, []);
 
   const loadCountdown = useCallback(async () => {
@@ -248,6 +254,28 @@ export function CalendarPageClient() {
     }
   }
 
+  async function toggleReturnDay(next: boolean) {
+    setSavingHoliday(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/calendar", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "set_return_day", date, isReturnDay: next }),
+      });
+      const json = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(json.error ?? "更新返校日失敗");
+      setDayIsReturnDay(next);
+      setMessage(next ? "已設為返校日" : "已取消返校日");
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "更新返校日失敗");
+    } finally {
+      setSavingHoliday(false);
+    }
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <header>
@@ -341,7 +369,7 @@ export function CalendarPageClient() {
           className={dayIsHoliday ? "text-red-600" : undefined}
         >
           {formatDisplayDate(date)}
-          {dayIsHoliday ? "（放假）" : ""}
+          {dayIsHoliday ? "（放假）" : ""}{dayIsReturnDay ? "（返校日）" : ""}
         </CardTitle>
         <CardDescription>
           {dayEvents.length === 0 ? "尚無活動" : `共 ${dayEvents.length} 筆`}
@@ -358,6 +386,16 @@ export function CalendarPageClient() {
               className="h-4 w-4 rounded border-gray-300"
             />
             放假日（月曆顯示紅色；六日／七八月預設勾選）
+          </label>
+          <label className="mt-2 flex items-start gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={dayIsReturnDay}
+              disabled={savingHoliday || loading}
+              onChange={(event) => { void toggleReturnDay(event.target.checked); }}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300"
+            />
+            <span>返校日（僅開放「上午打掃」與「交暑假作業」；不計入上課日、週次與值日）</span>
           </label>
         </div>
         <ul className="mt-4 space-y-2">

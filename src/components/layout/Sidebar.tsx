@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  BookMarked,
   BookOpen,
   CalendarDays,
   ClipboardList,
@@ -22,6 +23,7 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Today", icon: Home },
+  { href: "/course-plans", label: "課程計劃", icon: BookMarked },
   { href: "/contact-book", label: "聯絡簿", icon: ClipboardList },
   { href: "/duty", label: "值日表", icon: UserRound },
   { href: "/calendar", label: "行事曆", icon: CalendarDays },
@@ -59,7 +61,7 @@ export function Sidebar() {
   }, []);
 
   return (
-    <aside className="flex h-full w-56 shrink-0 flex-col border-r border-gray-200 bg-white">
+    <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-gray-200 bg-white">
       <div className="border-b border-gray-200 px-4 py-5">
         <p className="text-sm font-semibold text-gray-900">Teacher Workspace</p>
         <p className="mt-1 text-xs text-gray-500">導師工作台</p>

@@ -109,6 +109,37 @@ export function RoutinesPageClient() {
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
+      {view ? (
+        <Card>
+          <CardTitle>出缺席</CardTitle>
+          <CardDescription>僅影響當日統計，不屬於任何任務</CardDescription>
+          <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {view.tasks[0]?.students.map((student) => {
+              const key = `absence:${student.studentId}`;
+              return (
+                <li key={student.studentId}>
+                  <button
+                    type="button"
+                    disabled={busyKey === key}
+                    onClick={() => void toggleAbsence(student.studentId, student.absent)}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm",
+                      student.absent
+                        ? "border-amber-300 bg-amber-50 text-amber-900"
+                        : "border-gray-200 bg-white text-gray-800",
+                    )}
+                  >
+                    <span className="w-8 font-medium">{student.seatNumber}</span>
+                    <span className="flex-1">{student.name}</span>
+                    <span className="text-xs font-medium">{student.absent ? "缺席" : "出席"}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      ) : null}
+
       {view?.tasks.map((task) => (
         <Card key={task.taskKey}>
           <CardTitle>
@@ -137,18 +168,15 @@ export function RoutinesPageClient() {
                       "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm",
                       student.completed
                         ? "border-emerald-300 bg-emerald-50 text-emerald-900"
-                        : "border-gray-200 bg-white text-gray-800",
+                        : student.absent
+                          ? "border-gray-200 bg-gray-50 text-gray-400"
+                          : "border-gray-200 bg-white text-gray-800",
                     )}
                   >
                     <span className="w-8 font-medium">{student.seatNumber}</span>
                     <span className="flex-1">{student.name}</span>
-                    <span>{student.completed ? "✓" : ""}</span>
+                    <span>{student.absent ? "缺席" : student.completed ? "✓" : ""}</span>
                   </button>
-                  {task.taskKey === "contact_book_copied" ? (
-                    <button type="button" disabled={busyKey === `absence:${student.studentId}`} onClick={() => void toggleAbsence(student.studentId, student.absent)} className="mt-1 w-full text-xs text-gray-500 underline">
-                      {student.absent ? "取消缺席" : "標記缺席"}
-                    </button>
-                  ) : null}
                 </li>
               );
             })}

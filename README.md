@@ -2,6 +2,8 @@
 
 國小導師每日工作台（MVP）。
 
+正式站：[teacher-workspace-bearz.vercel.app](https://teacher-workspace-bearz.vercel.app)
+
 ## Docs
 
 | File | Purpose |

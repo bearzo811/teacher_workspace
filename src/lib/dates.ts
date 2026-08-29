@@ -7,8 +7,23 @@ export function formatDateInput(date: Date) {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * 班級資料一律以台灣校務日期為準；Vercel 伺服器可能跑在 UTC，
+ * 不可直接使用伺服器本地時區，否則台灣午夜到早上會仍被判成前一天。
+ */
 export function todayDateString(date = new Date()) {
-  return formatDateInput(date);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const value = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  return `${value.year}-${value.month}-${value.day}`;
 }
 
 export function parseDateInput(dateStr: string) {

@@ -5,7 +5,6 @@ import {
   hasDisplaySession,
   hasTeacherSession,
 } from "@/lib/auth";
-import { verifyDisplayAccessCode } from "@/services/classSettingsService";
 
 export async function isTeacherRequest() {
   const store = await cookies();
@@ -17,12 +16,13 @@ export async function isDisplayRequest() {
   return hasDisplaySession(store.get(DISPLAY_SESSION_COOKIE)?.value);
 }
 
-/** 大屏使用其專屬網址附帶的長隨機鍵；不可視為教師權限。 */
-export async function isDisplayKeyRequest(request: Request) {
-  const headerKey = request.headers.get("x-display-key");
-  const urlKey = new URL(request.url).searchParams.get("key");
-  const key = headerKey ?? urlKey;
-  return Boolean(key && (await verifyDisplayAccessCode(key)));
+/**
+ * 暫時開放教室大屏：學生可直接開啟並自助操作，不需要網址金鑰或登入。
+ * 導師工作台的教師 Session 仍由 middleware 保護。
+ */
+export async function isDisplayKeyRequest(_request: Request) {
+  void _request;
+  return true;
 }
 
 export async function requireTeacher() {

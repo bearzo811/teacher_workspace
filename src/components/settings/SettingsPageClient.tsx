@@ -18,7 +18,7 @@ type SettingsForm = {
   allowDisplayRoutineToggle: boolean;
   allowDisplayReadingToggle: boolean;
   displayCarouselEnabled: boolean;
-  displayToken: string;
+  displayFontSize: string;
   displayRefreshSeconds: string;
   homeworkOnTimeCoins: string;
   homeworkLateCoins: string;
@@ -28,6 +28,19 @@ type SettingsForm = {
   passportMissedCoins: string;
   routineXp: string;
   levelBaseXp: string;
+};
+
+type ReadinessCheck = {
+  id: string;
+  title: string;
+  detail: string;
+  status: "pass" | "warning" | "fail";
+};
+
+type ReadinessData = {
+  generatedAt: string;
+  checks: ReadinessCheck[];
+  smokeChecks: ReadinessCheck[];
 };
 
 const emptyForm: SettingsForm = {
@@ -43,7 +56,7 @@ const emptyForm: SettingsForm = {
   allowDisplayRoutineToggle: false,
   allowDisplayReadingToggle: false,
   displayCarouselEnabled: false,
-  displayToken: "",
+  displayFontSize: "16",
   displayRefreshSeconds: "20",
   homeworkOnTimeCoins: "2",
   homeworkLateCoins: "1",
@@ -62,6 +75,8 @@ export function SettingsPageClient() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [readiness, setReadiness] = useState<ReadinessData | null>(null);
+  const [checkingReadiness, setCheckingReadiness] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,7 +100,7 @@ export function SettingsPageClient() {
           allowDisplayRoutineToggle: boolean;
           allowDisplayReadingToggle: boolean;
           displayCarouselEnabled: boolean;
-          displayToken: string;
+          displayFontSize: number;
           displayRefreshSeconds: number;
           gamification: {
             homeworkOnTimeCoins: number;
@@ -126,7 +141,7 @@ export function SettingsPageClient() {
         allowDisplayRoutineToggle: data.allowDisplayRoutineToggle,
         allowDisplayReadingToggle: data.allowDisplayReadingToggle ?? false,
         displayCarouselEnabled: data.displayCarouselEnabled,
-        displayToken: data.displayToken ?? "",
+        displayFontSize: String(data.displayFontSize ?? 16),
         displayRefreshSeconds: String(data.displayRefreshSeconds ?? 20),
         homeworkOnTimeCoins: String(data.gamification.homeworkOnTimeCoins),
         homeworkLateCoins: String(data.gamification.homeworkLateCoins),
@@ -156,6 +171,21 @@ export function SettingsPageClient() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  async function runReadinessCheck() {
+    setCheckingReadiness(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/readiness", { cache: "no-store" });
+      const json = (await response.json()) as { data?: ReadinessData; error?: string };
+      if (!response.ok || !json.data) throw new Error(json.error ?? "開學檢查失敗");
+      setReadiness(json.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "開學檢查失敗");
+    } finally {
+      setCheckingReadiness(false);
+    }
+  }
+
   async function handleSave() {
     setSaving(true);
     setError(null);
@@ -167,6 +197,7 @@ export function SettingsPageClient() {
       const englishStartWeek = Number(form.englishStartWeek);
       const englishEndWeek = Number(form.englishEndWeek);
       const displayRefreshSeconds = Number(form.displayRefreshSeconds);
+      const displayFontSize = Number(form.displayFontSize);
       const gameNumbers = {
         homeworkOnTimeCoins: Number(form.homeworkOnTimeCoins),
         homeworkLateCoins: Number(form.homeworkLateCoins),
@@ -187,6 +218,7 @@ export function SettingsPageClient() {
         !Number.isInteger(englishStartWeek) ||
         !Number.isInteger(englishEndWeek) ||
         !Number.isInteger(displayRefreshSeconds) ||
+        !Number.isInteger(displayFontSize) ||
         Object.values(gameNumbers).some((value) => !Number.isInteger(value))
       ) {
         throw new Error("請檢查欄位，數字須為整數");
@@ -208,6 +240,9 @@ export function SettingsPageClient() {
       if (displayRefreshSeconds < 5) {
         throw new Error("大屏刷新秒數至少 5 秒");
       }
+      if (displayFontSize < 12 || displayFontSize > 32) {
+        throw new Error("大屏基準字級須為 12～32 px");
+      }
 
       const response = await fetch("/api/settings", {
         method: "PATCH",
@@ -225,7 +260,7 @@ export function SettingsPageClient() {
           allowDisplayRoutineToggle: form.allowDisplayRoutineToggle,
           allowDisplayReadingToggle: form.allowDisplayReadingToggle,
           displayCarouselEnabled: form.displayCarouselEnabled,
-          displayToken: form.displayToken.trim(),
+          displayFontSize,
           displayRefreshSeconds,
           gamification: gameNumbers,
         }),
@@ -243,12 +278,8 @@ export function SettingsPageClient() {
     }
   }
 
-  const displayHref = form.displayToken.trim()
-    ? `/display?token=${encodeURIComponent(form.displayToken.trim())}`
-    : "/display";
-  const displayLabel = form.displayToken.trim()
-    ? `/display?token=${form.displayToken.trim()}`
-    : "/display";
+  const displayHref = "/display";
+  const displayLabel = "/display";
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <header>
@@ -289,6 +320,30 @@ export function SettingsPageClient() {
       </Card>
 
       <TermManagerCard />
+
+      <Card>
+        <CardTitle>開學前檢查與備份</CardTitle>
+        <CardDescription>
+          檢查設定、名冊、值日與大屏資料；備份快照不會修改現有資料。
+        </CardDescription>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button type="button" onClick={() => void runReadinessCheck()} disabled={checkingReadiness}>
+            {checkingReadiness ? "檢查中…" : "執行開學前檢查"}
+          </Button>
+          <a
+            href="/api/export?type=snapshot"
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-800 hover:bg-gray-50"
+          >
+            下載班級備份快照（JSON）
+          </a>
+        </div>
+        {readiness ? (
+          <div className="mt-5 space-y-5">
+            <ReadinessSection title="設定與資料檢查" checks={readiness.checks} />
+            <ReadinessSection title="大屏核心 smoke test" checks={readiness.smokeChecks} />
+          </div>
+        ) : null}
+      </Card>
 
       <details className="rounded-xl border border-gray-200 bg-white px-6 py-4 shadow-sm">
         <summary className="cursor-pointer text-sm font-medium text-gray-600">
@@ -425,9 +480,10 @@ export function SettingsPageClient() {
             onChange={(value) => updateField("displayRefreshSeconds", value)}
           />
           <Field
-            label="存取碼（空白＝不驗證；有填則網址需 ?token=）"
-            value={form.displayToken}
-            onChange={(value) => updateField("displayToken", value)}
+            label="大屏基準字級（12～32 px）"
+            type="number"
+            value={form.displayFontSize}
+            onChange={(value) => updateField("displayFontSize", value)}
           />
         </div>
       </Card>
@@ -461,6 +517,27 @@ export function SettingsPageClient() {
         </Button>
       </div>
     </div>
+  );
+}
+
+function ReadinessSection({ title, checks }: { title: string; checks: ReadinessCheck[] }) {
+  return (
+    <section>
+      <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+      <div className="mt-2 space-y-2">
+        {checks.map((check) => (
+          <div key={check.id} className="flex items-start gap-3 rounded-lg bg-gray-50 px-3 py-2">
+            <span className={check.status === "pass" ? "text-emerald-600" : check.status === "fail" ? "text-red-600" : "text-amber-600"}>
+              {check.status === "pass" ? "✓" : check.status === "fail" ? "!" : "△"}
+            </span>
+            <div>
+              <p className="text-sm font-medium text-gray-900">{check.title}</p>
+              <p className="mt-0.5 text-sm text-gray-600">{check.detail}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

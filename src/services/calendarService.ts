@@ -2,6 +2,7 @@ import { and, asc, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { calendarDayOverrides, calendarEvents } from "@/db/schema";
 import { daysBetween, formatDateInput, parseDateInput, todayDateString } from "@/lib/dates";
+import { touchDisplayVersion } from "@/services/classSettingsService";
 import {
   formatCalendarTimeLabel,
   isTimeHhMm,
@@ -231,6 +232,64 @@ export async function getHolidayOverride(
   return rows[0]?.isHoliday ?? null;
 }
 
+/** 返校日是特別的試用／返校日期，不會影響學期上課日、週次或值日。 */
+export async function isReturnDay(date: string): Promise<boolean> {
+  parseDateInput(date);
+  const rows = await db
+    .select({ isReturnDay: calendarDayOverrides.isReturnDay })
+    .from(calendarDayOverrides)
+    .where(eq(calendarDayOverrides.date, date))
+    .limit(1);
+  return rows[0]?.isReturnDay ?? false;
+}
+
+export async function listReturnDaysInRange(
+  from: string,
+  to: string,
+): Promise<Record<string, boolean>> {
+  parseDateInput(from);
+  parseDateInput(to);
+  const rows = await db
+    .select({ date: calendarDayOverrides.date, isReturnDay: calendarDayOverrides.isReturnDay })
+    .from(calendarDayOverrides)
+    .where(and(gte(calendarDayOverrides.date, from), lte(calendarDayOverrides.date, to), eq(calendarDayOverrides.isReturnDay, true)));
+  return Object.fromEntries(rows.map((row) => [row.date, true]));
+}
+
+export async function setReturnDay(input: {
+  date: string;
+  isReturnDay: boolean;
+}): Promise<{ date: string; isReturnDay: boolean }> {
+  parseDateInput(input.date);
+  const existing = await db
+    .select()
+    .from(calendarDayOverrides)
+    .where(eq(calendarDayOverrides.date, input.date))
+    .limit(1);
+  const row = existing[0];
+
+  if (row) {
+    const defaultHoliday = isDefaultHoliday(input.date);
+    if (!input.isReturnDay && row.isHoliday === defaultHoliday) {
+      await db.delete(calendarDayOverrides).where(eq(calendarDayOverrides.id, row.id));
+    } else {
+      await db
+        .update(calendarDayOverrides)
+        .set({ isReturnDay: input.isReturnDay })
+        .where(eq(calendarDayOverrides.id, row.id));
+    }
+  } else if (input.isReturnDay) {
+    await db.insert(calendarDayOverrides).values({
+      date: input.date,
+      isHoliday: isDefaultHoliday(input.date),
+      isReturnDay: true,
+    });
+  }
+  // 大屏只在版本變動時重抓完整資料；返校日也必須立刻通知它更新。
+  await touchDisplayVersion();
+  return { date: input.date, isReturnDay: input.isReturnDay };
+}
+
 /**
  * 設定某日是否放假。
  * 若與預設相同（六日／七八月放假、其餘上課），刪除覆寫列以保持乾淨。
@@ -249,9 +308,16 @@ export async function setDayHoliday(input: {
 
   if (input.isHoliday === defaultHoliday) {
     if (existing[0]) {
-      await db
-        .delete(calendarDayOverrides)
-        .where(eq(calendarDayOverrides.id, existing[0].id));
+      if (!existing[0].isReturnDay) {
+        await db
+          .delete(calendarDayOverrides)
+          .where(eq(calendarDayOverrides.id, existing[0].id));
+      } else {
+        await db
+          .update(calendarDayOverrides)
+          .set({ isHoliday: input.isHoliday })
+          .where(eq(calendarDayOverrides.id, existing[0].id));
+      }
     }
     return {
       date: input.date,

@@ -30,6 +30,8 @@ const DEFAULT_SETTINGS = {
   displayToken: "",
   displayTokenHash: "",
   displayRefreshSeconds: 20,
+  displayFontScale: "medium",
+  displayFontSize: 16,
   displayContactBookDate: "",
   shopOpen: false,
   lunchVideoQuery: "",
@@ -158,6 +160,8 @@ export type ClassSettingsUpdate = Partial<{
   displayCarouselEnabled: boolean;
   displayToken: string;
   displayRefreshSeconds: number;
+  displayFontScale: "small" | "medium" | "large";
+  displayFontSize: number;
   displayContactBookDate: string;
   shopOpen: boolean;
   lunchVideoQuery: string;
@@ -168,6 +172,17 @@ export async function updateClassSettings(
 ): Promise<ClassSettingsView> {
   const current = await getClassSettings();
   const { displayToken, ...rest } = patch;
+  if (rest.displayFontScale !== undefined && !["small", "medium", "large"].includes(rest.displayFontScale)) {
+    throw new Error("大屏字體大小無效");
+  }
+  if (
+    rest.displayFontSize !== undefined &&
+    (!Number.isInteger(rest.displayFontSize) ||
+      rest.displayFontSize < 12 ||
+      rest.displayFontSize > 32)
+  ) {
+    throw new Error("大屏基準字級須為 12～32 px");
+  }
   const update = displayToken === undefined
     ? rest
     : {

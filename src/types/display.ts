@@ -17,6 +17,7 @@ export type DisplayPersonalRow = {
   seatNumber: number;
   contactBookCopied: boolean;
   morningCleaning: boolean;
+  summerHomeworkSubmitted: boolean;
   lunchBrushing: boolean;
   noonCleaning: boolean;
   chinesePassport: PassportStatus;
@@ -72,6 +73,8 @@ export type DisplayData = {
   className: string;
   schoolYear: string;
   today: string;
+  /** 返校日不算正式上課日與學期週次。 */
+  isReturnDay: boolean;
   /** 例如「第 8 週」 */
   weekProgressLabel: string;
   totalWeeks: number | null;
@@ -81,7 +84,7 @@ export type DisplayData = {
     dueDate: string;
     notes: string[];
     titles: string[];
-    /** 今日值日生（抬餐桶） */
+    /** 今日全天擦黑板主責 */
     dutyLeaders: { name: string; seatNumber: number }[];
     /** 設定空白＝跟系統今天（大屏選日後會寫入設定） */
     followsSystemToday: boolean;
@@ -139,6 +142,7 @@ export type DisplayData = {
     allowStudentReadingToggle: boolean;
     carouselEnabled: boolean;
     refreshSeconds: number;
+    fontSize: number;
     hasToken: boolean;
   };
   students: { studentId: string; name: string; seatNumber: number }[];

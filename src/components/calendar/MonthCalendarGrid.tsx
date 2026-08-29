@@ -82,6 +82,9 @@ export function MonthCalendarGrid({
           const content = (
             <>
               <span className={dayClass}>{cell.day}</span>
+              {cell.isReturnDay ? (
+                <span className={cn("mt-0.5 rounded px-1 text-[9px] font-semibold", isDisplay ? "bg-sky-500/30 text-sky-200" : "bg-sky-100 text-sky-700")}>返校</span>
+              ) : null}
               {cell.eventCount > 0 ? (
                 <span
                   className={cn(

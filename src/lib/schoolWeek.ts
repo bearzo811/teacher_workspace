@@ -139,3 +139,28 @@ export function formatWeekProgress(
 export function effectiveCurrentWeek(state: SchoolWeekState) {
   return state.week;
 }
+
+/** 指定日期所屬學期週次；未設第一週開始日則不顯示週數。 */
+export function schoolWeekForDate(input: {
+  weekOneStartDate: string;
+  termEndDate?: string;
+  date: string;
+}): { week: number | null; label: string | null } {
+  const start = input.weekOneStartDate.trim();
+  if (!start || !/^\d{4}-\d{2}-\d{2}$/.test(start)) {
+    return { week: null, label: null };
+  }
+  const state = resolveSchoolWeek({
+    weekOneStartDate: start,
+    termEndDate: input.termEndDate,
+    fallbackWeek: 1,
+    today: input.date,
+  });
+  if (state.week > 0 && (state.kind === "in_term" || state.kind === "manual")) {
+    return { week: state.week, label: `第 ${state.week} 週` };
+  }
+  if (state.kind === "after_term" && state.week > 0) {
+    return { week: state.week, label: `第 ${state.week} 週` };
+  }
+  return { week: null, label: state.label };
+}

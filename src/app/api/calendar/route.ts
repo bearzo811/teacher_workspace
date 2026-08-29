@@ -5,7 +5,9 @@ import {
   listCalendarEventsByDate,
   listCalendarEventsInRange,
   listHolidayOverridesInRange,
+  listReturnDaysInRange,
   setDayHoliday,
+  setReturnDay,
   updateCalendarEvent,
 } from "@/services/calendarService";
 import { resolveIsHoliday } from "@/types/calendar";
@@ -20,22 +22,25 @@ export async function GET(request: Request) {
     const to = searchParams.get("to");
 
     if (date) {
-      const [data, overrides] = await Promise.all([
+      const [data, overrides, returnDays] = await Promise.all([
         listCalendarEventsByDate(date),
         listHolidayOverridesInRange(date, date),
+        listReturnDaysInRange(date, date),
       ]);
       return NextResponse.json({
         data,
         holidayOverrides: overrides,
         isHoliday: resolveIsHoliday(date, overrides),
+        isReturnDay: Boolean(returnDays[date]),
       });
     }
     if (from && to) {
-      const [data, holidayOverrides] = await Promise.all([
+      const [data, holidayOverrides, returnDays] = await Promise.all([
         listCalendarEventsInRange(from, to),
         listHolidayOverridesInRange(from, to),
+        listReturnDaysInRange(from, to),
       ]);
-      return NextResponse.json({ data, holidayOverrides });
+      return NextResponse.json({ data, holidayOverrides, returnDays });
     }
     return NextResponse.json(
       { error: "請提供 date，或 from 與 to" },
@@ -60,7 +65,8 @@ export async function POST(request: Request) {
       sortOrder?: number;
       /** 若帶 isHoliday，改設放假日而非新增活動 */
       isHoliday?: boolean;
-      action?: "set_holiday";
+      action?: "set_holiday" | "set_return_day";
+      isReturnDay?: boolean;
     };
 
     if (
@@ -78,6 +84,13 @@ export async function POST(request: Request) {
         isHoliday: body.isHoliday,
       });
       return NextResponse.json({ data });
+    }
+
+    if (body.action === "set_return_day") {
+      if (!body.date || typeof body.isReturnDay !== "boolean") {
+        return NextResponse.json({ error: "請提供 date 與 isReturnDay" }, { status: 400 });
+      }
+      return NextResponse.json({ data: await setReturnDay({ date: body.date, isReturnDay: body.isReturnDay }) });
     }
 
     if (!body.date || typeof body.title !== "string") {
@@ -119,7 +132,8 @@ export async function PATCH(request: Request) {
       endTime?: string | null;
       sortOrder?: number;
       isHoliday?: boolean;
-      action?: "set_holiday";
+      action?: "set_holiday" | "set_return_day";
+      isReturnDay?: boolean;
     };
 
     if (body.action === "set_holiday" || (body.isHoliday !== undefined && !body.id)) {
@@ -134,6 +148,13 @@ export async function PATCH(request: Request) {
         isHoliday: body.isHoliday,
       });
       return NextResponse.json({ data });
+    }
+
+    if (body.action === "set_return_day") {
+      if (!body.date || typeof body.isReturnDay !== "boolean") {
+        return NextResponse.json({ error: "請提供 date 與 isReturnDay" }, { status: 400 });
+      }
+      return NextResponse.json({ data: await setReturnDay({ date: body.date, isReturnDay: body.isReturnDay }) });
     }
 
     if (!body.id) {

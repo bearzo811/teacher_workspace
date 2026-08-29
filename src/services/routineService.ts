@@ -9,9 +9,11 @@ import {
 } from "@/db/schema";
 import { todayDateString } from "@/lib/dates";
 import { reconcileRoutineReward } from "@/services/gamificationService";
+import { isReturnDay } from "@/services/calendarService";
 import { isActiveTermSchoolDay } from "@/services/termService";
 import {
   DAILY_STUDENT_TASK_LABEL,
+  RETURN_DAY_TASK_KEYS,
   ROUTINE_TASK_KEYS,
   type DailyStudentTaskKey,
 } from "@/types/today";
@@ -29,13 +31,14 @@ export async function listActiveStudents() {
 }
 
 export async function getRoutineDayView(date = todayDateString()) {
-  const [active, rows, absences] = await Promise.all([
+  const [active, rows, absences, returnDay] = await Promise.all([
     listActiveStudents(),
     db
     .select()
     .from(dailyStudentTasks)
     .where(eq(dailyStudentTasks.taskDate, date)),
     db.select({ studentId: dailyAbsences.studentId }).from(dailyAbsences).where(eq(dailyAbsences.taskDate, date)),
+    isReturnDay(date),
   ]);
   const absentIds = new Set(absences.map((row) => row.studentId));
 
@@ -45,7 +48,8 @@ export async function getRoutineDayView(date = todayDateString()) {
     ),
   );
 
-  const tasks = ROUTINE_TASK_KEYS.map((taskKey) => {
+  const taskKeys = returnDay ? RETURN_DAY_TASK_KEYS : ROUTINE_TASK_KEYS;
+  const tasks = taskKeys.map((taskKey) => {
     const studentsView = active.map((student) => ({
       ...student,
       absent: absentIds.has(student.studentId),
@@ -99,6 +103,7 @@ export async function getStudentTaskMap(
   return {
     contact_book_copied: map.contact_book_copied ?? false,
     morning_cleaning: map.morning_cleaning ?? false,
+    summer_homework_submitted: map.summer_homework_submitted ?? false,
     lunch_brushing: map.lunch_brushing ?? false,
     noon_cleaning: map.noon_cleaning ?? false,
   };
@@ -122,6 +127,7 @@ export async function getDailyStudentTaskMaps(
     const tasks = result.get(row.studentId) ?? {
       contact_book_copied: false,
       morning_cleaning: false,
+      summer_homework_submitted: false,
       lunch_brushing: false,
       noon_cleaning: false,
     };
@@ -173,8 +179,12 @@ export async function upsertDailyStudentTask(input: {
   taskDate?: string;
 }) {
   const taskDate = input.taskDate ?? todayDateString();
-  if (!(await isActiveTermSchoolDay(taskDate))) {
-    throw new Error("每日任務只能建立在目前學期的上課日");
+  const returnDay = await isReturnDay(taskDate);
+  if (!(await isActiveTermSchoolDay(taskDate)) && !returnDay) {
+    throw new Error("每日任務只能建立在目前學期的上課日或返校日");
+  }
+  if (returnDay && input.taskKey !== "morning_cleaning" && input.taskKey !== "summer_homework_submitted") {
+    throw new Error("返校日僅開放上午打掃與交暑假作業");
   }
   if (input.taskKey === "contact_book_copied" && input.completed) {
     const [contactBook] = await db.select({ id: contactBookDays.id }).from(contactBookDays).where(eq(contactBookDays.date, taskDate)).limit(1);

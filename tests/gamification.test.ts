@@ -9,6 +9,8 @@ import {
   isPastLocalDeadline,
   taipeiDateString,
 } from "../src/lib/gamification";
+import { schoolWeekForDate } from "../src/lib/schoolWeek";
+import { subjectHasClassOnDate } from "../src/lib/coursePlanSchedule";
 
 test("level curve uses cumulative 100 × current level thresholds", () => {
   assert.deepEqual(gamificationProgress(0), {
@@ -58,4 +60,36 @@ test("calendar math and effect keys are deterministic", () => {
     effectKey("homework", "abc", "student", "completion"),
     "homework:abc:student:completion",
   );
+});
+
+test("school week for a date uses the class week-one start", () => {
+  assert.deepEqual(
+    schoolWeekForDate({
+      weekOneStartDate: "",
+      date: "2026-08-31",
+    }),
+    { week: null, label: null },
+  );
+  assert.deepEqual(
+    schoolWeekForDate({
+      weekOneStartDate: "2026-08-31",
+      termEndDate: "2027-01-20",
+      date: "2026-08-31",
+    }),
+    { week: 1, label: "第 1 週" },
+  );
+  assert.deepEqual(
+    schoolWeekForDate({
+      weekOneStartDate: "2026-08-31",
+      termEndDate: "2027-01-20",
+      date: "2026-09-07",
+    }),
+    { week: 2, label: "第 2 週" },
+  );
+});
+
+test("math has no class on Thursday; Chinese still does", () => {
+  assert.equal(subjectHasClassOnDate("math", "2026-09-03"), false);
+  assert.equal(subjectHasClassOnDate("math", "2026-09-02"), true);
+  assert.equal(subjectHasClassOnDate("chinese", "2026-09-03"), true);
 });

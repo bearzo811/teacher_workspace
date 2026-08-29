@@ -22,6 +22,7 @@ export type CalendarMonthDay = {
   titles: string[];
   /** 放假日（六日／七八月預設 true，可覆寫） */
   isHoliday: boolean;
+  isReturnDay?: boolean;
 };
 
 /** 六／日 */

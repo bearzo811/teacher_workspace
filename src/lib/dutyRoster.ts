@@ -1,7 +1,7 @@
 import { daysBetween, formatDateInput, parseDateInput } from "@/lib/dates";
 import { resolveIsHoliday } from "@/types/calendar";
 
-/** 每天 9 個工作名額（班上 9 人剛好一人一職） */
+/** 每天 9 個主責名額；午餐工作可與掃拖／倒垃圾並行。 */
 export const DUTY_SLOT_KEYS = [
   "meal_bucket_1",
   "meal_bucket_2",
@@ -17,23 +17,23 @@ export const DUTY_SLOT_KEYS = [
 export type DutySlotKey = (typeof DUTY_SLOT_KEYS)[number];
 
 export const DUTY_SLOT_LABEL: Record<DutySlotKey, string> = {
-  meal_bucket_1: "抬餐桶①",
-  meal_bucket_2: "抬餐桶②",
-  blackboard: "擦黑板＋倒垃圾",
-  sweep_1a: "掃拖前①",
-  sweep_1b: "掃拖前②",
-  sweep_2a: "掃拖中①",
-  sweep_2b: "掃拖中②",
-  sweep_3a: "掃拖後①",
-  sweep_3b: "掃拖後②",
+  meal_bucket_1: "二年級餐桶①＋掃前",
+  meal_bucket_2: "二年級餐桶②＋拖前",
+  blackboard: "黑板、餐桶桌",
+  sweep_1a: "二年級餐桶③＋掃中",
+  sweep_1b: "二年級餐桶④＋拖中",
+  sweep_2a: "四年級餐桶①＋掃後",
+  sweep_2b: "四年級餐桶②＋拖後",
+  sweep_3a: "四年級餐桶③＋倒垃圾①",
+  sweep_3b: "四年級餐桶④＋倒垃圾②",
 };
 
 export const DUTY_EXPECTED_STUDENTS = DUTY_SLOT_KEYS.length;
 
 /**
  * 輪轉環上的位置（不是 UI 欄位順序）。
- * 抬餐桶①②刻意隔一格（0 與 2），避免「昨天②、今天①」連續當值日生。
- * day d 值日生：(d, d+2)；day d+1：(d+1, d+3) → 無人連續兩天。
+ * 每位學生依序輪轉九種「午餐／清潔組合」；九個上課日為一輪，
+ * 因每天八人都會抬餐桶，不再套用舊版避免連續抬桶規則。
  */
 export const DUTY_ROTATION_INDEX: Record<DutySlotKey, number> = {
   meal_bucket_1: 0,
@@ -85,24 +85,15 @@ export function schoolDayIndex(input: {
 
 /**
  * 座位序輪轉：
- * - 環內：每人每 9 個上課日剛好做過每個工作一次；值日生隔開、不連續兩天。
+ * - 環內：每人每 9 個上課日剛好做過每個工作組合一次。
  * - 環與環之間：每滿 9 個上課日重排「誰站在環上哪個位置」，避免搭檔永遠同一組。
- * - 換輪邊界若仍撞到「連續值日生」，會自動跟當天非值日生對調修好。
  * - N≠9：仍用同樣公式（N<9 可能一人多職；N>9 則每天只有部分人排到）
  */
 export function assignDutySlots(input: {
   students: DutyStudent[];
   dayIndex: number;
 }): Record<DutySlotKey, DutyStudent | null> {
-  const result = assignDutySlotsRaw(input);
-  if (input.dayIndex <= 0) return result;
-
-  // 用「已修好」的前一天，避免換輪邊界又撞連續值日
-  const prev = assignDutySlots({
-    students: input.students,
-    dayIndex: input.dayIndex - 1,
-  });
-  return avoidConsecutiveMealDuty(result, prev);
+  return assignDutySlotsRaw(input);
 }
 
 function assignDutySlotsRaw(input: {
@@ -134,42 +125,9 @@ function assignDutySlotsRaw(input: {
   return result;
 }
 
-/** 若今天值日生跟昨天重疊，把重疊的人跟當天「非值日」對調 */
-function avoidConsecutiveMealDuty(
-  today: Record<DutySlotKey, DutyStudent | null>,
-  yesterday: Record<DutySlotKey, DutyStudent | null>,
-): Record<DutySlotKey, DutyStudent | null> {
-  const result = { ...today };
-  const prevMealIds = new Set(
-    DUTY_SLOT_KEYS.filter(isMealBucketSlot)
-      .map((key) => yesterday[key]?.studentId)
-      .filter(Boolean) as string[],
-  );
-  if (prevMealIds.size === 0) return result;
-
-  const nonMealKeys = DUTY_SLOT_KEYS.filter((key) => !isMealBucketSlot(key));
-
-  for (const mealKey of DUTY_SLOT_KEYS.filter(isMealBucketSlot)) {
-    const person = result[mealKey];
-    if (!person || !prevMealIds.has(person.studentId)) continue;
-
-    const swapWith = nonMealKeys.find((key) => {
-      const other = result[key];
-      return other && !prevMealIds.has(other.studentId);
-    });
-    if (!swapWith) continue;
-
-    const other = result[swapWith];
-    result[mealKey] = other;
-    result[swapWith] = person;
-  }
-
-  return result;
-}
-
 /**
  * 用 epoch 當種子的穩定洗牌（同一 epoch 結果固定、可重現）。
- * 目標：不同輪次站位不同 → 值日生／掃拖搭檔會換人。
+ * 目標：不同輪次站位不同 → 午餐／清潔組合會換人。
  */
 export function shuffleStudentsDeterministic(
   students: DutyStudent[],
@@ -202,7 +160,7 @@ export function eachDateInclusive(from: string, to: string): string[] {
 }
 
 export function isMealBucketSlot(slotKey: DutySlotKey) {
-  return slotKey === "meal_bucket_1" || slotKey === "meal_bucket_2";
+  return slotKey !== "blackboard";
 }
 
 export function isDutySlotKey(value: string): value is DutySlotKey {

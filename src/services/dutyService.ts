@@ -8,7 +8,6 @@ import {
   DUTY_SLOT_LABEL,
   eachDateInclusive,
   isDutySlotKey,
-  isMealBucketSlot,
   schoolDayIndex,
   type DutySlotKey,
   type DutyStudent,
@@ -32,7 +31,7 @@ export type DutyDayView = {
   isHoliday: boolean;
   schoolDayIndex: number | null;
   slots: DutySlotView[];
-  /** 值日生（抬餐桶兩人） */
+  /** 全天擦黑板主責 */
   leaders: { studentId: string; name: string; seatNumber: number }[];
 };
 
@@ -137,7 +136,7 @@ function buildDayView(input: {
   });
 
   const leaders = slots
-    .filter((slot) => isMealBucketSlot(slot.slotKey) && slot.studentId && slot.name)
+    .filter((slot) => slot.slotKey === "blackboard" && slot.studentId && slot.name)
     .map((slot) => ({
       studentId: slot.studentId!,
       name: slot.name!,
@@ -238,7 +237,7 @@ export async function getDutyDay(date: string): Promise<DutyDayView> {
   );
 }
 
-/** 今日值日生（抬餐桶兩人）；放假則空陣列 */
+/** 今日全天擦黑板主責；放假則空陣列 */
 export async function getDutyLeaders(date: string) {
   const day = await getDutyDay(date);
   return day.leaders;

@@ -15,6 +15,7 @@ export function buildMonthGrid(
   month: number,
   events: CalendarEventView[],
   holidayOverrides: Record<string, boolean> = {},
+  returnDays: Record<string, boolean> = {},
 ): CalendarMonthDay[] {
   const first = new Date(year, month - 1, 1);
   const startPad = first.getDay();
@@ -42,6 +43,7 @@ export function buildMonthGrid(
       eventCount: dayEvents.length,
       titles: dayEvents.map((e) => e.title),
       isHoliday: resolveIsHoliday(dateStr, holidayOverrides),
+      isReturnDay: Boolean(returnDays[dateStr]),
     });
   }
   return cells;

@@ -5,6 +5,7 @@ import {
   listCalendarEventsByDate,
   listCalendarEventsInRange,
   listHolidayOverridesInRange,
+  isReturnDay,
 } from "@/services/calendarService";
 import { getClassSettings } from "@/services/classSettingsService";
 import { getContactBook } from "@/services/contactBookService";
@@ -149,6 +150,7 @@ async function buildDisplayData(options: {
   const contactBook = await getContactBook(contactBookDate);
 
   const [
+    returnDay,
     dutyLeaders,
     dutyToday,
     calendarEvents,
@@ -171,6 +173,7 @@ async function buildDisplayData(options: {
     termChinesePassport,
     termEnglishPassport,
   ] = await Promise.all([
+    isReturnDay(today),
     getDutyLeaders(contactBookDate),
     getDutyDay(contactBookDate),
     listCalendarEventsByDate(contactBookDate),
@@ -199,6 +202,7 @@ async function buildDisplayData(options: {
   const emptyTasks: Record<DailyStudentTaskKey, boolean> = {
     contact_book_copied: false,
     morning_cleaning: false,
+    summer_homework_submitted: false,
     lunch_brushing: false,
     noon_cleaning: false,
   };
@@ -220,6 +224,7 @@ async function buildDisplayData(options: {
   };
   const copied = taskCompletion("contact_book_copied");
   const morning = taskCompletion("morning_cleaning");
+  const summerHomework = taskCompletion("summer_homework_submitted");
   const brushing = taskCompletion("lunch_brushing");
   const noon = taskCompletion("noon_cleaning");
   const gameProfiles = await getGamificationForStudents(
@@ -258,6 +263,7 @@ async function buildDisplayData(options: {
       seatNumber: student.seatNumber,
       contactBookCopied: tasks.contact_book_copied,
       morningCleaning: tasks.morning_cleaning,
+      summerHomeworkSubmitted: tasks.summer_homework_submitted,
       lunchBrushing: tasks.lunch_brushing,
       noonCleaning: tasks.noon_cleaning,
       chinesePassport: chineseStatus,
@@ -319,7 +325,8 @@ async function buildDisplayData(options: {
     className: settings.className,
     schoolYear: settings.schoolYear,
     today,
-    weekProgressLabel: settings.weekProgressLabel,
+    weekProgressLabel: returnDay ? "返校日" : settings.weekProgressLabel,
+    isReturnDay: returnDay,
     totalWeeks: settings.totalWeeks,
     currentWeek: settings.schoolWeek.week,
     contactBook: {
@@ -332,7 +339,7 @@ async function buildDisplayData(options: {
         seatNumber: leader.seatNumber,
       })),
       followsSystemToday: !settings.displayContactBookDate.trim(),
-      weekProgressLabel: contactBookWeekLabel,
+      weekProgressLabel: returnDay && contactBook.date === today ? "返校日" : contactBookWeekLabel,
     },
     calendarEvents,
     calendarMonth: {
@@ -354,7 +361,22 @@ async function buildDisplayData(options: {
       reflection: readingReflection,
     },
     debts,
-    progress: [
+    progress: returnDay ? [
+      {
+        key: "morning_cleaning",
+        label: DAILY_STUDENT_TASK_LABEL.morning_cleaning,
+        completed: morning.completed,
+        total: morning.total,
+        missingNames: morning.missingNames,
+      },
+      {
+        key: "summer_homework_submitted",
+        label: DAILY_STUDENT_TASK_LABEL.summer_homework_submitted,
+        completed: summerHomework.completed,
+        total: summerHomework.total,
+        missingNames: summerHomework.missingNames,
+      },
+    ] : [
       {
         key: "morning_cleaning",
         label: DAILY_STUDENT_TASK_LABEL.morning_cleaning,
@@ -384,7 +406,7 @@ async function buildDisplayData(options: {
           .map((student) => student.name),
       },
     ],
-    lunchProgress: [
+    lunchProgress: returnDay ? [] : [
       {
         key: "lunch_brushing",
         label: "刷牙",
@@ -435,6 +457,7 @@ async function buildDisplayData(options: {
       allowStudentReadingToggle: false,
       carouselEnabled: settings.displayCarouselEnabled,
       refreshSeconds: Math.max(5, settings.displayRefreshSeconds || 20),
+      fontSize: settings.displayFontSize ?? 16,
       hasToken: settings.hasDisplayToken,
     },
     students: activeStudents,

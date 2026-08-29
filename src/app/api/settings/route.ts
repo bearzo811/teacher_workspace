@@ -54,6 +54,8 @@ export async function PATCH(request: Request) {
       displayCarouselEnabled?: boolean;
       displayToken?: string;
       displayRefreshSeconds?: number;
+      displayFontScale?: "small" | "medium" | "large";
+      displayFontSize?: number;
       displayContactBookDate?: string;
       shopOpen?: boolean;
       lunchVideoQuery?: string;
@@ -70,6 +72,17 @@ export async function PATCH(request: Request) {
         { error: `目前週數須為 ${SCHOOL_WEEK_MIN}～${SCHOOL_WEEK_MAX}` },
         { status: 400 },
       );
+    }
+    if (body.displayFontScale !== undefined && !["small", "medium", "large"].includes(body.displayFontScale)) {
+      return NextResponse.json({ error: "大屏字體大小無效" }, { status: 400 });
+    }
+    if (
+      body.displayFontSize !== undefined &&
+      (!Number.isInteger(body.displayFontSize) ||
+        body.displayFontSize < 12 ||
+        body.displayFontSize > 32)
+    ) {
+      return NextResponse.json({ error: "大屏基準字級須為 12～32 px" }, { status: 400 });
     }
     if (body.grade !== undefined && !Number.isInteger(body.grade)) {
       return NextResponse.json({ error: "年級須為整數" }, { status: 400 });

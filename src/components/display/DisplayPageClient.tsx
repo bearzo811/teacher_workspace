@@ -7,7 +7,6 @@ import {
   useMemo,
   useRef,
   useState,
-  Fragment,
 } from "react";
 import { useSearchParams } from "next/navigation";
 import {
@@ -190,6 +189,13 @@ export function DisplayPageClient() {
   const displayVersionRef = useRef("");
   const contentScrollRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const previous = document.documentElement.style.fontSize;
+    const fontSize = data?.displaySettings.fontSize ?? 16;
+    document.documentElement.style.fontSize = `${fontSize}px`;
+    return () => { document.documentElement.style.fontSize = previous; };
+  }, [data?.displaySettings.fontSize]);
+
   const load = useCallback(async () => {
     try {
       const response = await fetch("/api/display", { headers: displayHeaders });
@@ -269,7 +275,7 @@ export function DisplayPageClient() {
     }
     setActiveStudentId(studentId);
     bumpIdle();
-    setPanel((prev) => (prev === "passport" || prev === "student" ? prev : "today"));
+    setPanel((prev) => (prev === "passport" || prev === "student" || prev === "lunch" ? prev : "today"));
   }
 
   const activePersonal = useMemo(
@@ -301,6 +307,7 @@ export function DisplayPageClient() {
       const personal = previous.personal.map((row) => {
         if (row.studentId !== studentId) return row;
         if (taskKey === "morning_cleaning") return { ...row, morningCleaning: completed };
+        if (taskKey === "summer_homework_submitted") return { ...row, summerHomeworkSubmitted: completed };
         if (taskKey === "contact_book_copied") return { ...row, contactBookCopied: completed };
         if (taskKey === "lunch_brushing") return { ...row, lunchBrushing: completed };
         if (taskKey === "noon_cleaning") return { ...row, noonCleaning: completed };
@@ -529,6 +536,7 @@ export function DisplayPageClient() {
   const showSeatPicker = Boolean(
     data &&
     panel !== "calendar" && panel !== "lunch" && panel !== "debts" &&
+    !(panel === "student" && studentView === "overview") &&
     data.students.length > 0,
   );
 
@@ -626,7 +634,6 @@ export function DisplayPageClient() {
           <LunchPanel
             data={data}
             busyKey={busyKey}
-            canRoutine
             displayHeaders={displayHeaders}
             onRoutineCell={(studentId, taskKey, completed) => {
               void patchRoutineRequest(studentId, taskKey, completed);
@@ -1326,7 +1333,7 @@ function TodayProgressOverview({ data }: { data: DisplayData }) {
       <h2 className="text-2xl font-semibold leading-tight text-slate-200">
         今日進度
       </h2>
-      <div className="grid min-h-0 grid-rows-3 gap-2 overflow-hidden">
+      <div className={cn("grid min-h-0 gap-2 overflow-hidden", data.progress.length === 2 ? "grid-rows-2" : "grid-rows-3")}>
         {data.progress.map((item) => {
           const pct =
             item.total > 0
@@ -1350,7 +1357,7 @@ function TodayProgressOverview({ data }: { data: DisplayData }) {
                 />
               </div>
               {item.missingNames.length > 0 ? (
-                <p className="mt-1.5 truncate text-base text-rose-300">
+                <p className="mt-1.5 whitespace-normal break-words text-base leading-snug text-rose-300">
                   未完成：{item.missingNames.join("、")}
                 </p>
               ) : (
@@ -1392,51 +1399,14 @@ function formatClockNow() {
   return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
 }
 
-const LUNCH_DUTY_GROUPS: {
-  title: string;
-  slotKeys: string[];
-}[] = [
-  { title: "抬餐桶（值日生）", slotKeys: ["meal_bucket_1", "meal_bucket_2"] },
-  { title: "擦黑板＋倒垃圾", slotKeys: ["blackboard"] },
-  { title: "掃拖（前）", slotKeys: ["sweep_1a", "sweep_1b"] },
-  { title: "掃拖（中）", slotKeys: ["sweep_2a", "sweep_2b"] },
-  { title: "掃拖（後）", slotKeys: ["sweep_3a", "sweep_3b"] },
-];
-
-const LUNCH_DUTY_LEFT = LUNCH_DUTY_GROUPS.slice(0, 2);
-const LUNCH_DUTY_RIGHT = LUNCH_DUTY_GROUPS.slice(2);
-
-function LunchDutyCard({
-  group,
-  people,
-}: {
-  group: (typeof LUNCH_DUTY_GROUPS)[number];
-  people: ({ name: string | null } | undefined)[];
-}) {
-  return (
-    <div className="flex min-h-0 flex-1 flex-col justify-center rounded-lg border border-slate-600/80 bg-slate-900/90 px-3 py-2.5">
-      <p className="truncate text-lg font-semibold text-amber-200">
-        {group.title}
-      </p>
-      <p className="mt-1 truncate text-xl font-semibold leading-snug text-slate-50">
-        {people.length === 0
-          ? "—"
-          : people.map((slot) => slot?.name ?? "—").join("、")}
-      </p>
-    </div>
-  );
-}
-
 function LunchPanel({
   data,
   busyKey,
-  canRoutine,
   displayHeaders,
   onRoutineCell,
 }: {
   data: DisplayData;
   busyKey: string | null;
-  canRoutine: boolean;
   displayHeaders: Record<string, string>;
   onRoutineCell: (
     studentId: string,
@@ -1448,6 +1418,12 @@ function LunchPanel({
     () => [...data.personal].sort((a, b) => a.seatNumber - b.seatNumber),
     [data.personal],
   );
+  const duties = useMemo(
+    () => data.dutyToday.slots
+      .filter((slot) => slot.name && slot.seatNumber !== null)
+      .sort((a, b) => (a.seatNumber ?? 0) - (b.seatNumber ?? 0)),
+    [data.dutyToday.slots],
+  );
   const videoUrl = toYouTubeEmbedUrl(data.lunchVideoQuery);
 
   return (
@@ -1456,66 +1432,78 @@ function LunchPanel({
         {videoUrl ? <LunchVideoPlayer query={data.lunchVideoQuery} src={videoUrl} displayHeaders={displayHeaders} /> : <p className="text-lg text-slate-500">目前沒有午餐影音</p>}
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1.55fr)_minmax(0,1fr)] gap-2 overflow-hidden">
+      <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1.1fr)_minmax(0,0.9fr)] gap-3 overflow-hidden">
         <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950/40 p-3">
-          <h2 className="shrink-0 text-2xl font-semibold text-slate-100">
-            中午打掃分配
-          </h2>
-          <div className="mt-2 min-h-0 flex-1 overflow-hidden">
-            {data.dutyToday.isHoliday ? (
-              <p className="text-lg text-slate-400">今天放假，無值日排程</p>
-            ) : (
-              <div className="grid h-full min-h-0 grid-cols-2 gap-2">
-                <div className="flex min-h-0 flex-col gap-2">
-                  {LUNCH_DUTY_LEFT.map((group) => {
-                    const people = group.slotKeys
-                      .map((key) =>
-                        data.dutyToday.slots.find(
-                          (slot) => slot.slotKey === key,
-                        ),
-                      )
-                      .filter(Boolean);
-                    return (
-                      <LunchDutyCard
-                        key={group.title}
-                        group={group}
-                        people={people}
-                      />
-                    );
-                  })}
+          <h2 className="shrink-0 text-xl font-semibold text-slate-100">今日午餐工作</h2>
+          <div className="mt-2 min-h-0 flex-1 overflow-auto">
+              {data.isReturnDay ? (
+                <p className="text-lg text-slate-400">返校日，無午餐工作</p>
+              ) : data.dutyToday.isHoliday ? (
+                <p className="text-lg text-slate-400">今天放假，無午餐工作</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {duties.map((slot) => (
+                    <article key={slot.slotKey} className="rounded-xl border border-slate-600/80 bg-slate-900/90 px-3 py-2">
+                      <p className="text-base font-semibold text-slate-50">{slot.name}</p>
+                      <p className="mt-0.5 text-lg font-semibold text-amber-200">{displayDutyLabel(slot.label)}</p>
+                    </article>
+                  ))}
                 </div>
-                <div className="flex min-h-0 flex-col gap-2">
-                  {LUNCH_DUTY_RIGHT.map((group) => {
-                    const people = group.slotKeys
-                      .map((key) =>
-                        data.dutyToday.slots.find(
-                          (slot) => slot.slotKey === key,
-                        ),
-                      )
-                      .filter(Boolean);
-                    return (
-                      <LunchDutyCard
-                        key={group.title}
-                        group={group}
-                        people={people}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+              )}
           </div>
         </div>
-
-        <LunchRoutineMatrix
+        <LunchTaskMatrix
           rows={rows}
-          lunchProgress={data.lunchProgress}
           busyKey={busyKey}
-          canRoutine={canRoutine}
           onRoutineCell={onRoutineCell}
         />
       </div>
     </section>
+  );
+}
+
+const LUNCH_TASKS = [
+  { key: "lunch_brushing" as const, label: "刷牙" },
+  { key: "noon_cleaning" as const, label: "中午打掃" },
+];
+
+function displayDutyLabel(label: string) {
+  return label
+    .replace("二年級餐桶", "餐桶（二）")
+    .replace("四年級餐桶", "餐桶（四）")
+    .replace(/[①②③④]/g, "")
+    .replace("＋", "・");
+}
+
+function LunchTaskMatrix({
+  rows,
+  busyKey,
+  onRoutineCell,
+}: {
+  rows: DisplayPersonalRow[];
+  busyKey: string | null;
+  onRoutineCell: (
+    studentId: string,
+    taskKey: "lunch_brushing" | "noon_cleaning",
+    completed: boolean,
+  ) => void;
+}) {
+  return (
+    <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950/50 p-3">
+      <h2 className="shrink-0 text-xl font-semibold text-slate-100">午餐任務</h2>
+      <div className="mt-2 grid min-h-0 flex-1 gap-1" style={{ gridTemplateColumns: `4.5rem repeat(${rows.length}, minmax(0, 1fr))` }}>
+        <div aria-hidden />
+        {rows.map((row) => <div key={row.studentId} className="flex items-center justify-center text-sm font-bold text-amber-200">{row.seatNumber}</div>)}
+        {LUNCH_TASKS.flatMap((task) => [
+          <div key={`${task.key}-label`} className="flex items-center text-sm font-semibold text-slate-200">{task.label}</div>,
+          ...rows.map((row) => {
+            const done = task.key === "lunch_brushing" ? row.lunchBrushing : row.noonCleaning;
+            const key = `${row.studentId}:${task.key}`;
+            return <button key={key} type="button" disabled={busyKey === key} onClick={() => onRoutineCell(row.studentId, task.key, !done)} className={cn("mx-auto flex h-8 w-[88%] max-w-10 items-center justify-center rounded-md border text-sm font-bold transition active:scale-95", done ? "border-emerald-300 bg-emerald-500 text-white" : "border-slate-600 bg-slate-800 text-slate-500")}>{done ? "✓" : ""}</button>;
+          }),
+        ])}
+      </div>
+    </div>
   );
 }
 
@@ -1553,113 +1541,6 @@ function toYouTubeEmbedUrl(value: string): string | null {
     if (/^[A-Za-z0-9_-]{11}$/.test(id)) return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&enablejsapi=1`;
   } catch { /* 歌名改用 YouTube 搜尋播放清單 */ }
   return `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(query)}&autoplay=1&rel=0&enablejsapi=1`;
-}
-
-const LUNCH_MATRIX_TASKS = [
-  { key: "lunch_brushing" as const, label: "刷牙" },
-  { key: "noon_cleaning" as const, label: "打掃" },
-];
-
-function LunchRoutineMatrix({
-  rows,
-  lunchProgress,
-  busyKey,
-  canRoutine,
-  onRoutineCell,
-}: {
-  rows: DisplayPersonalRow[];
-  lunchProgress: DisplayData["lunchProgress"];
-  busyKey: string | null;
-  canRoutine: boolean;
-  onRoutineCell: (
-    studentId: string,
-    taskKey: "lunch_brushing" | "noon_cleaning",
-    completed: boolean,
-  ) => void;
-}) {
-  const summary = useMemo(() => {
-    const map = new Map(lunchProgress.map((item) => [item.key, item]));
-    return LUNCH_MATRIX_TASKS.map((task) => {
-      const item = map.get(task.key);
-      return {
-        ...task,
-        completed: item?.completed ?? 0,
-        total: item?.total ?? rows.length,
-      };
-    });
-  }, [lunchProgress, rows.length]);
-
-  return (
-    <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950/50 px-2 pb-2 pt-1">
-      <div
-        className="grid min-h-0 flex-1 gap-0.5"
-        style={{
-          gridTemplateColumns: `2.75rem repeat(${rows.length}, minmax(0, 1fr))`,
-          gridTemplateRows: `auto repeat(${LUNCH_MATRIX_TASKS.length}, minmax(0, 1fr))`,
-        }}
-      >
-        <div aria-hidden className="min-h-0" />
-        {rows.map((row) => (
-          <div
-            key={`head-${row.studentId}`}
-            className="flex min-h-0 items-center justify-center self-center text-sm font-bold tabular-nums text-amber-200"
-            title={row.name}
-          >
-            {row.seatNumber}
-          </div>
-        ))}
-
-        {LUNCH_MATRIX_TASKS.map((task) => {
-          const stat = summary.find((item) => item.key === task.key);
-          return (
-            <Fragment key={task.key}>
-              <div className="flex h-full min-h-0 flex-col items-center justify-center gap-0.5 px-0.5 text-center leading-tight">
-                <span className="text-base font-semibold text-slate-200">
-                  {task.label}
-                </span>
-                <span className="text-xs tabular-nums text-emerald-300">
-                  {stat?.completed ?? 0}/{stat?.total ?? rows.length}
-                </span>
-              </div>
-              {rows.map((row) => {
-                const done =
-                  task.key === "lunch_brushing"
-                    ? row.lunchBrushing
-                    : row.noonCleaning;
-                const cellKey = `${row.studentId}:${task.key}`;
-                const canToggle = canRoutine;
-                return (
-                  <div
-                    key={`${row.studentId}-${task.key}`}
-                    className="flex h-full min-h-0 items-center justify-center px-0.5"
-                  >
-                    <button
-                      type="button"
-                      disabled={!canToggle || busyKey === cellKey}
-                      aria-label={`${row.seatNumber} ${row.name} ${task.label}${done ? " 已完成" : " 未完成"}`}
-                      onClick={() =>
-                        onRoutineCell(row.studentId, task.key, !done)
-                      }
-                      className={cn(
-                        "flex h-9 w-[92%] max-w-[2.85rem] items-center justify-center rounded-md border text-sm font-bold transition active:scale-[0.98]",
-                        done
-                          ? "border-emerald-300 bg-emerald-500 text-white"
-                          : "border-slate-600 bg-slate-800/90 text-slate-500",
-                        canToggle && "hover:brightness-110",
-                        !canToggle && "cursor-default opacity-50",
-                      )}
-                    >
-                      {done ? "✓" : ""}
-                    </button>
-                  </div>
-                );
-              })}
-            </Fragment>
-          );
-        })}
-      </div>
-    </div>
-  );
 }
 
 function CalendarOverviewPanel({ data }: { data: DisplayData }) {
@@ -2415,17 +2296,20 @@ function PersonalChecklist({
             onToggle={() => onRoutine("morning_cleaning", !row.morningCleaning)}
           />
           <CheckRow
-            label="抄聯絡簿"
-            done={row.contactBookCopied}
+            label={data.isReturnDay ? "交暑假作業" : "抄聯絡簿"}
+            done={data.isReturnDay ? row.summerHomeworkSubmitted : row.contactBookCopied}
             disabled={
-              !canRoutine || busyKey === `${row.studentId}:contact_book_copied`
+              !canRoutine || busyKey === `${row.studentId}:${data.isReturnDay ? "summer_homework_submitted" : "contact_book_copied"}`
             }
             onToggle={() =>
-              onRoutine("contact_book_copied", !row.contactBookCopied)
+              onRoutine(
+                data.isReturnDay ? "summer_homework_submitted" : "contact_book_copied",
+                !(data.isReturnDay ? row.summerHomeworkSubmitted : row.contactBookCopied),
+              )
             }
           />
         </ul>
-        <ul className="space-y-3 text-xl">
+        {data.isReturnDay ? null : <ul className="space-y-3 text-xl">
           {hwCells.length === 0 ? (
             <li className="rounded-xl border border-slate-700 px-4 py-3 text-slate-400">
               今日無繳交項
@@ -2457,7 +2341,7 @@ function PersonalChecklist({
               );
             })
           )}
-        </ul>
+        </ul>}
       </div>
     </div>
   );
