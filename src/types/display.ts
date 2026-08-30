@@ -128,6 +128,16 @@ export type DisplayData = {
       seatNumber: number | null;
     }[];
     leaders: { name: string; seatNumber: number }[];
+    substitutions: {
+      id: string;
+      slotKey: string;
+      label: string;
+      absentStudentName: string;
+      substituteStudentId: string | null;
+      substituteStudentName: string | null;
+      status: "open" | "claimed" | "assigned" | "confirmed" | "cancelled";
+      isVolunteer: boolean;
+    }[];
   };
   personal: DisplayPersonalRow[];
   shop: {

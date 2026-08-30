@@ -511,6 +511,48 @@ export const dutyOverrides = pgTable(
   ],
 );
 
+/** 請假值日的自願／老師指定代班；一個工作欄位一天僅一筆。 */
+export const dutySubstitutions = pgTable(
+  "duty_substitutions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    date: date("date").notNull(),
+    slotKey: text("slot_key").notNull(),
+    absentStudentId: uuid("absent_student_id").notNull().references(() => students.id),
+    substituteStudentId: uuid("substitute_student_id").references(() => students.id),
+    /** open｜claimed（自願）｜assigned（老師指定）｜confirmed｜cancelled */
+    status: text("status").notNull().default("open"),
+    isVolunteer: boolean("is_volunteer").notNull().default(false),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("duty_substitutions_date_slot_uidx").on(table.date, table.slotKey),
+    index("duty_substitutions_date_status_idx").on(table.date, table.status),
+  ],
+);
+
+/** 請假學生回校後，由老師安排的補值日待辦。 */
+export const dutyMakeups = pgTable(
+  "duty_makeups",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    studentId: uuid("student_id").notNull().references(() => students.id),
+    sourceDate: date("source_date").notNull(),
+    sourceSlotKey: text("source_slot_key").notNull(),
+    assignedDate: date("assigned_date"),
+    assignedSlotKey: text("assigned_slot_key"),
+    /** pending｜completed｜cancelled */
+    status: text("status").notNull().default("pending"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("duty_makeups_source_uidx").on(table.studentId, table.sourceDate, table.sourceSlotKey),
+    index("duty_makeups_student_status_idx").on(table.studentId, table.status),
+  ],
+);
+
 /** 讀報／閱讀心得（學期月份；1,2,7,8 不計） */
 export const readingTypeEnum = pgEnum("reading_type", [
   "newspaper",
@@ -722,6 +764,8 @@ export type TermRosterEntry = typeof termRosterEntries.$inferSelect;
 export type CoursePlan = typeof coursePlans.$inferSelect;
 export type CoursePlanAssignment = typeof coursePlanAssignments.$inferSelect;
 export type DutyOverride = typeof dutyOverrides.$inferSelect;
+export type DutySubstitution = typeof dutySubstitutions.$inferSelect;
+export type DutyMakeup = typeof dutyMakeups.$inferSelect;
 export type ReadingRecord = typeof readingRecords.$inferSelect;
 export type StudentReward = typeof studentRewards.$inferSelect;
 export type GamificationSettings = typeof gamificationSettings.$inferSelect;

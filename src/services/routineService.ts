@@ -11,6 +11,7 @@ import { todayDateString } from "@/lib/dates";
 import { reconcileRoutineReward } from "@/services/gamificationService";
 import { isReturnDay } from "@/services/calendarService";
 import { isActiveTermSchoolDay } from "@/services/termService";
+import { syncDutySubstitutionsForDate } from "@/services/dutyService";
 import {
   DAILY_STUDENT_TASK_LABEL,
   RETURN_DAY_TASK_KEYS,
@@ -80,6 +81,8 @@ export async function setDailyAbsence(input: { studentId: string; taskDate: stri
   } else {
     await db.delete(dailyAbsences).where(and(eq(dailyAbsences.taskDate, input.taskDate), eq(dailyAbsences.studentId, input.studentId)));
   }
+  // 出缺席獨立於每日任務，但會開啟／取消該生當日值日工作的代班招募。
+  await syncDutySubstitutionsForDate(input.taskDate);
 }
 
 export async function getStudentTaskMap(

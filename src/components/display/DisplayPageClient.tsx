@@ -491,6 +491,38 @@ export function DisplayPageClient() {
     finally { setBusyKey(null); }
   }
 
+  async function claimDutySubstitution(id: string) {
+    if (!data || !activeStudentId) return;
+    const previousData = data;
+    setBusyKey(`substitution:${id}`);
+    bumpIdle();
+    setData((current) => current ? {
+      ...current,
+      dutyToday: {
+        ...current.dutyToday,
+        substitutions: current.dutyToday.substitutions.map((item) =>
+          item.id === id
+            ? { ...item, status: "claimed", isVolunteer: true, substituteStudentId: activeStudentId, substituteStudentName: current.students.find((student) => student.studentId === activeStudentId)?.name ?? null }
+            : item,
+        ),
+      },
+    } : current);
+    try {
+      const response = await fetch("/api/display/duty-substitution", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...displayHeaders },
+        body: JSON.stringify({ id, studentId: activeStudentId }),
+      });
+      const json = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(json.error ?? "登記代班失敗");
+    } catch (err) {
+      setData(previousData);
+      setError(err instanceof Error ? err.message : "登記代班失敗");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   async function setReading(
     studentId: string,
     type: ReadingType,
@@ -625,6 +657,7 @@ export function DisplayPageClient() {
               if (!activeStudentId) return;
               void toggleHomeworkCell(activeStudentId, homeworkId, next);
             }}
+            onClaimSubstitution={(id) => void claimDutySubstitution(id)}
           />
         ) : null}
 
@@ -1172,6 +1205,7 @@ function TodayPanel({
   canHomework,
   onRoutine,
   onHomework,
+  onClaimSubstitution,
 }: {
   data: DisplayData;
   row: DisplayPersonalRow | null;
@@ -1180,6 +1214,7 @@ function TodayPanel({
   canHomework: boolean;
   onRoutine: (taskKey: string, completed: boolean) => void;
   onHomework: (homeworkId: string, next: boolean) => void;
+  onClaimSubstitution: (id: string) => void;
 }) {
   const boardViewportRef = useRef<HTMLDivElement>(null);
   const boardContentRef = useRef<HTMLDivElement>(null);
@@ -1310,19 +1345,66 @@ function TodayPanel({
         </div>
       </div>
 
-      {row ? (
-        <PersonalChecklist
-          data={data}
-          row={row}
-          busyKey={busyKey}
-          canRoutine={canRoutine}
-          canHomework={canHomework}
-          onRoutine={onRoutine}
-          onHomework={onHomework}
-        />
-      ) : (
-        <TodayProgressOverview data={data} />
-      )}
+      <div className="flex min-h-0 flex-col gap-3 overflow-hidden">
+        {data.dutyToday.substitutions.some((item) => item.status === "open" || item.status === "claimed" || item.status === "assigned") ? (
+          <DutySubstitutionCallout
+            items={data.dutyToday.substitutions}
+            row={row}
+            busyKey={busyKey}
+            onClaim={onClaimSubstitution}
+          />
+        ) : null}
+        <div className="min-h-0 flex-1 overflow-hidden">
+          {row ? (
+            <PersonalChecklist
+              data={data}
+              row={row}
+              busyKey={busyKey}
+              canRoutine={canRoutine}
+              canHomework={canHomework}
+              onRoutine={onRoutine}
+              onHomework={onHomework}
+            />
+          ) : (
+            <TodayProgressOverview data={data} />
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DutySubstitutionCallout({
+  items,
+  row,
+  busyKey,
+  onClaim,
+}: {
+  items: DisplayData["dutyToday"]["substitutions"];
+  row: DisplayPersonalRow | null;
+  busyKey: string | null;
+  onClaim: (id: string) => void;
+}) {
+  return (
+    <section className="shrink-0 rounded-2xl border border-amber-300/70 bg-amber-950/40 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-xl font-semibold text-amber-100">需要代班</h2>
+        <span className="rounded-full bg-amber-300/15 px-3 py-1 text-sm font-bold text-amber-200">完成後 +3 金幣</span>
+      </div>
+      <div className="mt-2 grid gap-2">
+        {items.filter((item) => item.status !== "cancelled" && item.status !== "confirmed").map((item) => (
+          <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-100/20 bg-slate-950/40 px-3 py-2">
+            <p className="text-base text-slate-100"><span className="font-semibold">{item.label}</span>・{item.absentStudentName}請假</p>
+            {item.status === "open" ? (
+              <button type="button" disabled={!row || busyKey === `substitution:${item.id}`} onClick={() => onClaim(item.id)} className="rounded-lg bg-amber-300 px-3 py-2 text-sm font-bold text-slate-950 disabled:cursor-not-allowed disabled:opacity-40">
+                {row ? "我要代班" : "先選座號"}
+              </button>
+            ) : (
+              <span className="text-sm font-semibold text-emerald-300">{item.substituteStudentName} 已接下</span>
+            )}
+          </div>
+        ))}
+      </div>
     </section>
   );
 }

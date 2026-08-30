@@ -1,6 +1,6 @@
-import { and, asc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, eq, gte, lte, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { dutyOverrides, students } from "@/db/schema";
+import { dailyAbsences, dutyMakeups, dutyOverrides, dutySubstitutions, students } from "@/db/schema";
 import {
   assignDutySlots,
   DUTY_EXPECTED_STUDENTS,
@@ -12,7 +12,8 @@ import {
   type DutySlotKey,
   type DutyStudent,
 } from "@/lib/dutyRoster";
-import { getClassSettings } from "@/services/classSettingsService";
+import { getClassSettings, touchDisplayVersion } from "@/services/classSettingsService";
+import { setGamificationEffect } from "@/services/gamificationService";
 import { listHolidayOverridesInRange } from "@/services/calendarService";
 import { getActiveTerm } from "@/services/termService";
 import { resolveIsHoliday } from "@/types/calendar";
@@ -44,6 +45,30 @@ export type DutyRangeView = {
   expectedStudentCount: number;
   warning: string | null;
   days: DutyDayView[];
+};
+
+export type DutySubstitutionView = {
+  id: string;
+  date: string;
+  slotKey: DutySlotKey;
+  label: string;
+  absentStudentId: string;
+  absentStudentName: string;
+  substituteStudentId: string | null;
+  substituteStudentName: string | null;
+  status: "open" | "claimed" | "assigned" | "confirmed" | "cancelled";
+  isVolunteer: boolean;
+};
+
+export type DutyMakeupView = {
+  id: string;
+  studentId: string;
+  studentName: string;
+  sourceDate: string;
+  sourceSlotKey: DutySlotKey;
+  assignedDate: string | null;
+  assignedSlotKey: DutySlotKey | null;
+  status: "pending" | "completed" | "cancelled";
 };
 
 async function listActiveDutyStudents(): Promise<DutyStudent[]> {
@@ -235,6 +260,149 @@ export async function getDutyDay(date: string): Promise<DutyDayView> {
       leaders: [],
     }
   );
+}
+
+async function substitutionViews(date: string): Promise<DutySubstitutionView[]> {
+  const [rows, roster] = await Promise.all([
+    db.select().from(dutySubstitutions).where(eq(dutySubstitutions.date, date)),
+    listActiveDutyStudents(),
+  ]);
+  const names = new Map(roster.map((student) => [student.studentId, student.name]));
+  return rows
+    .filter((row) => isDutySlotKey(row.slotKey))
+    .map((row) => ({
+      id: row.id,
+      date: String(row.date),
+      slotKey: row.slotKey as DutySlotKey,
+      label: DUTY_SLOT_LABEL[row.slotKey as DutySlotKey],
+      absentStudentId: row.absentStudentId,
+      absentStudentName: names.get(row.absentStudentId) ?? "（未知）",
+      substituteStudentId: row.substituteStudentId,
+      substituteStudentName: row.substituteStudentId ? names.get(row.substituteStudentId) ?? "（未知）" : null,
+      status: row.status as DutySubstitutionView["status"],
+      isVolunteer: row.isVolunteer,
+    }))
+    .sort((a, b) => DUTY_SLOT_KEYS.indexOf(a.slotKey) - DUTY_SLOT_KEYS.indexOf(b.slotKey));
+}
+
+export async function getDutySubstitutionDay(date: string) {
+  return substitutionViews(date);
+}
+
+/** 缺席異動後建立／取消當日代班與補值日待辦；不影響原輪值表。 */
+export async function syncDutySubstitutionsForDate(date: string) {
+  const [day, absentRows] = await Promise.all([
+    getDutyDay(date),
+    db.select({ studentId: dailyAbsences.studentId }).from(dailyAbsences).where(eq(dailyAbsences.taskDate, date)),
+  ]);
+  if (day.isHoliday) return [];
+  const absentIds = new Set(absentRows.map((row) => row.studentId));
+  const affected = day.slots.filter((slot) => slot.studentId && absentIds.has(slot.studentId));
+  for (const slot of affected) {
+    await db.insert(dutySubstitutions).values({
+      date,
+      slotKey: slot.slotKey,
+      absentStudentId: slot.studentId!,
+    }).onConflictDoNothing();
+    await db.insert(dutyMakeups).values({
+      studentId: slot.studentId!,
+      sourceDate: date,
+      sourceSlotKey: slot.slotKey,
+    }).onConflictDoNothing();
+  }
+  const current = await db.select().from(dutySubstitutions).where(eq(dutySubstitutions.date, date));
+  for (const row of current) {
+    if (!absentIds.has(row.absentStudentId) && row.status !== "confirmed") {
+      await db.update(dutySubstitutions).set({ status: "cancelled" }).where(eq(dutySubstitutions.id, row.id));
+    }
+  }
+  await touchDisplayVersion();
+  return substitutionViews(date);
+}
+
+async function assertEligibleSubstitute(date: string, studentId: string, substitutionId: string) {
+  const [student, absent, existing] = await Promise.all([
+    db.select({ id: students.id }).from(students).where(and(eq(students.id, studentId), eq(students.isActive, true))).limit(1),
+    db.select({ studentId: dailyAbsences.studentId }).from(dailyAbsences).where(and(eq(dailyAbsences.taskDate, date), eq(dailyAbsences.studentId, studentId))).limit(1),
+    db.select({ id: dutySubstitutions.id }).from(dutySubstitutions).where(and(eq(dutySubstitutions.date, date), eq(dutySubstitutions.substituteStudentId, studentId), ne(dutySubstitutions.id, substitutionId), eq(dutySubstitutions.status, "claimed"))).limit(1),
+  ]);
+  if (!student[0]) throw new Error("找不到可代班的學生");
+  if (absent[0]) throw new Error("請假學生不能代班");
+  if (existing[0]) throw new Error("每位學生一天最多自願代班一項");
+}
+
+export async function claimDutySubstitution(input: { id: string; studentId: string }) {
+  const [row] = await db.select().from(dutySubstitutions).where(eq(dutySubstitutions.id, input.id)).limit(1);
+  if (!row || row.status !== "open") throw new Error("這項代班已被接下或已取消");
+  if (row.absentStudentId === input.studentId) throw new Error("請假學生不能代班自己的工作");
+  await assertEligibleSubstitute(String(row.date), input.studentId, row.id);
+  const [updated] = await db.update(dutySubstitutions).set({ substituteStudentId: input.studentId, status: "claimed", isVolunteer: true }).where(and(eq(dutySubstitutions.id, row.id), eq(dutySubstitutions.status, "open"))).returning();
+  if (!updated) throw new Error("這項代班剛剛已被其他同學接下");
+  await touchDisplayVersion();
+  return substitutionViews(String(row.date));
+}
+
+export async function assignDutySubstitution(input: { id: string; studentId: string }) {
+  const [row] = await db.select().from(dutySubstitutions).where(eq(dutySubstitutions.id, input.id)).limit(1);
+  if (!row || (row.status !== "open" && row.status !== "claimed")) throw new Error("這項代班目前不能安排");
+  await assertEligibleSubstitute(String(row.date), input.studentId, row.id);
+  await db.update(dutySubstitutions).set({ substituteStudentId: input.studentId, status: "assigned", isVolunteer: false }).where(eq(dutySubstitutions.id, row.id));
+  await touchDisplayVersion();
+  return substitutionViews(String(row.date));
+}
+
+export async function confirmDutySubstitution(id: string) {
+  const [row] = await db.select().from(dutySubstitutions).where(eq(dutySubstitutions.id, id)).limit(1);
+  if (!row || !row.substituteStudentId || (row.status !== "claimed" && row.status !== "assigned")) throw new Error("這項代班目前不能確認");
+  if (row.isVolunteer) {
+    await setGamificationEffect({
+      effectKey: `duty-substitution:${row.id}`,
+      studentId: row.substituteStudentId,
+      currency: "coins",
+      sourceType: "duty-substitution",
+      sourceId: row.id,
+      effectType: "confirmed",
+      amount: 3,
+      reason: "自願代班完成",
+      ruleSnapshot: { coins: 3 },
+    });
+  }
+  await db.update(dutySubstitutions).set({ status: "confirmed", confirmedAt: new Date() }).where(eq(dutySubstitutions.id, row.id));
+  await touchDisplayVersion();
+  return substitutionViews(String(row.date));
+}
+
+export async function cancelDutySubstitution(id: string) {
+  const [row] = await db.select().from(dutySubstitutions).where(eq(dutySubstitutions.id, id)).limit(1);
+  if (!row || row.status === "confirmed") throw new Error("已確認完成的代班不能取消");
+  await db.update(dutySubstitutions).set({ substituteStudentId: null, status: "open", isVolunteer: false }).where(eq(dutySubstitutions.id, id));
+  await touchDisplayVersion();
+  return substitutionViews(String(row.date));
+}
+
+export async function listDutyMakeups() {
+  const [rows, roster] = await Promise.all([
+    db.select().from(dutyMakeups).where(eq(dutyMakeups.status, "pending")).orderBy(asc(dutyMakeups.sourceDate)),
+    listActiveDutyStudents(),
+  ]);
+  const names = new Map(roster.map((student) => [student.studentId, student.name]));
+  return rows.filter((row) => isDutySlotKey(row.sourceSlotKey)).map((row) => ({
+    id: row.id, studentId: row.studentId, studentName: names.get(row.studentId) ?? "（未知）", sourceDate: String(row.sourceDate), sourceSlotKey: row.sourceSlotKey as DutySlotKey,
+    assignedDate: row.assignedDate ? String(row.assignedDate) : null,
+    assignedSlotKey: row.assignedSlotKey && isDutySlotKey(row.assignedSlotKey) ? row.assignedSlotKey as DutySlotKey : null,
+    status: row.status as DutyMakeupView["status"],
+  }));
+}
+
+export async function scheduleDutyMakeup(input: { id: string; assignedDate: string; assignedSlotKey: string }) {
+  if (!isDutySlotKey(input.assignedSlotKey)) throw new Error("工作欄位無效");
+  await db.update(dutyMakeups).set({ assignedDate: input.assignedDate, assignedSlotKey: input.assignedSlotKey }).where(eq(dutyMakeups.id, input.id));
+  return listDutyMakeups();
+}
+
+export async function completeDutyMakeup(id: string) {
+  await db.update(dutyMakeups).set({ status: "completed", completedAt: new Date() }).where(eq(dutyMakeups.id, id));
+  return listDutyMakeups();
 }
 
 /** 今日全天擦黑板主責；放假則空陣列 */

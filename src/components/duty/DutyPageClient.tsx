@@ -6,7 +6,7 @@ import {
   formatDisplayDate,
   todayDateString,
 } from "@/lib/dates";
-import { DUTY_SLOT_KEYS, type DutySlotKey } from "@/lib/dutyRoster";
+import { DUTY_SLOT_KEYS, DUTY_SLOT_LABEL, type DutySlotKey } from "@/lib/dutyRoster";
 import { cn } from "@/lib/utils";
 
 type DutySlotView = {
@@ -38,6 +38,8 @@ type DutyRangeView = {
 };
 
 type CellRef = { date: string; slotKey: DutySlotKey };
+type DutySubstitutionView = { id: string; label: string; absentStudentName: string; substituteStudentId: string | null; substituteStudentName: string | null; status: "open" | "claimed" | "assigned" | "confirmed" | "cancelled"; isVolunteer: boolean };
+type DutyMakeupView = { id: string; studentId: string; studentName: string; sourceDate: string; sourceSlotKey: DutySlotKey; assignedDate: string | null; assignedSlotKey: DutySlotKey | null; status: "pending" | "completed" | "cancelled" };
 
 const COLUMN_GROUPS: { title: string; slots: DutySlotKey[] }[] = [
   { title: "二年級餐桶＋前區", slots: ["meal_bucket_1", "meal_bucket_2"] },
@@ -55,20 +57,30 @@ export function DutyPageClient() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<CellRef | null>(null);
+  const [substitutions, setSubstitutions] = useState<DutySubstitutionView[]>([]);
+  const [makeups, setMakeups] = useState<DutyMakeupView[]>([]);
+  const [assignmentChoices, setAssignmentChoices] = useState<Record<string, string>>({});
+  const [makeupDates, setMakeupDates] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(
-        "/api/duty?semester=active",
-      );
+      const [response, substitutionsResponse, makeupsResponse] = await Promise.all([
+        fetch("/api/duty?semester=active"),
+        fetch(`/api/duty?substitutions=${todayDateString()}`),
+        fetch("/api/duty?makeups=pending"),
+      ]);
       const json = (await response.json()) as {
         data?: DutyRangeView;
         error?: string;
       };
       if (!response.ok) throw new Error(json.error ?? "讀取失敗");
       setRange(json.data ?? null);
+      const substitutionJson = (await substitutionsResponse.json()) as { data?: DutySubstitutionView[] };
+      const makeupJson = (await makeupsResponse.json()) as { data?: DutyMakeupView[] };
+      setSubstitutions(substitutionJson.data ?? []);
+      setMakeups(makeupJson.data ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "讀取失敗");
     } finally {
@@ -153,6 +165,18 @@ export function DutyPageClient() {
     }
   }
 
+  async function dutyAction(body: Record<string, unknown>, success: string) {
+    setBusy(true); setError(null);
+    try {
+      const response = await fetch("/api/duty", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const json = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(json.error ?? "更新失敗");
+      setMessage(success);
+      await load();
+    } catch (err) { setError(err instanceof Error ? err.message : "更新失敗"); }
+    finally { setBusy(false); }
+  }
+
   const dates = useMemo(
     () => range?.days.map((day) => day.date) ?? [],
     [range?.days],
@@ -197,6 +221,39 @@ export function DutyPageClient() {
       {message ? <p className="text-sm text-green-600">{message}</p> : null}
       {loading && !range ? (
         <p className="text-sm text-gray-400">載入中…</p>
+      ) : null}
+
+      {substitutions.filter((item) => item.status !== "confirmed" && item.status !== "cancelled").length > 0 ? (
+        <Card>
+          <CardTitle>今日待確認代班</CardTitle>
+          <CardDescription>自願代班完成後確認才會發放 +3 金幣；老師指定代班不發獎勵。</CardDescription>
+          <div className="mt-3 grid gap-2">
+            {substitutions.filter((item) => item.status !== "confirmed" && item.status !== "cancelled").map((item) => (
+              <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 p-3">
+                <div><p className="font-semibold text-gray-900">{item.label}</p><p className="text-sm text-gray-500">{item.absentStudentName} 請假 → {item.substituteStudentName ?? "尚未有人接下"}</p></div>
+                <div className="flex flex-wrap gap-2">
+                  {!item.substituteStudentId ? <select value={assignmentChoices[item.id] ?? ""} onChange={(e) => setAssignmentChoices((old) => ({ ...old, [item.id]: e.target.value }))} className="h-9 rounded border border-gray-300 px-2 text-sm"><option value="">老師指定…</option>{Array.from(new Map((range?.days[0]?.slots ?? []).filter((slot) => slot.studentId).map((slot) => [slot.studentId!, `${slot.seatNumber} ${slot.name}`])).entries()).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select> : null}
+                  {!item.substituteStudentId ? <button type="button" disabled={busy || !assignmentChoices[item.id]} onClick={() => void dutyAction({ action: "assign-substitution", id: item.id, studentId: assignmentChoices[item.id] }, "已指定代班者")} className="rounded bg-slate-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-40">指定</button> : <><button type="button" disabled={busy} onClick={() => void dutyAction({ action: "confirm-substitution", id: item.id }, item.isVolunteer ? "已確認並發放 +3 金幣" : "已確認老師指定的代班")} className="rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white">確認完成</button><button type="button" disabled={busy} onClick={() => void dutyAction({ action: "cancel-substitution", id: item.id }, "已取消代班登記")} className="rounded border border-gray-300 px-3 py-2 text-sm">取消</button></>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+
+      {makeups.length > 0 ? (
+        <Card>
+          <CardTitle>補值日待辦</CardTitle>
+          <CardDescription>請假學生回校後，老師選一天安排同等工作；完成後不發額外金幣。</CardDescription>
+          <div className="mt-3 grid gap-2">
+            {makeups.map((item) => (
+              <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 p-3">
+                <p className="text-sm text-gray-700"><span className="font-semibold">{item.studentName}</span>・補 {DUTY_SLOT_LABEL[item.sourceSlotKey]}</p>
+                  <div className="flex flex-wrap gap-2"><input type="date" value={makeupDates[item.id] ?? item.assignedDate ?? today} onChange={(e) => setMakeupDates((old) => ({ ...old, [item.id]: e.target.value }))} className="h-9 rounded border border-gray-300 px-2 text-sm"/><select value={assignmentChoices[`makeup:${item.id}`] ?? item.assignedSlotKey ?? ""} onChange={(e) => setAssignmentChoices((old) => ({ ...old, [`makeup:${item.id}`]: e.target.value }))} className="h-9 rounded border border-gray-300 px-2 text-sm"><option value="">安排工作…</option>{DUTY_SLOT_KEYS.map((key) => <option key={key} value={key}>{DUTY_SLOT_LABEL[key]}</option>)}</select>{item.assignedDate ? <button type="button" disabled={busy} onClick={() => void dutyAction({ action: "complete-makeup", id: item.id }, "已完成補值日")} className="rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white">完成</button> : <button type="button" disabled={busy || !(assignmentChoices[`makeup:${item.id}`] ?? item.assignedSlotKey)} onClick={() => { const slot = assignmentChoices[`makeup:${item.id}`] ?? item.assignedSlotKey; if (slot) void dutyAction({ action: "schedule-makeup", id: item.id, assignedDate: makeupDates[item.id] ?? today, assignedSlotKey: slot }, "已安排補值日"); }} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white">安排</button>}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
       ) : null}
 
       <Card className="overflow-auto !p-0">

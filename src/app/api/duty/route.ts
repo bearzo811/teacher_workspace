@@ -2,9 +2,16 @@ import { NextResponse } from "next/server";
 import { parseDateInput } from "@/lib/dates";
 import {
   clearDutyOverride,
+  cancelDutySubstitution,
+  completeDutyMakeup,
+  confirmDutySubstitution,
   getActiveTermDutySchedule,
   getDutyDay,
+  getDutySubstitutionDay,
   getDutyRange,
+  listDutyMakeups,
+  assignDutySubstitution,
+  scheduleDutyMakeup,
   swapDutySlots,
 } from "@/services/dutyService";
 
@@ -20,6 +27,14 @@ export async function GET(request: Request) {
     if (searchParams.get("semester") === "active") {
       const data = await getActiveTermDutySchedule();
       return NextResponse.json({ data });
+    }
+    if (searchParams.get("makeups") === "pending") {
+      return NextResponse.json({ data: await listDutyMakeups() });
+    }
+    const substitutionsDate = searchParams.get("substitutions");
+    if (substitutionsDate) {
+      parseDateInput(substitutionsDate);
+      return NextResponse.json({ data: await getDutySubstitutionDay(substitutionsDate) });
     }
 
     if (date) {
@@ -50,11 +65,15 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = (await request.json()) as {
-      action?: "swap" | "clear";
+      action?: "swap" | "clear" | "assign-substitution" | "confirm-substitution" | "cancel-substitution" | "schedule-makeup" | "complete-makeup";
       a?: { date?: string; slotKey?: string };
       b?: { date?: string; slotKey?: string };
       date?: string;
       slotKey?: string;
+      id?: string;
+      studentId?: string;
+      assignedDate?: string;
+      assignedSlotKey?: string;
     };
 
     if (body.action === "swap") {
@@ -86,6 +105,23 @@ export async function PATCH(request: Request) {
         slotKey: body.slotKey,
       });
       return NextResponse.json({ data });
+    }
+
+    if (body.action === "assign-substitution" && body.id && body.studentId) {
+      return NextResponse.json({ data: await assignDutySubstitution({ id: body.id, studentId: body.studentId }) });
+    }
+    if (body.action === "confirm-substitution" && body.id) {
+      return NextResponse.json({ data: await confirmDutySubstitution(body.id) });
+    }
+    if (body.action === "cancel-substitution" && body.id) {
+      return NextResponse.json({ data: await cancelDutySubstitution(body.id) });
+    }
+    if (body.action === "schedule-makeup" && body.id && body.assignedDate && body.assignedSlotKey) {
+      parseDateInput(body.assignedDate);
+      return NextResponse.json({ data: await scheduleDutyMakeup({ id: body.id, assignedDate: body.assignedDate, assignedSlotKey: body.assignedSlotKey }) });
+    }
+    if (body.action === "complete-makeup" && body.id) {
+      return NextResponse.json({ data: await completeDutyMakeup(body.id) });
     }
 
     return NextResponse.json({ error: "未知 action" }, { status: 400 });

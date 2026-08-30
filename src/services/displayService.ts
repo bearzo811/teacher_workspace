@@ -9,7 +9,7 @@ import {
 } from "@/services/calendarService";
 import { getClassSettings } from "@/services/classSettingsService";
 import { getContactBook } from "@/services/contactBookService";
-import { getDutyDay, getDutyLeaders } from "@/services/dutyService";
+import { getDutyDay, getDutyLeaders, getDutySubstitutionDay } from "@/services/dutyService";
 import { getGamificationForStudents } from "@/services/gamificationService";
 import {
   getHomeworkDayView,
@@ -72,16 +72,16 @@ function readingDebts(
   if (!student) return [];
   const dueMonths = (() => {
     if (matrix.semester === "first") {
-      // 上學期跨年度：9～12 月依序到期，1 月才補上 1 月任務；7、8 月不算欠繳。
+      // 當月仍是進行中的任務，月底結束後才列入欠繳；7、8 月不算欠繳。
       if (asOfMonth >= 9 && asOfMonth <= 12) {
-        return new Set(Array.from({ length: asOfMonth - 8 }, (_, index) => index + 9));
+        return new Set(Array.from({ length: asOfMonth - 9 }, (_, index) => index + 9));
       }
-      if (asOfMonth === 1) return new Set([9, 10, 11, 12, 1]);
+      if (asOfMonth === 1) return new Set([9, 10, 11, 12]);
       return new Set<number>();
     }
     // 下學期為同一年 2～6 月；其餘月份不列欠繳。
     if (asOfMonth >= 2 && asOfMonth <= 6) {
-      return new Set(Array.from({ length: asOfMonth - 1 }, (_, index) => index + 2));
+      return new Set(Array.from({ length: asOfMonth - 2 }, (_, index) => index + 2));
     }
     return new Set<number>();
   })();
@@ -153,6 +153,7 @@ async function buildDisplayData(options: {
     returnDay,
     dutyLeaders,
     dutyToday,
+    dutySubstitutions,
     calendarEvents,
     calendarMonthEvents,
     calendarHolidayOverrides,
@@ -176,6 +177,7 @@ async function buildDisplayData(options: {
     isReturnDay(today),
     getDutyLeaders(contactBookDate),
     getDutyDay(contactBookDate),
+    getDutySubstitutionDay(contactBookDate),
     listCalendarEventsByDate(contactBookDate),
     listCalendarEventsInRange(from, to),
     listHolidayOverridesInRange(from, to),
@@ -426,15 +428,24 @@ async function buildDisplayData(options: {
     dutyToday: {
       date: dutyToday.date,
       isHoliday: dutyToday.isHoliday,
-      slots: dutyToday.slots.map((slot) => ({
-        slotKey: slot.slotKey,
-        label: slot.label,
-        name: slot.name,
-        seatNumber: slot.seatNumber,
-      })),
+      slots: dutyToday.slots.map((slot) => {
+        const substitute = dutySubstitutions.find((item) => item.slotKey === slot.slotKey && (item.status === "claimed" || item.status === "assigned" || item.status === "confirmed"));
+        const student = substitute?.substituteStudentId ? activeStudents.find((item) => item.studentId === substitute.substituteStudentId) : null;
+        return { slotKey: slot.slotKey, label: slot.label, name: student?.name ?? slot.name, seatNumber: student?.seatNumber ?? slot.seatNumber };
+      }),
       leaders: dutyToday.leaders.map((leader) => ({
         name: leader.name,
         seatNumber: leader.seatNumber,
+      })),
+      substitutions: dutySubstitutions.filter((item) => item.status !== "cancelled").map((item) => ({
+        id: item.id,
+        slotKey: item.slotKey,
+        label: item.label,
+        absentStudentName: item.absentStudentName,
+        substituteStudentId: item.substituteStudentId,
+        substituteStudentName: item.substituteStudentName,
+        status: item.status,
+        isVolunteer: item.isVolunteer,
       })),
     },
     personal: personalByStudent,
