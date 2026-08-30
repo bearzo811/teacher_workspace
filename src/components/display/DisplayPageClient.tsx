@@ -1271,29 +1271,30 @@ function TodayPanel({
 
   return (
     <section className="grid min-h-0 flex-1 gap-4 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80 p-4 lg:grid-cols-2">
-      <div
-        ref={boardViewportRef}
-        className="flex h-full min-h-0 justify-center overflow-hidden rounded-sm border-[8px] border-amber-950 bg-[#173d2b] text-stone-100 shadow-[inset_0_0_30px_rgba(0,0,0,0.45),0_8px_18px_rgba(0,0,0,0.35)] ring-2 ring-amber-800"
-      >
+      <div className="flex min-h-0 flex-col gap-3">
         <div
-          className="relative shrink-0"
-          style={
-            boardLayout.width
-              ? {
-                  width: boardLayout.width * boardLayout.scale,
-                  height: boardLayout.height * boardLayout.scale,
-                }
-              : { width: "100%" }
-          }
+          ref={boardViewportRef}
+          className="flex min-h-0 flex-1 justify-center overflow-hidden rounded-sm border-[8px] border-amber-950 bg-[#173d2b] text-stone-100 shadow-[inset_0_0_30px_rgba(0,0,0,0.45),0_8px_18px_rgba(0,0,0,0.35)] ring-2 ring-amber-800"
         >
           <div
-            ref={boardContentRef}
-            className="absolute left-0 top-0 p-5"
-            style={{
-              transform: `scale(${boardLayout.scale})`,
-              transformOrigin: "top left",
-            }}
+            className="relative shrink-0"
+            style={
+              boardLayout.width
+                ? {
+                    width: boardLayout.width * boardLayout.scale,
+                    height: boardLayout.height * boardLayout.scale,
+                  }
+                : { width: "100%" }
+            }
           >
+            <div
+              ref={boardContentRef}
+              className="absolute left-0 top-0 p-5"
+              style={{
+                transform: `scale(${boardLayout.scale})`,
+                transformOrigin: "top left",
+              }}
+            >
             <div className="flex items-baseline justify-between gap-4">
               <p className="text-4xl font-semibold tracking-wide text-stone-50">
                 {formatDisplayDate(data.contactBook.date)}
@@ -1341,11 +1342,9 @@ function TodayPanel({
                 </ul>
               </div>
             ) : null}
+            </div>
           </div>
         </div>
-      </div>
-
-      <div className="flex min-h-0 flex-col gap-3 overflow-hidden">
         {data.dutyToday.substitutions.some((item) => item.status === "open" || item.status === "claimed" || item.status === "assigned") ? (
           <DutySubstitutionCallout
             items={data.dutyToday.substitutions}
@@ -1354,6 +1353,9 @@ function TodayPanel({
             onClaim={onClaimSubstitution}
           />
         ) : null}
+      </div>
+
+      <div className="flex min-h-0 flex-col gap-3 overflow-hidden">
         <div className="min-h-0 flex-1 overflow-hidden">
           {row ? (
             <PersonalChecklist
