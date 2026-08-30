@@ -16,7 +16,8 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as { password?: string };
     const expected = process.env.TEACHER_PASSWORD;
-    if (!expected || expected.length < 12) {
+    // 單班教師端使用簡短密碼，至少避免空值造成登入意外開放。
+    if (!expected || expected.length < 5) {
       return NextResponse.json({ error: "教師登入尚未設定" }, { status: 503 });
     }
     if (typeof body.password !== "string" || !safeEqual(body.password, expected)) {

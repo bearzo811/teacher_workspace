@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  BookMarked,
   BookOpen,
   CalendarDays,
   ClipboardList,
@@ -23,7 +22,6 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Today", icon: Home },
-  { href: "/course-plans", label: "課程計劃", icon: BookMarked },
   { href: "/contact-book", label: "聯絡簿", icon: ClipboardList },
   { href: "/duty", label: "值日表", icon: UserRound },
   { href: "/calendar", label: "行事曆", icon: CalendarDays },
