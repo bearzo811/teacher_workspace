@@ -1,7 +1,7 @@
 import { daysBetween, formatDateInput, parseDateInput } from "@/lib/dates";
 import { resolveIsHoliday } from "@/types/calendar";
 
-/** 每天 9 個主責名額；午餐工作可與掃拖／倒垃圾並行。 */
+/** 每天 9 個主責名額；兩班各三桶餐桶＋一台餐桶車，午餐工作可與掃拖／倒垃圾並行。 */
 export const DUTY_SLOT_KEYS = [
   "meal_bucket_1",
   "meal_bucket_2",
@@ -21,11 +21,11 @@ export const DUTY_SLOT_LABEL: Record<DutySlotKey, string> = {
   meal_bucket_2: "二年級餐桶②＋拖前",
   blackboard: "黑板、餐桶桌",
   sweep_1a: "二年級餐桶③＋掃中",
-  sweep_1b: "二年級餐桶④＋拖中",
+  sweep_1b: "二年級餐桶車＋拖中",
   sweep_2a: "四年級餐桶①＋掃後",
   sweep_2b: "四年級餐桶②＋拖後",
   sweep_3a: "四年級餐桶③＋倒垃圾①",
-  sweep_3b: "四年級餐桶④＋倒垃圾②",
+  sweep_3b: "四年級餐桶車＋倒垃圾②",
 };
 
 export const DUTY_EXPECTED_STUDENTS = DUTY_SLOT_KEYS.length;
@@ -33,7 +33,7 @@ export const DUTY_EXPECTED_STUDENTS = DUTY_SLOT_KEYS.length;
 /**
  * 輪轉環上的位置（不是 UI 欄位順序）。
  * 每位學生依序輪轉九種「午餐／清潔組合」；九個上課日為一輪，
- * 因每天八人都會抬餐桶，不再套用舊版避免連續抬桶規則。
+ * 因每天八人都會負責餐桶或餐桶車，不再套用舊版避免連續餐桶工作的規則。
  */
 export const DUTY_ROTATION_INDEX: Record<DutySlotKey, number> = {
   meal_bucket_1: 0,

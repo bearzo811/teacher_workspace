@@ -1553,6 +1553,8 @@ const LUNCH_TASKS = [
 
 function displayDutyLabel(label: string) {
   return label
+    .replace("二年級餐桶車", "餐桶車（二）")
+    .replace("四年級餐桶車", "餐桶車（四）")
     .replace("二年級餐桶", "餐桶（二）")
     .replace("四年級餐桶", "餐桶（四）")
     .replace(/[①②③④]/g, "")

@@ -44,9 +44,9 @@ type DutyMakeupView = { id: string; studentId: string; studentName: string; sour
 const COLUMN_GROUPS: { title: string; slots: DutySlotKey[] }[] = [
   { title: "二年級餐桶＋前區", slots: ["meal_bucket_1", "meal_bucket_2"] },
   { title: "黑板、餐桶桌", slots: ["blackboard"] },
-  { title: "二年級餐桶＋中區", slots: ["sweep_1a", "sweep_1b"] },
+  { title: "二年級餐桶、餐桶車＋中區", slots: ["sweep_1a", "sweep_1b"] },
   { title: "四年級餐桶＋後區", slots: ["sweep_2a", "sweep_2b"] },
-  { title: "四年級餐桶＋倒垃圾", slots: ["sweep_3a", "sweep_3b"] },
+  { title: "四年級餐桶、餐桶車＋倒垃圾", slots: ["sweep_3a", "sweep_3b"] },
 ];
 
 export function DutyPageClient() {
