@@ -158,6 +158,16 @@ const PANEL_LABEL: Record<PanelKey, string> = {
 const SEAT_IDLE_MS = 30_000;
 const CAROUSEL_MS = 60_000;
 
+type DisplayLayout = "wide" | "standard" | "compact";
+
+function getDisplayLayout(width: number, height: number): DisplayLayout {
+  if (width < 1120 || height < 720 || width / Math.max(height, 1) < 1.45) {
+    return "compact";
+  }
+  if (width < 1500 || height < 900) return "standard";
+  return "wide";
+}
+
 export function DisplayPageClient() {
   const searchParams = useSearchParams();
   const displayKey = searchParams.get("key") ?? "";
@@ -182,6 +192,7 @@ export function DisplayPageClient() {
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [shopRequests, setShopRequests] = useState<Set<string>>(() => new Set());
   const [needsScroll, setNeedsScroll] = useState(false);
+  const [viewport, setViewport] = useState({ width: 1440, height: 900 });
   const displaySyncInterval = data
     ? Math.max(2, Math.min(data.displaySettings.refreshSeconds, 5)) * 1000
     : 0;
@@ -189,12 +200,27 @@ export function DisplayPageClient() {
   const displayVersionRef = useRef("");
   const contentScrollRef = useRef<HTMLDivElement>(null);
 
+  const displayLayout = getDisplayLayout(viewport.width, viewport.height);
+  const effectiveFontSize = Math.min(
+    data?.displaySettings.fontSize ?? 16,
+    displayLayout === "compact" ? 18 : displayLayout === "standard" ? 22 : 26,
+  );
+
+  useEffect(() => {
+    function updateViewport() {
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    }
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+    return () => window.removeEventListener("resize", updateViewport);
+  }, []);
+
   useEffect(() => {
     const previous = document.documentElement.style.fontSize;
-    const fontSize = data?.displaySettings.fontSize ?? 16;
-    document.documentElement.style.fontSize = `${fontSize}px`;
+    // 字級仍由導師設定，但會依可用空間設上限，避免小螢幕把按鈕擠出畫面。
+    document.documentElement.style.fontSize = `${effectiveFontSize}px`;
     return () => { document.documentElement.style.fontSize = previous; };
-  }, [data?.displaySettings.fontSize]);
+  }, [effectiveFontSize]);
 
   const load = useCallback(async () => {
     try {
@@ -611,12 +637,13 @@ export function DisplayPageClient() {
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 flex-col gap-4 overflow-hidden overscroll-none",
-        showSeatPicker ? "pb-28" : "pb-20",
+        "flex h-full min-h-0 flex-col overflow-hidden overscroll-none",
+        displayLayout === "compact" ? "gap-[8px]" : "gap-[16px]",
+        showSeatPicker ? "pb-[112px]" : "pb-[80px]",
       )}
     >
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-4 md:gap-8">
+      <header className={cn("flex shrink-0 flex-wrap items-center justify-between", displayLayout === "compact" ? "gap-2" : "gap-3")}>
+        <div className={cn("flex flex-wrap items-center", displayLayout === "compact" ? "gap-3" : "gap-4 md:gap-8")}>
           <h1 className="text-2xl font-semibold md:text-3xl">
             {data.className}
           </h1>
@@ -634,7 +661,7 @@ export function DisplayPageClient() {
         ref={contentScrollRef}
         className={cn(
           "flex min-h-0 flex-1 flex-col overscroll-none",
-          needsScroll ? "overflow-auto" : "overflow-hidden",
+          needsScroll || displayLayout === "compact" ? "overflow-auto" : "overflow-hidden",
         )}
       >
         {panel === "today" ? (
@@ -658,6 +685,7 @@ export function DisplayPageClient() {
               void toggleHomeworkCell(activeStudentId, homeworkId, next);
             }}
             onClaimSubstitution={(id) => void claimDutySubstitution(id)}
+            layout={displayLayout}
           />
         ) : null}
 
@@ -1206,6 +1234,7 @@ function TodayPanel({
   onRoutine,
   onHomework,
   onClaimSubstitution,
+  layout,
 }: {
   data: DisplayData;
   row: DisplayPersonalRow | null;
@@ -1215,6 +1244,7 @@ function TodayPanel({
   onRoutine: (taskKey: string, completed: boolean) => void;
   onHomework: (homeworkId: string, next: boolean) => void;
   onClaimSubstitution: (id: string) => void;
+  layout: DisplayLayout;
 }) {
   const boardViewportRef = useRef<HTMLDivElement>(null);
   const boardContentRef = useRef<HTMLDivElement>(null);
@@ -1270,7 +1300,10 @@ function TodayPanel({
   ]);
 
   return (
-    <section className="grid min-h-0 flex-1 gap-4 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80 p-4 lg:grid-cols-2">
+    <section className={cn(
+      "grid min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80",
+      layout === "compact" ? "h-auto gap-[10px] p-[12px]" : "gap-4 p-4 lg:grid-cols-2",
+    )}>
       <div className="flex min-h-0 flex-col gap-3">
         <div
           ref={boardViewportRef}
