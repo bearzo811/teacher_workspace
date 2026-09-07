@@ -1055,11 +1055,12 @@ function ShopDisplayPanel({
             ? requestedItems.has(`${row.studentId}:${item.id}`)
             : false;
           const affordable = Boolean(row && row.gamification.coins >= item.price);
+          const levelMet = Boolean(row && row.gamification.level >= item.minLevel);
           return (
             <button
               key={item.id}
               type="button"
-              disabled={!row || hasDebt || requested || !affordable || busyKey === `shop:${item.id}`}
+              disabled={!row || hasDebt || requested || !affordable || !levelMet || busyKey === `shop:${item.id}`}
               onClick={() => onRequest(item.id)}
               className={cn(
                 "flex min-h-36 flex-col rounded-2xl border p-4 text-left transition disabled:cursor-default disabled:opacity-45",
@@ -1072,6 +1073,9 @@ function ShopDisplayPanel({
               <span className="mt-3 text-xl font-semibold">{item.name}</span>
               <span className="mt-auto text-lg text-amber-200">
                 {requested ? "✓ 已放入背包" : `${item.price} 金幣`}
+              </span>
+              <span className={cn("mt-1 text-sm font-semibold", levelMet ? "text-emerald-300" : "text-rose-300")}>
+                需 Lv.{item.minLevel}
               </span>
               {item.stock >= 0 ? <span className="mt-1 text-sm text-slate-400">庫存 {item.stock}</span> : null}
             </button>

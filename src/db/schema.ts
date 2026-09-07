@@ -683,6 +683,8 @@ export const shopItems = pgTable("shop_items", {
   name: text("name").notNull(),
   icon: text("icon").notNull().default("🎁"),
   price: integer("price").notNull(),
+  /** 購買資格；老師贈送不受此限制。 */
+  minLevel: integer("min_level").notNull().default(1),
   kind: rewardKindEnum("kind").notNull().default("physical"),
   description: text("description").notNull().default(""),
   /** -1 代表無限供應 */

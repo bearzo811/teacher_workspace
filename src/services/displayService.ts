@@ -451,7 +451,7 @@ async function buildDisplayData(options: {
     personal: personalByStudent,
     shop: {
       open: settings.shopOpen,
-      items: shopItems.map((item) => ({ id: item.id, name: item.name, icon: item.icon, price: item.price, stock: item.stock, kind: item.kind, description: item.description })),
+      items: shopItems.map((item) => ({ id: item.id, name: item.name, icon: item.icon, price: item.price, minLevel: item.minLevel, stock: item.stock, kind: item.kind, description: item.description })),
     },
     backpacks: activeStudents.map((student) => ({
       studentId: student.studentId, name: student.name, seatNumber: student.seatNumber,

@@ -142,7 +142,7 @@ export type DisplayData = {
   personal: DisplayPersonalRow[];
   shop: {
     open: boolean;
-    items: { id: string; name: string; icon: string; price: number; stock: number; kind: "physical" | "privilege"; description: string }[];
+    items: { id: string; name: string; icon: string; price: number; minLevel: number; stock: number; kind: "physical" | "privilege"; description: string }[];
   };
   backpacks: DisplayBackpackRow[];
   displaySettings: {

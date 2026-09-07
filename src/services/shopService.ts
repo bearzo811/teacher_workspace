@@ -9,7 +9,8 @@ import {
   type StudentReward,
 } from "@/db/schema";
 import { getClassSettings } from "@/services/classSettingsService";
-import { setGamificationEffect } from "@/services/gamificationService";
+import { getGamificationSettings, setGamificationEffect } from "@/services/gamificationService";
+import { gamificationProgress } from "@/lib/gamification";
 
 export type RewardKind = "physical" | "privilege";
 export type RewardStatus = "available" | "requested" | "redeemed" | "revoked";
@@ -33,18 +34,21 @@ export async function createShopItem(input: {
   name: string;
   icon?: string;
   price: number;
+  minLevel?: number;
   stock: number;
   kind?: RewardKind;
   description?: string;
 }) {
   const name = input.name.trim();
-  if (!name || !Number.isInteger(input.price) || input.price < 0 || !Number.isInteger(input.stock) || input.stock < -1) {
-    throw new Error("商品名稱、所需點數與庫存格式不正確");
+  const minLevel = input.minLevel ?? 1;
+  if (!name || !Number.isInteger(input.price) || input.price < 0 || !Number.isInteger(input.stock) || input.stock < -1 || !Number.isInteger(minLevel) || minLevel < 1 || minLevel > 20) {
+    throw new Error("商品名稱、所需點數、最低等級與庫存格式不正確");
   }
   const [item] = await db.insert(shopItems).values({
     name,
     icon: input.icon?.trim() || "🎁",
     price: input.price,
+    minLevel,
     stock: input.stock,
     kind: input.kind ?? "physical",
     description: input.description?.trim() ?? "",
@@ -57,6 +61,7 @@ export async function updateShopItem(input: {
   name?: string;
   icon?: string;
   price?: number;
+  minLevel?: number;
   stock?: number;
   kind?: RewardKind;
   description?: string;
@@ -65,11 +70,13 @@ export async function updateShopItem(input: {
   const [existing] = await db.select().from(shopItems).where(eq(shopItems.id, input.id)).limit(1);
   if (!existing) throw new Error("找不到商品");
   if (input.price !== undefined && (!Number.isInteger(input.price) || input.price < 0)) throw new Error("所需點數不可為負數");
+  if (input.minLevel !== undefined && (!Number.isInteger(input.minLevel) || input.minLevel < 1 || input.minLevel > 20)) throw new Error("最低等級須為 Lv.1～Lv.20");
   if (input.stock !== undefined && (!Number.isInteger(input.stock) || input.stock < -1)) throw new Error("庫存須為 -1（無限）或非負整數");
   const [item] = await db.update(shopItems).set({
     name: input.name?.trim() || undefined,
     icon: input.icon?.trim() || undefined,
     price: input.price,
+    minLevel: input.minLevel,
     stock: input.stock,
     kind: input.kind,
     description: input.description?.trim(),
@@ -85,7 +92,7 @@ async function addHistory(rewardId: string, action: string, actor: "student" | "
 
 /** 學生購買：立即扣金幣、有限庫存立即保留，並放入背包。 */
 export async function purchaseShopItem(input: { studentId: string; itemId: string }) {
-  const settings = await getClassSettings();
+  const [settings, gameSettings] = await Promise.all([getClassSettings(), getGamificationSettings()]);
   if (!settings.shopOpen) throw new Error("目前不是商店時間");
   const reward = await db.transaction(async (tx) => {
     // 依商品上鎖，避免不同學生同時搶最後一份庫存時超賣。
@@ -97,6 +104,8 @@ export async function purchaseShopItem(input: { studentId: string; itemId: strin
     if (!student) throw new Error("找不到學生");
     const [profile] = await tx.select().from(studentGameProfiles)
       .where(eq(studentGameProfiles.studentId, input.studentId)).limit(1);
+    const level = gamificationProgress(profile?.xpTotal ?? 0, gameSettings.levelBaseXp).level;
+    if (level < item.minLevel) throw new Error(`需要 Lv.${item.minLevel} 才能兌換`);
     if ((profile?.coinNet ?? 0) < item.price) throw new Error("金幣不足");
     if (item.stock >= 0) {
       await tx.update(shopItems).set({ stock: item.stock - 1, updatedAt: new Date() })
