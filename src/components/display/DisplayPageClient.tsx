@@ -158,13 +158,17 @@ const PANEL_LABEL: Record<PanelKey, string> = {
 const SEAT_IDLE_MS = 30_000;
 const CAROUSEL_MS = 60_000;
 
-type DisplayLayout = "wide" | "standard" | "compact";
+type DisplayLayout = "ultra" | "wide" | "standard" | "compact";
 
-function getDisplayLayout(width: number, height: number): DisplayLayout {
+function getDisplayLayout(width: number, height: number, devicePixelRatio = 1): DisplayLayout {
   // 瀏覽器網址列與 Windows 工作列會吃掉高度，不能單靠高度判定。
   // 1280×720 的電子白板一律保留雙欄；只有真正窄或接近直式的畫面才改直向。
   if (width < 1120 || width / Math.max(height, 1) < 1.45) {
     return "compact";
+  }
+  // Windows 的顯示比例可能讓 4K 白板回報為 1920 或 2560 CSS px；以實際像素一起判定。
+  if (width * devicePixelRatio >= 3000 && height * devicePixelRatio >= 1600) {
+    return "ultra";
   }
   if (width < 1500 || height < 900) return "standard";
   return "wide";
@@ -194,7 +198,7 @@ export function DisplayPageClient() {
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [shopRequests, setShopRequests] = useState<Set<string>>(() => new Set());
   const [needsScroll, setNeedsScroll] = useState(false);
-  const [viewport, setViewport] = useState({ width: 1440, height: 900 });
+  const [viewport, setViewport] = useState({ width: 1440, height: 900, devicePixelRatio: 1 });
   const displaySyncInterval = data
     ? Math.max(2, Math.min(data.displaySettings.refreshSeconds, 5)) * 1000
     : 0;
@@ -202,15 +206,22 @@ export function DisplayPageClient() {
   const displayVersionRef = useRef("");
   const contentScrollRef = useRef<HTMLDivElement>(null);
 
-  const displayLayout = getDisplayLayout(viewport.width, viewport.height);
+  const displayLayout = getDisplayLayout(viewport.width, viewport.height, viewport.devicePixelRatio);
+  const configuredFontSize = data?.displaySettings.fontSize ?? 16;
+  const maxFontSize = displayLayout === "compact" ? 18 : displayLayout === "standard" ? 22 : displayLayout === "wide" ? 26 : 32;
+  const minFontSize = displayLayout === "ultra" ? 24 : 12;
   const effectiveFontSize = Math.min(
-    data?.displaySettings.fontSize ?? 16,
-    displayLayout === "compact" ? 18 : displayLayout === "standard" ? 22 : 26,
+    Math.max(configuredFontSize, minFontSize),
+    maxFontSize,
   );
 
   useEffect(() => {
     function updateViewport() {
-      setViewport({ width: window.innerWidth, height: window.innerHeight });
+      setViewport({
+        width: window.innerWidth,
+        height: window.innerHeight,
+        devicePixelRatio: window.devicePixelRatio || 1,
+      });
     }
     updateViewport();
     window.addEventListener("resize", updateViewport);
@@ -640,7 +651,7 @@ export function DisplayPageClient() {
     <div
       className={cn(
         "flex h-full min-h-0 flex-col overflow-hidden overscroll-none",
-        displayLayout === "compact" ? "gap-[8px]" : "gap-[16px]",
+        displayLayout === "compact" ? "gap-[8px]" : displayLayout === "ultra" ? "gap-[24px]" : "gap-[16px]",
         showSeatPicker ? "pb-[112px]" : "pb-[80px]",
       )}
     >
@@ -826,7 +837,7 @@ export function DisplayPageClient() {
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-700 bg-slate-950/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_30px_rgba(0,0,0,0.35)] backdrop-blur">
-        <div className="mx-auto flex max-w-[1600px] items-end gap-3">
+        <div className="mx-auto flex w-full items-end gap-3">
           <nav
             className="flex shrink-0 gap-2 overflow-x-auto"
             aria-label="大屏頁面"

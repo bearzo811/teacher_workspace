@@ -24,7 +24,7 @@ export function DisplayShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="h-dvh overflow-hidden overscroll-none bg-slate-950 text-slate-50">
-      <main className="mx-auto flex h-full w-full max-w-[1600px] flex-col overflow-hidden p-[12px] sm:p-[16px] lg:p-[24px]">
+      <main className="mx-auto flex h-full w-full flex-col overflow-hidden p-[12px] sm:p-[16px] lg:p-[24px]">
         {children}
       </main>
     </div>
