@@ -161,8 +161,9 @@ const CAROUSEL_MS = 60_000;
 type DisplayLayout = "wide" | "standard" | "compact";
 
 function getDisplayLayout(width: number, height: number): DisplayLayout {
-  // 1280×720 仍是標準 16:9 電子白板，保留雙欄；只有真正矮／窄的視窗才改直向。
-  if (width < 1120 || height < 650 || width / Math.max(height, 1) < 1.45) {
+  // 瀏覽器網址列與 Windows 工作列會吃掉高度，不能單靠高度判定。
+  // 1280×720 的電子白板一律保留雙欄；只有真正窄或接近直式的畫面才改直向。
+  if (width < 1120 || width / Math.max(height, 1) < 1.45) {
     return "compact";
   }
   if (width < 1500 || height < 900) return "standard";
