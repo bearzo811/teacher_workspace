@@ -208,8 +208,11 @@ export function DisplayPageClient() {
 
   const displayLayout = getDisplayLayout(viewport.width, viewport.height, viewport.devicePixelRatio);
   const configuredFontSize = data?.displaySettings.fontSize ?? 16;
-  const maxFontSize = displayLayout === "compact" ? 18 : displayLayout === "standard" ? 22 : displayLayout === "wide" ? 26 : 32;
-  const minFontSize = displayLayout === "ultra" ? 24 : 12;
+  // `html` 的字級同時也是所有 rem 間距與元件尺寸的基準。不能因為面板是 4K
+  // 就強制放大，否則 Windows 的縮放比例下會把整個版面一起撐出可視範圍。
+  // 保留導師設定的字級，但依 CSS 可用空間設安全上限，優先確保學生不用縮放瀏覽器。
+  const maxFontSize = displayLayout === "compact" ? 16 : displayLayout === "standard" ? 18 : displayLayout === "wide" ? 20 : 22;
+  const minFontSize = 12;
   const effectiveFontSize = Math.min(
     Math.max(configuredFontSize, minFontSize),
     maxFontSize,

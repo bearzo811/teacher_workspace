@@ -480,7 +480,7 @@ export function SettingsPageClient() {
             onChange={(value) => updateField("displayRefreshSeconds", value)}
           />
           <Field
-            label="大屏基準字級（12～32 px）"
+            label="大屏基準字級（12～32 px；75 吋 4K 建議從 16 開始）"
             type="number"
             value={form.displayFontSize}
             onChange={(value) => updateField("displayFontSize", value)}
