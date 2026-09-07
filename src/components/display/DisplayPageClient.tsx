@@ -187,7 +187,6 @@ export function DisplayPageClient() {
   );
   const [data, setData] = useState<DisplayData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [updatedAt, setUpdatedAt] = useState("");
   const [panel, setPanel] = useState<PanelKey>("today");
   const [studentView, setStudentView] = useState<"overview" | "shop" | "backpack">("overview");
   const [backpackStudentId, setBackpackStudentId] = useState<string | null>(null);
@@ -250,10 +249,6 @@ export function DisplayPageClient() {
       displayVersionRef.current = nextData?.version ?? displayVersionRef.current;
       setData(nextData);
       setError(null);
-      const now = new Date();
-      setUpdatedAt(
-        `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`,
-      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "讀取失敗");
     }
@@ -632,7 +627,7 @@ export function DisplayPageClient() {
       observer.observe(child);
     }
     return () => observer.disconnect();
-  }, [panel, activeStudentId, data, showSeatPicker, updatedAt]);
+  }, [panel, activeStudentId, data, showSeatPicker]);
 
   if (error && !data) {
     return (
@@ -658,19 +653,6 @@ export function DisplayPageClient() {
         showSeatPicker ? "pb-[112px]" : "pb-[80px]",
       )}
     >
-      <header className={cn("flex shrink-0 flex-wrap items-center justify-between", displayLayout === "compact" ? "gap-2" : "gap-3")}>
-        <div className={cn("flex flex-wrap items-center", displayLayout === "compact" ? "gap-3" : "gap-4 md:gap-8")}>
-          <h1 className="text-2xl font-semibold md:text-3xl">
-            {data.className}
-          </h1>
-          <DisplayHeaderClock />
-        </div>
-        <div className="text-right">
-          <p className="text-sm text-slate-300">聯絡簿：{formatDisplayDate(data.contactBook.date)}</p>
-          <span className="text-sm text-slate-500">更新 {updatedAt}</span>
-        </div>
-      </header>
-
       {error ? <p className="shrink-0 text-sm text-rose-300">{error}</p> : null}
 
       <div
@@ -1515,34 +1497,6 @@ function TodayProgressOverview({ data }: { data: DisplayData }) {
       </div>
     </div>
   );
-}
-
-function useClockLabel() {
-  const [label, setLabel] = useState(() => formatClockNow());
-  useEffect(() => {
-    const id = setInterval(() => setLabel(formatClockNow()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  return label;
-}
-
-function DisplayHeaderClock() {
-  const clock = useClockLabel();
-  return (
-    <div className="border-l border-slate-700 pl-4 md:pl-8">
-      <p className="text-xs uppercase tracking-[0.2em] text-amber-200/80">
-        現在時間
-      </p>
-      <p className="font-mono text-3xl font-semibold tabular-nums leading-none text-amber-100 md:text-4xl">
-        {clock}
-      </p>
-    </div>
-  );
-}
-
-function formatClockNow() {
-  const now = new Date();
-  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
 }
 
 function LunchPanel({
