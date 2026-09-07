@@ -1101,52 +1101,50 @@ function DebtsPanel({
   const debtCount = debts.filter((row) => row.hasBlockingDebt).length;
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+    <section className="flex h-full min-h-0 flex-1 flex-col gap-2 overflow-hidden">
       <div className="shrink-0">
-        <h2 className="text-3xl font-semibold">欠繳作業</h2>
-        <p className="mt-1 text-base text-slate-400">
+        <h2 className="text-2xl font-semibold">欠繳作業</h2>
+        <p className="text-sm text-slate-400">
           作業狀態、護照與閱讀進度一覽 ·
           {` ${debtCount} 人尚有需要自己完成的項目`}
         </p>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid min-h-0 flex-1 grid-cols-3 grid-rows-3 gap-2">
           {debts.map((row) => (
               <article
                 key={row.studentId}
                 className={cn(
-                  "rounded-2xl border bg-slate-900/90 p-4",
+                  "flex min-h-0 flex-col overflow-hidden rounded-xl border bg-slate-900/90 p-2.5",
                   row.hasBlockingDebt ? "border-rose-400/40" : "border-emerald-400/40",
                 )}
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-2xl font-semibold">
+                <div className="flex shrink-0 items-center justify-between gap-2">
+                  <h3 className="text-xl font-semibold">
                   {row.seatNumber} {row.name}
                   </h3>
                   <span className={cn(
-                    "rounded-full px-3 py-1 text-base font-semibold",
+                    "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold",
                     row.hasBlockingDebt
                       ? "border border-rose-400/60 bg-rose-500/20 text-rose-100"
                       : "border border-emerald-400/60 bg-emerald-500/20 text-emerald-100",
                   )}>
-                    {row.hasBlockingDebt ? "不能下課" : "可以下課／兌換商品"}
+                    {row.hasBlockingDebt ? "不能下課" : "可以下課"}
                   </span>
                 </div>
                 {row.hasDebt ? (
-                  <>
+                  <div className="min-h-0 overflow-hidden">
                     <HomeworkStatusGroups items={row.homework} />
                     <DebtGroup label="國語護照" items={row.chinesePassport} />
                     <DebtGroup label="英語護照" items={row.englishPassport} />
                     <DebtGroup label="讀報" items={row.newspaper} />
                     <DebtGroup label="閱讀心得" items={row.reflection} />
-                  </>
+                  </div>
                 ) : (
-                  <p className="mt-4 text-lg text-emerald-200">所有需要完成的項目都已完成。</p>
+                  <p className="mt-2 text-sm text-emerald-200">所有需要完成的項目都已完成。</p>
                 )}
               </article>
           ))}
-        </div>
       </div>
     </section>
   );
@@ -1161,13 +1159,13 @@ function DebtGroup({
 }) {
   if (items.length === 0) return null;
   return (
-    <div className="mt-3">
-      <p className="text-sm font-semibold text-slate-400">{label}</p>
-      <ul className="mt-1 flex flex-wrap gap-1.5">
+    <div className="mt-1.5">
+      <p className="text-xs font-semibold text-slate-400">{label}</p>
+      <ul className="mt-0.5 flex flex-wrap gap-1">
         {items.map((item) => (
           <li
             key={`${label}-${item.label}-${item.note ?? ""}`}
-            className="rounded-lg border border-rose-400/40 bg-rose-500/15 px-2.5 py-1 text-base text-rose-100"
+            className="rounded-md border border-rose-400/40 bg-rose-500/15 px-1.5 py-0.5 text-xs text-rose-100"
           >
             {item.label}
             {item.note ? (
@@ -1212,22 +1210,22 @@ function HomeworkStatusGroups({
   ] as const;
 
   return (
-    <div className="mt-3 space-y-2.5">
-      <p className="text-sm font-semibold text-slate-400">作業</p>
+    <div className="mt-1.5 space-y-1">
+      <p className="text-xs font-semibold text-slate-400">作業</p>
       {statuses.map((status) => {
         const grouped = items.filter((item) => item.status === status);
         if (grouped.length === 0) return null;
         const meta = HOMEWORK_STATUS_META[status];
         return (
           <div key={status}>
-            <p className="text-sm font-medium text-slate-300">
+            <p className="text-xs font-medium text-slate-300">
               {meta.label} <span className="text-slate-500">{grouped.length}</span>
             </p>
-            <ul className="mt-1 flex flex-wrap gap-1.5">
+            <ul className="mt-0.5 flex flex-wrap gap-1">
               {grouped.map((item) => (
                 <li
                   key={`${status}-${item.label}`}
-                  className={cn("rounded-lg border px-2.5 py-1 text-base", meta.className)}
+                  className={cn("rounded-md border px-1.5 py-0.5 text-xs", meta.className)}
                 >
                   {item.label}
                 </li>
