@@ -161,7 +161,7 @@ const CAROUSEL_MS = 60_000;
 type DisplayLayout = "wide" | "standard" | "compact";
 
 function getDisplayLayout(width: number, height: number): DisplayLayout {
-  if (width < 1120 || height < 720 || width / Math.max(height, 1) < 1.45) {
+  if (width < 1120 || height <= 720 || width / Math.max(height, 1) < 1.45) {
     return "compact";
   }
   if (width < 1500 || height < 900) return "standard";
