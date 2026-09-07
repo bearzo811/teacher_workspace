@@ -27,7 +27,13 @@ export async function listShopItems(options?: { activeOnly?: boolean }) {
         or(eq(shopItems.stock, -1), sql`${shopItems.stock} > 0`),
       )
     : undefined;
-  return db.select().from(shopItems).where(where).orderBy(asc(shopItems.name));
+  // 先呈現需要較高等級的目標；同等級時讓較高金額的商品排前面。
+  // 名稱只用來讓完全相同條件下的順序穩定。
+  return db.select().from(shopItems).where(where).orderBy(
+    desc(shopItems.minLevel),
+    desc(shopItems.price),
+    asc(shopItems.name),
+  );
 }
 
 export async function createShopItem(input: {
