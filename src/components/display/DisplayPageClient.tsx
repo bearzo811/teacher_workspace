@@ -1568,7 +1568,7 @@ function LunchPanel({
   }
 
   return (
-    <section className="grid min-h-0 flex-1 grid-rows-[minmax(0,1.1fr)_minmax(0,0.9fr)] gap-3 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80 p-4">
+    <section className="grid min-h-0 flex-1 grid-cols-2 gap-3 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80 p-4">
         <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950/40 p-3">
           <h2 className="shrink-0 text-xl font-semibold text-slate-100">今日午餐工作</h2>
           <div className="mt-2 min-h-0 flex-1 overflow-auto">
