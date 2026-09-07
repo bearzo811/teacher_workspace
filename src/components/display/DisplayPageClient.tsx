@@ -1556,13 +1556,19 @@ function LunchPanel({
   );
   const videoUrl = toYouTubeEmbedUrl(data.lunchVideoQuery);
 
-  return (
-    <section className="grid min-h-0 flex-1 gap-4 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80 p-4 lg:grid-cols-2">
-      <div className="flex h-full min-h-0 items-center justify-center overflow-hidden rounded-2xl border border-dashed border-slate-600 bg-slate-950/30">
-        {videoUrl ? <LunchVideoPlayer query={data.lunchVideoQuery} src={videoUrl} displayHeaders={displayHeaders} /> : <p className="text-lg text-slate-500">目前沒有午餐影音</p>}
-      </div>
+  // 午餐時間只讓學生看一種重點：有影片時專心播放；沒有影片時才完整展示工作。
+  if (videoUrl) {
+    return (
+      <section className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80 p-3">
+        <div className="h-full w-full overflow-hidden rounded-xl bg-black">
+          <LunchVideoPlayer query={data.lunchVideoQuery} src={videoUrl} displayHeaders={displayHeaders} />
+        </div>
+      </section>
+    );
+  }
 
-      <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1.1fr)_minmax(0,0.9fr)] gap-3 overflow-hidden">
+  return (
+    <section className="grid min-h-0 flex-1 grid-rows-[minmax(0,1.1fr)_minmax(0,0.9fr)] gap-3 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80 p-4">
         <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950/40 p-3">
           <h2 className="shrink-0 text-xl font-semibold text-slate-100">今日午餐工作</h2>
           <div className="mt-2 min-h-0 flex-1 overflow-auto">
@@ -1587,7 +1593,6 @@ function LunchPanel({
           busyKey={busyKey}
           onRoutineCell={onRoutineCell}
         />
-      </div>
     </section>
   );
 }
