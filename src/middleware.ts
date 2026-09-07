@@ -8,6 +8,9 @@ const DISPLAY_API_PATHS = [
   "/api/passport",
   "/api/reading",
   "/api/routines",
+  // 此班級網站僅供教室使用：學生可直接在大屏兌換商品／申請使用背包。
+  // 商品管理、贈送與核銷仍會在 shop route 中要求教師登入。
+  "/api/shop",
 ];
 
 function isPublicPath(pathname: string) {
