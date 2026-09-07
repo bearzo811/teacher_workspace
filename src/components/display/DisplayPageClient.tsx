@@ -726,6 +726,7 @@ export function DisplayPageClient() {
               hasDebt={Boolean(activePersonal && data.debts.find((debt) => debt.studentId === activePersonal.studentId)?.hasBlockingDebt)}
               busyKey={busyKey}
               requestedItems={shopRequests}
+              layout={displayLayout}
               onBack={() => setStudentView("overview")}
               onRequest={(itemId) => {
                 if (activeStudentId) void requestShopItem(activeStudentId, itemId);
@@ -991,6 +992,7 @@ function ShopDisplayPanel({
   hasDebt,
   busyKey,
   requestedItems,
+  layout,
   onBack,
   onRequest,
 }: {
@@ -999,15 +1001,16 @@ function ShopDisplayPanel({
   hasDebt: boolean;
   busyKey: string | null;
   requestedItems: Set<string>;
+  layout: DisplayLayout;
   onBack: () => void;
   onRequest: (itemId: string) => void;
 }) {
   return (
-    <section className="flex min-h-0 flex-1 flex-col gap-4 rounded-2xl border border-amber-400/40 bg-slate-900/80 p-5">
+    <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden rounded-2xl border border-amber-400/40 bg-slate-900/80 p-4">
       <div className="flex shrink-0 items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-semibold text-amber-100">班級商店</h2>
-          <p className="mt-1 text-base text-slate-400">
+          <h2 className="text-2xl font-semibold text-amber-100">班級商店</h2>
+          <p className="mt-0.5 text-sm text-slate-400">
             {row
               ? hasDebt
                 ? "你有尚未完成的項目，完成前不能使用商店"
@@ -1018,38 +1021,47 @@ function ShopDisplayPanel({
         <button
           type="button"
           onClick={onBack}
-          className="min-h-12 rounded-xl border border-slate-600 bg-slate-800 px-4 text-lg font-semibold text-slate-100"
+          className="min-h-10 rounded-xl border border-slate-600 bg-slate-800 px-4 text-base font-semibold text-slate-100"
         >
           返回個人點數
         </button>
       </div>
 
       {row ? (
-        <div className="shrink-0 rounded-2xl border border-violet-400/50 bg-violet-500/10 p-4">
+        <div className="shrink-0 rounded-2xl border border-violet-400/50 bg-violet-500/10 p-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm text-slate-400">目前兌換者</p>
-              <p className="text-3xl font-semibold">{row.seatNumber} 號 {row.name}</p>
+              <p className="text-2xl font-semibold">{row.seatNumber} 號 {row.name}</p>
             </div>
-            <div className="flex gap-3 text-xl font-semibold">
-              <span className="rounded-full border border-violet-400/50 px-4 py-2 text-violet-200">Lv.{row.gamification.level}</span>
-              <span className="rounded-full border border-amber-400/50 bg-amber-500/10 px-4 py-2 text-amber-200">{row.gamification.coins} 金幣</span>
+            <div className="flex gap-2 text-lg font-semibold">
+              <span className="rounded-full border border-violet-400/50 px-3 py-1.5 text-violet-200">Lv.{row.gamification.level}</span>
+              <span className="rounded-full border border-amber-400/50 bg-amber-500/10 px-3 py-1.5 text-amber-200">{row.gamification.coins} 金幣</span>
             </div>
           </div>
         </div>
       ) : (
-        <div className="flex min-h-28 shrink-0 items-center justify-center rounded-2xl border border-dashed border-slate-600 text-2xl text-slate-400">
+        <div className="flex min-h-20 shrink-0 items-center justify-center rounded-2xl border border-dashed border-slate-600 text-xl text-slate-400">
           請點下方自己的座號
         </div>
       )}
 
       {row && hasDebt ? (
-        <p className="shrink-0 rounded-xl border border-rose-400/50 bg-rose-500/15 px-4 py-3 text-lg font-semibold text-rose-100">
+        <p className="shrink-0 rounded-xl border border-rose-400/50 bg-rose-500/15 px-4 py-2 text-base font-semibold text-rose-100">
           尚有欠繳項目，請先到「欠繳作業」頁確認並完成，暫時不能兌換商品。
         </p>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-auto sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div
+        className={cn(
+          "grid min-h-0 flex-1 auto-rows-fr gap-3 overflow-hidden",
+          // 大屏以三欄、兩列呈現目前六項商品：卡片夠寬，且不必在商品區捲動。
+          // 商品日後增加時才在超寬螢幕改四欄，仍優先把所有商品留在同一畫面。
+          data.shop.items.length > 6 && (layout === "ultra" || layout === "wide")
+            ? "grid-cols-2 md:grid-cols-3 xl:grid-cols-4"
+            : "grid-cols-2 md:grid-cols-3",
+        )}
+      >
         {data.shop.items.map((item) => {
           const requested = row
             ? requestedItems.has(`${row.studentId}:${item.id}`)
@@ -1063,15 +1075,15 @@ function ShopDisplayPanel({
               disabled={!row || hasDebt || requested || !affordable || !levelMet || busyKey === `shop:${item.id}`}
               onClick={() => onRequest(item.id)}
               className={cn(
-                "flex min-h-36 flex-col rounded-2xl border p-4 text-left transition disabled:cursor-default disabled:opacity-45",
+                "flex min-h-0 h-full flex-col rounded-2xl border p-3 text-left transition disabled:cursor-default disabled:opacity-45",
                 requested
                   ? "border-emerald-400 bg-emerald-500/15 text-emerald-100"
                   : "border-amber-300/50 bg-slate-950/50 text-amber-50 enabled:active:scale-[0.98]",
               )}
             >
-              <span className="text-4xl">{item.icon}</span>
-              <span className="mt-3 text-xl font-semibold">{item.name}</span>
-              <span className="mt-auto text-lg text-amber-200">
+              <span className="text-3xl">{item.icon}</span>
+              <span className="mt-2 text-lg font-semibold leading-tight">{item.name}</span>
+              <span className="mt-auto pt-2 text-base text-amber-200">
                 {requested ? "✓ 已放入背包" : `${item.price} 金幣`}
               </span>
               <span className={cn("mt-1 text-sm font-semibold", levelMet ? "text-emerald-300" : "text-rose-300")}>
