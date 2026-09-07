@@ -1193,7 +1193,6 @@ function HomeworkStatusGroups({
     "unsubmitted",
     "correction_required",
     "pending_confirmation",
-    "completed",
   ] as const;
 
   return (
