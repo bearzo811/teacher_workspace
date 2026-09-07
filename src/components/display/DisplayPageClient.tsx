@@ -161,7 +161,8 @@ const CAROUSEL_MS = 60_000;
 type DisplayLayout = "wide" | "standard" | "compact";
 
 function getDisplayLayout(width: number, height: number): DisplayLayout {
-  if (width < 1120 || height <= 720 || width / Math.max(height, 1) < 1.45) {
+  // 1280×720 仍是標準 16:9 電子白板，保留雙欄；只有真正矮／窄的視窗才改直向。
+  if (width < 1120 || height < 650 || width / Math.max(height, 1) < 1.45) {
     return "compact";
   }
   if (width < 1500 || height < 900) return "standard";
@@ -1303,7 +1304,7 @@ function TodayPanel({
       "grid min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80",
       layout === "compact" ? "h-auto gap-[10px] p-[12px]" : "gap-4 p-4 lg:grid-cols-2",
     )}>
-      <div className="flex min-h-0 flex-col gap-3">
+      <div className={cn("flex min-h-0 flex-col gap-3", layout === "compact" && "min-h-[360px]")}>
         <div
           ref={boardViewportRef}
           className="flex min-h-0 flex-1 justify-center overflow-hidden rounded-sm border-[8px] border-amber-950 bg-[#173d2b] text-stone-100 shadow-[inset_0_0_30px_rgba(0,0,0,0.45),0_8px_18px_rgba(0,0,0,0.35)] ring-2 ring-amber-800"
