@@ -606,6 +606,17 @@ export const gamificationSettings = pgTable("gamification_settings", {
   passportOnTimeCoins: integer("passport_on_time_coins").notNull().default(5),
   passportLateCoins: integer("passport_late_coins").notNull().default(2),
   passportMissedCoins: integer("passport_missed_coins").notNull().default(-2),
+  /** 每本每週護照依完成日發放的金幣；逾週後不再給完成獎勵。 */
+  passportMondayCoins: integer("passport_monday_coins").notNull().default(8),
+  passportTuesdayCoins: integer("passport_tuesday_coins").notNull().default(6),
+  passportWednesdayCoins: integer("passport_wednesday_coins").notNull().default(4),
+  passportThursdayCoins: integer("passport_thursday_coins").notNull().default(2),
+  passportFridayCoins: integer("passport_friday_coins").notNull().default(1),
+  /** 護照跨到下一週仍未完成時，每個上課日、每本扣除的金幣。 */
+  passportOverdueDailyCoins: integer("passport_overdue_daily_coins").notNull().default(-1),
+  /** 每月讀報／閱讀心得由老師勾選完成時的金幣。 */
+  readingNewspaperCoins: integer("reading_newspaper_coins").notNull().default(5),
+  readingReflectionCoins: integer("reading_reflection_coins").notNull().default(5),
   routineXp: integer("routine_xp").notNull().default(2),
   levelBaseXp: integer("level_base_xp").notNull().default(100),
   ...timestamps,

@@ -21,6 +21,8 @@ import {
 } from "@/lib/gamification";
 import { resolveSchoolWeek } from "@/lib/schoolWeek";
 import { getClassSettings } from "@/services/classSettingsService";
+import { listHolidayOverridesInRange } from "@/services/calendarService";
+import { resolveIsHoliday } from "@/types/calendar";
 import type {
   GameCurrency,
   GamificationLedgerView,
@@ -39,6 +41,14 @@ export type GamificationRulesUpdate = Partial<
     | "passportOnTimeCoins"
     | "passportLateCoins"
     | "passportMissedCoins"
+    | "passportMondayCoins"
+    | "passportTuesdayCoins"
+    | "passportWednesdayCoins"
+    | "passportThursdayCoins"
+    | "passportFridayCoins"
+    | "passportOverdueDailyCoins"
+    | "readingNewspaperCoins"
+    | "readingReflectionCoins"
     | "routineXp"
     | "levelBaseXp"
   >
@@ -92,6 +102,14 @@ export function gamificationRulesView(
     passportOnTimeCoins: settings.passportOnTimeCoins,
     passportLateCoins: settings.passportLateCoins,
     passportMissedCoins: settings.passportMissedCoins,
+    passportMondayCoins: settings.passportMondayCoins,
+    passportTuesdayCoins: settings.passportTuesdayCoins,
+    passportWednesdayCoins: settings.passportWednesdayCoins,
+    passportThursdayCoins: settings.passportThursdayCoins,
+    passportFridayCoins: settings.passportFridayCoins,
+    passportOverdueDailyCoins: settings.passportOverdueDailyCoins,
+    readingNewspaperCoins: settings.readingNewspaperCoins,
+    readingReflectionCoins: settings.readingReflectionCoins,
     routineXp: settings.routineXp,
     levelBaseXp: settings.levelBaseXp,
   };
@@ -316,15 +334,20 @@ export async function reconcilePassportReward(input: {
     "completion",
   );
   if (input.completedAt && !isAfterLaunch(settings, input.completedAt)) return;
-  const penalty = await getEffectAmount(
-    effectKey("passport", input.type, input.week, input.studentId, "missed"),
-  );
-  const late = input.isPastWeek || penalty < 0;
-  const amount = !input.completed
+  // 每週護照在該週的平日完成才給獎勵；跨到下一週後僅結算每日逾期扣點。
+  const weekday = input.completedAt
+    ? new Date(`${taipeiDateString(input.completedAt)}T00:00:00Z`).getUTCDay()
+    : 0;
+  const weekdayCoins: Record<number, number> = {
+    1: settings.passportMondayCoins,
+    2: settings.passportTuesdayCoins,
+    3: settings.passportWednesdayCoins,
+    4: settings.passportThursdayCoins,
+    5: settings.passportFridayCoins,
+  };
+  const amount = !input.completed || input.isPastWeek
     ? 0
-    : late
-      ? settings.passportLateCoins
-      : settings.passportOnTimeCoins;
+    : (weekdayCoins[weekday] ?? 0);
   await setGamificationEffect({
     effectKey: key,
     studentId: input.studentId,
@@ -334,12 +357,48 @@ export async function reconcilePassportReward(input: {
     effectType: "completion",
     amount,
     reason:
-      amount === 0 ? "護照完成回沖" : late ? "逾期補完護照" : "準時完成護照",
+      amount === 0 ? "護照完成回沖" : `第 ${weekday} 天完成護照`,
     ruleSnapshot: {
-      onTime: settings.passportOnTimeCoins,
-      late: settings.passportLateCoins,
+      monday: settings.passportMondayCoins,
+      tuesday: settings.passportTuesdayCoins,
+      wednesday: settings.passportWednesdayCoins,
+      thursday: settings.passportThursdayCoins,
+      friday: settings.passportFridayCoins,
     },
     metadata: { type: input.type, week: input.week },
+  });
+}
+
+/** 讀報／閱讀心得由老師完成檢核時，各發放一次金幣；退回未完成時會回沖。 */
+export async function reconcileReadingReward(input: {
+  studentId: string;
+  type: "newspaper" | "reflection";
+  schoolYear: string;
+  semester: "first" | "second";
+  month: number;
+  completed: boolean;
+  completedAt: Date | null;
+}) {
+  const settings = await getGamificationSettings();
+  const sourceId = `${input.type}:${input.schoolYear}:${input.semester}:${input.month}`;
+  const amount = input.completed && input.completedAt && isAfterLaunch(settings, input.completedAt)
+    ? input.type === "newspaper"
+      ? settings.readingNewspaperCoins
+      : settings.readingReflectionCoins
+    : 0;
+  return setGamificationEffect({
+    effectKey: effectKey("reading", sourceId, input.studentId, "completion"),
+    studentId: input.studentId,
+    currency: "coins",
+    sourceType: "reading",
+    sourceId,
+    effectType: "completion",
+    amount,
+    reason: amount === 0 ? "讀報閱讀完成回沖" : input.type === "newspaper" ? "完成讀報" : "完成閱讀心得",
+    ruleSnapshot: {
+      coins: input.type === "newspaper" ? settings.readingNewspaperCoins : settings.readingReflectionCoins,
+    },
+    metadata: { type: input.type, month: input.month, schoolYear: input.schoolYear, semester: input.semester },
   });
 }
 
@@ -491,16 +550,6 @@ export async function getStudentGamification(studentId: string) {
   };
 }
 
-function calendarWeekday(dateString: string) {
-  const [year, month, day] = dateString.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-}
-
-function mostRecentEndedSunday(today: string) {
-  const yesterday = addCalendarDays(today, -1);
-  return addCalendarDays(yesterday, -calendarWeekday(yesterday));
-}
-
 async function settleHomeworkPenalties(
   now: Date,
   settings: GamificationSettings,
@@ -564,22 +613,25 @@ async function settleHomeworkPenalties(
   return changed;
 }
 
-async function settlePassportPenalties(
+async function settlePassportDailyOverduePenalties(
   now: Date,
   settings: GamificationSettings,
 ) {
   const classSettings = await getClassSettings();
-  const today = taipeiDateString(now);
-  const deadlineDate = mostRecentEndedSunday(today);
-  if (deadlineDate < taipeiDateString(settings.enabledAt)) return 0;
+  // 排程在台北時間 00:05 執行，因此結算剛結束的前一日。
+  const penaltyDate = addCalendarDays(taipeiDateString(now), -1);
+  if (!sourceIsAfterLaunch(settings, penaltyDate)) return 0;
+  const overrides = await listHolidayOverridesInRange(penaltyDate, penaltyDate);
+  // 六日、暑假與行事曆中標紅的放假日都不扣點；補課日覆寫為 false 時會照常扣。
+  if (resolveIsHoliday(penaltyDate, overrides)) return 0;
 
-  const deadlineWeek = resolveSchoolWeek({
+  const currentWeek = resolveSchoolWeek({
     weekOneStartDate: classSettings.weekOneStartDate,
     termEndDate: classSettings.termEndDate,
     fallbackWeek: classSettings.currentWeek,
-    today: deadlineDate,
+    today: penaltyDate,
   }).week;
-  if (deadlineWeek < 1) return 0;
+  if (currentWeek < 1) return 0;
 
   const activeTypes = [
     {
@@ -592,7 +644,7 @@ async function settlePassportPenalties(
       start: classSettings.englishStartWeek,
       end: classSettings.englishEndWeek,
     },
-  ].filter(({ start, end }) => deadlineWeek >= start && deadlineWeek <= end);
+  ].filter(({ start }) => currentWeek > start);
   if (activeTypes.length === 0) return 0;
 
   const activeStudents = await db
@@ -600,43 +652,35 @@ async function settlePassportPenalties(
     .from(students)
     .where(eq(students.isActive, true));
   let changed = 0;
-  for (const { type } of activeTypes) {
+  for (const { type, start, end } of activeTypes) {
     const records = await db
       .select()
       .from(passportRecords)
       .where(
         and(
           eq(passportRecords.type, type),
-          eq(passportRecords.week, deadlineWeek),
+          lt(passportRecords.week, currentWeek),
         ),
       );
-    const recordMap = new Map(records.map((row) => [row.studentId, row]));
+    const recordMap = new Map(records.map((row) => [`${row.studentId}:${row.week}`, row]));
     for (const student of activeStudents) {
-      const record = recordMap.get(student.studentId);
-      const completedOnTime = Boolean(
-        record?.status === "completed" &&
-        record.completedAt &&
-        isCompletedOnTime(record.completedAt, deadlineDate),
-      );
-      const result = await setGamificationEffect({
-        effectKey: effectKey(
-          "passport",
-          type,
-          deadlineWeek,
-          student.studentId,
-          "missed",
-        ),
-        studentId: student.studentId,
-        currency: "coins",
-        sourceType: "passport",
-        sourceId: `${type}:${deadlineWeek}`,
-        effectType: "missed",
-        amount: completedOnTime ? 0 : settings.passportMissedCoins,
-        reason: completedOnTime ? "護照逾期扣款回沖" : "護照逾期未完成",
-        ruleSnapshot: { missed: settings.passportMissedCoins },
-        metadata: { type, week: deadlineWeek, deadlineDate },
-      });
-      if (result.delta !== 0) changed += 1;
+      for (let week = start; week <= Math.min(end, currentWeek - 1); week += 1) {
+        const record = recordMap.get(`${student.studentId}:${week}`);
+        if (record?.status === "completed") continue;
+        const result = await setGamificationEffect({
+          effectKey: effectKey("passport-overdue", type, week, student.studentId, penaltyDate),
+          studentId: student.studentId,
+          currency: "coins",
+          sourceType: "passport-overdue",
+          sourceId: `${type}:${week}`,
+          effectType: "daily-overdue",
+          amount: settings.passportOverdueDailyCoins,
+          reason: "護照跨週未完成（每日扣點）",
+          ruleSnapshot: { daily: settings.passportOverdueDailyCoins },
+          metadata: { type, week, penaltyDate },
+        });
+        if (result.delta !== 0) changed += 1;
+      }
     }
   }
   return changed;
@@ -646,7 +690,7 @@ export async function settleGamificationOverdue(now = new Date()) {
   const settings = await getGamificationSettings();
   const [homeworkChanged, passportChanged] = await Promise.all([
     settleHomeworkPenalties(now, settings),
-    settlePassportPenalties(now, settings),
+    settlePassportDailyOverduePenalties(now, settings),
   ]);
   return { homeworkChanged, passportChanged };
 }

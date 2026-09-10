@@ -26,6 +26,14 @@ type SettingsForm = {
   passportOnTimeCoins: string;
   passportLateCoins: string;
   passportMissedCoins: string;
+  passportMondayCoins: string;
+  passportTuesdayCoins: string;
+  passportWednesdayCoins: string;
+  passportThursdayCoins: string;
+  passportFridayCoins: string;
+  passportOverdueDailyCoins: string;
+  readingNewspaperCoins: string;
+  readingReflectionCoins: string;
   routineXp: string;
   levelBaseXp: string;
 };
@@ -64,6 +72,14 @@ const emptyForm: SettingsForm = {
   passportOnTimeCoins: "5",
   passportLateCoins: "2",
   passportMissedCoins: "-2",
+  passportMondayCoins: "8",
+  passportTuesdayCoins: "6",
+  passportWednesdayCoins: "4",
+  passportThursdayCoins: "2",
+  passportFridayCoins: "1",
+  passportOverdueDailyCoins: "-1",
+  readingNewspaperCoins: "5",
+  readingReflectionCoins: "5",
   routineXp: "2",
   levelBaseXp: "100",
 };
@@ -109,6 +125,14 @@ export function SettingsPageClient() {
             passportOnTimeCoins: number;
             passportLateCoins: number;
             passportMissedCoins: number;
+            passportMondayCoins: number;
+            passportTuesdayCoins: number;
+            passportWednesdayCoins: number;
+            passportThursdayCoins: number;
+            passportFridayCoins: number;
+            passportOverdueDailyCoins: number;
+            readingNewspaperCoins: number;
+            readingReflectionCoins: number;
             routineXp: number;
             levelBaseXp: number;
           };
@@ -149,6 +173,14 @@ export function SettingsPageClient() {
         passportOnTimeCoins: String(data.gamification.passportOnTimeCoins),
         passportLateCoins: String(data.gamification.passportLateCoins),
         passportMissedCoins: String(data.gamification.passportMissedCoins),
+        passportMondayCoins: String(data.gamification.passportMondayCoins),
+        passportTuesdayCoins: String(data.gamification.passportTuesdayCoins),
+        passportWednesdayCoins: String(data.gamification.passportWednesdayCoins),
+        passportThursdayCoins: String(data.gamification.passportThursdayCoins),
+        passportFridayCoins: String(data.gamification.passportFridayCoins),
+        passportOverdueDailyCoins: String(data.gamification.passportOverdueDailyCoins),
+        readingNewspaperCoins: String(data.gamification.readingNewspaperCoins),
+        readingReflectionCoins: String(data.gamification.readingReflectionCoins),
         routineXp: String(data.gamification.routineXp),
         levelBaseXp: String(data.gamification.levelBaseXp),
       });
@@ -205,6 +237,14 @@ export function SettingsPageClient() {
         passportOnTimeCoins: Number(form.passportOnTimeCoins),
         passportLateCoins: Number(form.passportLateCoins),
         passportMissedCoins: Number(form.passportMissedCoins),
+        passportMondayCoins: Number(form.passportMondayCoins),
+        passportTuesdayCoins: Number(form.passportTuesdayCoins),
+        passportWednesdayCoins: Number(form.passportWednesdayCoins),
+        passportThursdayCoins: Number(form.passportThursdayCoins),
+        passportFridayCoins: Number(form.passportFridayCoins),
+        passportOverdueDailyCoins: Number(form.passportOverdueDailyCoins),
+        readingNewspaperCoins: Number(form.readingNewspaperCoins),
+        readingReflectionCoins: Number(form.readingReflectionCoins),
         routineXp: Number(form.routineXp),
         levelBaseXp: Number(form.levelBaseXp),
       };
@@ -372,7 +412,7 @@ export function SettingsPageClient() {
       <Card>
         <CardTitle>學生養成</CardTitle>
         <CardDescription>
-          數值調整只影響之後的新事件，不會重算既有帳本。逾期補交保留扣款，另發較少金幣。
+          數值調整只影響之後的新事件，不會重算既有帳本。
         </CardDescription>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field
@@ -394,22 +434,52 @@ export function SettingsPageClient() {
             onChange={(value) => updateField("homeworkMissedCoins", value)}
           />
           <Field
-            label="護照準時完成（金幣）"
+            label="護照週一完成（每本金幣）"
             type="number"
-            value={form.passportOnTimeCoins}
-            onChange={(value) => updateField("passportOnTimeCoins", value)}
+            value={form.passportMondayCoins}
+            onChange={(value) => updateField("passportMondayCoins", value)}
           />
           <Field
-            label="護照逾期補完（金幣）"
+            label="護照週二完成（每本金幣）"
             type="number"
-            value={form.passportLateCoins}
-            onChange={(value) => updateField("passportLateCoins", value)}
+            value={form.passportTuesdayCoins}
+            onChange={(value) => updateField("passportTuesdayCoins", value)}
           />
           <Field
-            label="護照逾期未完成（負數）"
+            label="護照週三完成（每本金幣）"
             type="number"
-            value={form.passportMissedCoins}
-            onChange={(value) => updateField("passportMissedCoins", value)}
+            value={form.passportWednesdayCoins}
+            onChange={(value) => updateField("passportWednesdayCoins", value)}
+          />
+          <Field
+            label="護照週四完成（每本金幣）"
+            type="number"
+            value={form.passportThursdayCoins}
+            onChange={(value) => updateField("passportThursdayCoins", value)}
+          />
+          <Field
+            label="護照週五完成（每本金幣）"
+            type="number"
+            value={form.passportFridayCoins}
+            onChange={(value) => updateField("passportFridayCoins", value)}
+          />
+          <Field
+            label="護照跨週未完成（每上課日／每本，負數）"
+            type="number"
+            value={form.passportOverdueDailyCoins}
+            onChange={(value) => updateField("passportOverdueDailyCoins", value)}
+          />
+          <Field
+            label="讀報完成（金幣）"
+            type="number"
+            value={form.readingNewspaperCoins}
+            onChange={(value) => updateField("readingNewspaperCoins", value)}
+          />
+          <Field
+            label="閱讀心得完成（金幣）"
+            type="number"
+            value={form.readingReflectionCoins}
+            onChange={(value) => updateField("readingReflectionCoins", value)}
           />
           <Field
             label="每項生活習慣（XP）"
@@ -459,13 +529,6 @@ export function SettingsPageClient() {
             checked={form.allowDisplayRoutineToggle}
             onChange={(value) =>
               updateField("allowDisplayRoutineToggle", value)
-            }
-          />
-          <Toggle
-            label="允許大屏自助點閱讀總表（讀報／心得三態）"
-            checked={form.allowDisplayReadingToggle}
-            onChange={(value) =>
-              updateField("allowDisplayReadingToggle", value)
             }
           />
           <Toggle

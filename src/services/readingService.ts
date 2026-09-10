@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { readingRecords, students } from "@/db/schema";
 import { getClassSettings } from "@/services/classSettingsService";
+import { reconcileReadingReward } from "@/services/gamificationService";
 import type { PassportStatus } from "@/types/passport";
 import {
   isReadingMonth,
@@ -145,8 +146,6 @@ export async function upsertReadingStatus(input: {
     .limit(1);
   if (student.length === 0) throw new Error("找不到學生");
 
-  const completedAt = input.status === "completed" ? new Date() : null;
-
   const existing = await db
     .select()
     .from(readingRecords)
@@ -161,6 +160,14 @@ export async function upsertReadingStatus(input: {
     )
     .limit(1);
 
+  // 同一筆已完成紀錄再次儲存時，保留原本的完成時間與獎勵日，避免重複計分。
+  const completedAt =
+    input.status === "completed"
+      ? existing[0]?.status === "completed" && existing[0].completedAt
+        ? existing[0].completedAt
+        : new Date()
+      : null;
+
   if (existing[0]) {
     const [row] = await db
       .update(readingRecords)
@@ -170,6 +177,15 @@ export async function upsertReadingStatus(input: {
       })
       .where(eq(readingRecords.id, existing[0].id))
       .returning();
+    await reconcileReadingReward({
+      studentId: input.studentId,
+      type: input.type,
+      schoolYear,
+      semester,
+      month: input.month,
+      completed: input.status === "completed",
+      completedAt,
+    });
     return row;
   }
 
@@ -185,5 +201,14 @@ export async function upsertReadingStatus(input: {
       completedAt,
     })
     .returning();
+  await reconcileReadingReward({
+    studentId: input.studentId,
+    type: input.type,
+    schoolYear,
+    semester,
+    month: input.month,
+    completed: input.status === "completed",
+    completedAt,
+  });
   return row;
 }

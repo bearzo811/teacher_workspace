@@ -187,6 +187,13 @@ export async function PATCH(request: Request) {
         "homeworkLateCoins",
         "passportOnTimeCoins",
         "passportLateCoins",
+        "passportMondayCoins",
+        "passportTuesdayCoins",
+        "passportWednesdayCoins",
+        "passportThursdayCoins",
+        "passportFridayCoins",
+        "readingNewspaperCoins",
+        "readingReflectionCoins",
         "routineXp",
       ] as const) {
         const value = game[key];
@@ -200,6 +207,7 @@ export async function PATCH(request: Request) {
       for (const key of [
         "homeworkMissedCoins",
         "passportMissedCoins",
+        "passportOverdueDailyCoins",
       ] as const) {
         const value = game[key];
         if (value !== undefined && (!Number.isInteger(value) || value > 0)) {

@@ -26,6 +26,14 @@ export type GamificationRulesView = {
   passportOnTimeCoins: number;
   passportLateCoins: number;
   passportMissedCoins: number;
+  passportMondayCoins: number;
+  passportTuesdayCoins: number;
+  passportWednesdayCoins: number;
+  passportThursdayCoins: number;
+  passportFridayCoins: number;
+  passportOverdueDailyCoins: number;
+  readingNewspaperCoins: number;
+  readingReflectionCoins: number;
   routineXp: number;
   levelBaseXp: number;
 };

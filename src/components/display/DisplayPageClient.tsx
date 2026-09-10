@@ -26,7 +26,6 @@ import type {
 import { formatCountdownLabel, type CalendarEventView } from "@/types/calendar";
 import {
   nextBinaryPassportStatus,
-  nextPassportStatus,
   type PassportStatus,
 } from "@/types/passport";
 import type { PassportMatrixView } from "@/services/passportService";
@@ -34,7 +33,6 @@ import {
   READING_SEMESTER_LABEL,
   READING_TYPE_LABEL,
   type ReadingMatrixView,
-  type ReadingType,
 } from "@/types/reading";
 
 function updatePassportMatrix(
@@ -70,43 +68,6 @@ function updatePassportMatrix(
     ...matrix,
     students,
     weekTotals,
-    overallCompleted: students.reduce((sum, student) => sum + student.completedCount, 0),
-  };
-}
-
-function updateReadingMatrix(
-  matrix: ReadingMatrixView,
-  studentId: string,
-  month: number,
-  status: PassportStatus,
-): ReadingMatrixView {
-  const students = matrix.students.map((student) => {
-    if (student.studentId !== studentId) return student;
-    const cells = student.cells.map((cell) =>
-      cell.month === month ? { ...cell, status } : cell,
-    );
-    return {
-      ...student,
-      cells,
-      completedCount: cells.filter((cell) => cell.status === "completed").length,
-    };
-  });
-  const monthTotals = matrix.monthTotals.map((total) => {
-    if (total.month !== month) return total;
-    const cells = students.flatMap((student) =>
-      student.cells.filter((cell) => cell.month === month),
-    );
-    return {
-      ...total,
-      completed: cells.filter((cell) => cell.status === "completed").length,
-      missingParent: cells.filter((cell) => cell.status === "missing_parent").length,
-      notStarted: cells.filter((cell) => cell.status === "not_started").length,
-    };
-  });
-  return {
-    ...matrix,
-    students,
-    monthTotals,
     overallCompleted: students.reduce((sum, student) => sum + student.completedCount, 0),
   };
 }
@@ -560,48 +521,6 @@ export function DisplayPageClient() {
     }
   }
 
-  async function setReading(
-    studentId: string,
-    type: ReadingType,
-    month: number,
-    status: PassportStatus,
-  ) {
-    if (!data?.displaySettings.allowStudentReadingToggle) return;
-    if (activeStudentId !== studentId) return;
-    const previousData = data;
-    setBusyKey(`${studentId}:${type}:${month}`);
-    bumpIdle();
-    setData((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        reading: {
-          ...current.reading,
-          [type]: updateReadingMatrix(current.reading[type], studentId, month, status),
-        },
-      };
-    });
-    try {
-      const response = await fetch("/api/reading", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...displayHeaders },
-        body: JSON.stringify({
-          studentId,
-          type,
-          month,
-          status,
-        }),
-      });
-      const json = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(json.error ?? "更新失敗");
-    } catch (err) {
-      setData(previousData);
-      setError(err instanceof Error ? err.message : "更新失敗");
-    } finally {
-      setBusyKey(null);
-    }
-  }
-
   const showSeatPicker = Boolean(
     data &&
     panel !== "calendar" && panel !== "lunch" && panel !== "debts" &&
@@ -798,18 +717,6 @@ export function DisplayPageClient() {
                   }
                   newspaper={data.reading.newspaper}
                   reflection={data.reading.reflection}
-                  canToggle={Boolean(
-                    data.displaySettings.allowStudentReadingToggle,
-                  )}
-                  busyKey={busyKey}
-                  onCycle={(type, month, current) => {
-                    void setReading(
-                      activeStudentId,
-                      type,
-                      month,
-                      nextPassportStatus(current),
-                    );
-                  }}
                 />
               ) : (
                 <ReadingMatrixOverview
@@ -2238,17 +2145,11 @@ function ReadingStudentFocus({
   studentLabel,
   newspaper,
   reflection,
-  canToggle,
-  busyKey,
-  onCycle,
 }: {
   studentId: string;
   studentLabel: string;
   newspaper: ReadingMatrixView;
   reflection: ReadingMatrixView;
-  canToggle: boolean;
-  busyKey: string | null;
-  onCycle: (type: ReadingType, month: number, current: PassportStatus) => void;
 }) {
   const rows = [
     {
@@ -2269,7 +2170,7 @@ function ReadingStudentFocus({
       <div className="rounded-2xl border border-sky-400/50 bg-slate-900/90 p-4">
         <h2 className="text-3xl font-semibold text-sky-100">{studentLabel}</h2>
         <p className="mt-1 text-base text-slate-400">
-          {termLabel} · 只顯示你的橫欄 · 點月份循環（未開始／缺／完成）
+          {termLabel} · 完成狀態由老師登錄
         </p>
       </div>
       {rows.map(({ label, matrix, type }) => {
@@ -2290,19 +2191,11 @@ function ReadingStudentFocus({
             </div>
             <div className="flex gap-2 overflow-x-auto pb-1">
               {student.cells.map((cell) => {
-                const key = `${studentId}:${type}:${cell.month}`;
                 return (
-                  <button
+                  <div
                     key={cell.month}
-                    type="button"
-                    disabled={!canToggle || busyKey === key}
-                    aria-label={`${label}${cell.month}月`}
-                    onClick={() => {
-                      if (!canToggle) return;
-                      onCycle(type, cell.month, cell.status);
-                    }}
                     className={cn(
-                      "flex h-16 min-w-16 flex-col items-center justify-center rounded-xl border text-lg font-bold transition active:scale-95",
+                      "flex h-16 min-w-16 flex-col items-center justify-center rounded-xl border text-lg font-bold",
                       cell.status === "completed" &&
                         "border-emerald-300 bg-emerald-500 text-white",
                       cell.status === "missing_parent" &&
@@ -2311,8 +2204,6 @@ function ReadingStudentFocus({
                         "border-slate-500 bg-slate-800 text-slate-200",
                       cell.month === matrix.currentMonth &&
                         "ring-2 ring-amber-300",
-                      canToggle && "cursor-pointer",
-                      !canToggle && "cursor-default opacity-90",
                     )}
                   >
                     <span className="text-xs font-medium opacity-90">
@@ -2323,7 +2214,7 @@ function ReadingStudentFocus({
                       : cell.status === "missing_parent"
                         ? "缺"
                         : "—"}
-                  </button>
+                  </div>
                 );
               })}
             </div>

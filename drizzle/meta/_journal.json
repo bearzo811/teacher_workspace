@@ -218,6 +218,13 @@
       "when": 1787932800000,
       "tag": "0030_shop_min_level",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1788192000000,
+      "tag": "0031_reading_and_weekly_passport_rewards",
+      "breakpoints": true
     }
   ]
 }
