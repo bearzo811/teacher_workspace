@@ -640,6 +640,7 @@ export function DisplayPageClient() {
               rows={data.personal}
               debts={data.debts}
               shopOpen={data.shop.open}
+              layout={displayLayout}
               onOpenShop={() => setStudentView("shop")}
               onOpenBackpack={(studentId) => { setBackpackStudentId(studentId); setStudentView("backpack"); }}
             />
@@ -791,12 +792,14 @@ function GamificationOverviewPanel({
   rows,
   debts,
   shopOpen,
+  layout,
   onOpenShop,
   onOpenBackpack,
 }: {
   rows: DisplayPersonalRow[];
   debts: DisplayDebtRow[];
   shopOpen: boolean;
+  layout: DisplayLayout;
   onOpenShop: () => void;
   onOpenBackpack: (studentId: string) => void;
 }) {
@@ -813,7 +816,14 @@ function GamificationOverviewPanel({
       <div className="shrink-0">
         <h2 className="text-3xl font-semibold">個人點數</h2>
       </div>
-      <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-1 gap-3 overflow-auto sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div
+        className={cn(
+          "grid min-h-0 flex-1 auto-rows-fr gap-3 overflow-hidden",
+          // 白板常以 Windows 縮放回報較小的 CSS 寬度；不可依 Tailwind 斷點退成
+          // 3 欄，否則 9 位學生與商店會變 4 列而擠出 16:9 畫面。
+          layout === "compact" ? "grid-cols-2 overflow-auto" : "grid-cols-5",
+        )}
+      >
         {sorted.map((row) => (
           <button
             type="button"
