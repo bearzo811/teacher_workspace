@@ -10,6 +10,7 @@
     "test:gamification": "tsx --test tests/gamification.test.ts",
     "test:course-plans": "RUN_COURSE_PLAN_INTEGRATION=1 tsx --test tests/course-plans.integration.test.ts",
     "gamification:settle": "tsx scripts/gamification-settle.ts",
+    "gamification:backfill-reading": "tsx scripts/backfill-reading-rewards.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:migrate:production": "vercel env run --environment=production -- drizzle-kit migrate",
