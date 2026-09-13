@@ -647,7 +647,9 @@ export function DisplayPageClient() {
           )
         ) : null}
 
-        {panel === "debts" ? <DebtsPanel debts={data.debts} /> : null}
+        {panel === "debts" ? (
+          <DebtsPanel debts={data.debts} layout={displayLayout} />
+        ) : null}
 
         {panel === "passport" ? (
           <div className="flex h-full min-h-0 gap-3">
@@ -1010,8 +1012,10 @@ function BackpackDisplayPanel({ bag, busyKey, onBack, onRequest }: { bag: Displa
 
 function DebtsPanel({
   debts,
+  layout,
 }: {
   debts: DisplayDebtRow[];
+  layout: DisplayLayout;
 }) {
   const debtCount = debts.filter((row) => row.hasBlockingDebt).length;
 
@@ -1025,7 +1029,16 @@ function DebtsPanel({
         </p>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-3 grid-rows-3 gap-2">
+      <div
+        className={cn(
+          "grid min-h-0 flex-1 gap-2",
+          // 與學生資訊相同：白板的 Windows 縮放可能讓 4K 回報成較窄 CSS 寬度。
+          // 固定五欄兩列，讓 9 位學生不會排成三列而被底部列遮住。
+          layout === "compact"
+            ? "grid-cols-3 grid-rows-3 overflow-auto"
+            : "grid-cols-5 grid-rows-2 overflow-hidden",
+        )}
+      >
           {debts.map((row) => (
               <article
                 key={row.studentId}
@@ -1035,7 +1048,7 @@ function DebtsPanel({
                 )}
               >
                 <div className="flex shrink-0 items-center justify-between gap-2">
-                  <h3 className="text-xl font-semibold">
+                  <h3 className="truncate text-xl font-semibold">
                   {row.seatNumber} {row.name}
                   </h3>
                   <span className={cn(
@@ -1048,7 +1061,7 @@ function DebtsPanel({
                   </span>
                 </div>
                 {row.hasDebt ? (
-                  <div className="min-h-0 overflow-hidden">
+                  <div className="min-h-0 overflow-y-auto pr-1">
                     <HomeworkStatusGroups items={row.homework} />
                     <DebtGroup label="國語護照" items={row.chinesePassport} />
                     <DebtGroup label="英語護照" items={row.englishPassport} />
