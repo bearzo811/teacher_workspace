@@ -405,6 +405,8 @@ export async function upsertPassportStatus(input: {
     completedAt,
     isPastWeek:
       settings.schoolWeek.week > 0 && input.week < settings.schoolWeek.week,
+    isFutureWeek:
+      settings.schoolWeek.week > 0 && input.week > settings.schoolWeek.week,
   });
   return result;
 }

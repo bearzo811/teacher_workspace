@@ -323,6 +323,7 @@ export async function reconcilePassportReward(input: {
   completed: boolean;
   completedAt: Date | null;
   isPastWeek: boolean;
+  isFutureWeek: boolean;
 }) {
   const settings = await getGamificationSettings();
   const sourceId = `${input.type}:${input.week}`;
@@ -334,7 +335,8 @@ export async function reconcilePassportReward(input: {
     "completion",
   );
   if (input.completedAt && !isAfterLaunch(settings, input.completedAt)) return;
-  // 每週護照在該週的平日完成才給獎勵；跨到下一週後僅結算每日逾期扣點。
+  // 提前完成一律採用星期一的最高獎勵；當週才依平日遞減。
+  // 跨到下一週後僅結算每日逾期扣點，不再給完成獎勵。
   const weekday = input.completedAt
     ? new Date(`${taipeiDateString(input.completedAt)}T00:00:00Z`).getUTCDay()
     : 0;
@@ -347,7 +349,9 @@ export async function reconcilePassportReward(input: {
   };
   const amount = !input.completed || input.isPastWeek
     ? 0
-    : (weekdayCoins[weekday] ?? 0);
+    : input.isFutureWeek
+      ? settings.passportMondayCoins
+      : (weekdayCoins[weekday] ?? 0);
   await setGamificationEffect({
     effectKey: key,
     studentId: input.studentId,
@@ -357,13 +361,18 @@ export async function reconcilePassportReward(input: {
     effectType: "completion",
     amount,
     reason:
-      amount === 0 ? "護照完成回沖" : `第 ${weekday} 天完成護照`,
+      amount === 0
+        ? "護照完成回沖"
+        : input.isFutureWeek
+          ? "提前完成護照"
+          : `第 ${weekday} 天完成護照`,
     ruleSnapshot: {
       monday: settings.passportMondayCoins,
       tuesday: settings.passportTuesdayCoins,
       wednesday: settings.passportWednesdayCoins,
       thursday: settings.passportThursdayCoins,
       friday: settings.passportFridayCoins,
+      early: settings.passportMondayCoins,
     },
     metadata: { type: input.type, week: input.week },
   });
