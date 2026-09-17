@@ -293,10 +293,13 @@ async function buildDisplayData(options: {
       student.studentId,
       month,
     );
+    // 回條仍列在欠繳清單，方便師生追蹤；但不屬於禁止下課／使用商店的項目。
+    // 以簿本或作業名稱含「回條」辨識，避免日後建立不同名稱的回條時漏判。
     const hasBlockingDebt =
       homeworkItems.some(
         (item) =>
-          item.status === "unsubmitted" || item.status === "correction_required",
+          !item.label.includes("回條") &&
+          (item.status === "unsubmitted" || item.status === "correction_required"),
       ) ||
       chinesePassport.length > 0 ||
       englishPassport.length > 0 ||
