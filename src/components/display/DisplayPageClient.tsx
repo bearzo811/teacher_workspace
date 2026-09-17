@@ -955,12 +955,11 @@ function ShopDisplayPanel({
 
       <div
         className={cn(
-          "grid min-h-0 flex-1 auto-rows-fr gap-3 overflow-hidden",
-          // 75 吋白板上即使 Windows 縮放造成 CSS 寬度變小，也不可倚賴 Tailwind
-          // 的 rem 斷點。九項商品固定五欄兩列，才能完整留在操作列上方。
-          layout === "ultra" || layout === "wide"
-            ? "grid-cols-5 grid-rows-2"
-            : "grid-cols-3 grid-rows-3",
+          "grid min-h-0 flex-1 gap-3 overflow-y-auto pr-1",
+          // 商店一列固定四項；商品增加時只在此區垂直捲動，底部的座號列保持可見。
+          layout === "compact"
+            ? "grid-cols-2 auto-rows-[12rem]"
+            : "grid-cols-4 auto-rows-[14rem]",
         )}
       >
         {data.shop.items.map((item) => {
