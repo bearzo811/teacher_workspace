@@ -956,11 +956,11 @@ function ShopDisplayPanel({
       <div
         className={cn(
           "grid min-h-0 flex-1 auto-rows-fr gap-3 overflow-hidden",
-          // 大屏以三欄、兩列呈現目前六項商品：卡片夠寬，且不必在商品區捲動。
-          // 商品日後增加時才在超寬螢幕改四欄，仍優先把所有商品留在同一畫面。
-          data.shop.items.length > 6 && (layout === "ultra" || layout === "wide")
-            ? "grid-cols-2 md:grid-cols-3 xl:grid-cols-4"
-            : "grid-cols-2 md:grid-cols-3",
+          // 75 吋白板上即使 Windows 縮放造成 CSS 寬度變小，也不可倚賴 Tailwind
+          // 的 rem 斷點。九項商品固定五欄兩列，才能完整留在操作列上方。
+          layout === "ultra" || layout === "wide"
+            ? "grid-cols-5 grid-rows-2"
+            : "grid-cols-3 grid-rows-3",
         )}
       >
         {data.shop.items.map((item) => {
