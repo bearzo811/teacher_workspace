@@ -954,12 +954,17 @@ function ShopDisplayPanel({
       ) : null}
 
       <div
+        style={
+          layout === "compact"
+            ? undefined
+            : { gridAutoRows: "calc((100% - 0.75rem) / 2)" }
+        }
         className={cn(
           "grid min-h-0 flex-1 gap-3 overflow-y-auto pr-1",
-          // 商店一列固定四項；商品增加時只在此區垂直捲動，底部的座號列保持可見。
+          // 商店一列固定四項；前兩列維持原本等高卡片，之後只在此區垂直捲動。
           layout === "compact"
             ? "grid-cols-2 auto-rows-[12rem]"
-            : "grid-cols-4 auto-rows-[14rem]",
+            : "grid-cols-4",
         )}
       >
         {data.shop.items.map((item) => {
