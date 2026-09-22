@@ -1055,18 +1055,21 @@ function DebtsPanel({
                   <h3 className="truncate text-xl font-semibold">
                   {row.seatNumber} {row.name}
                   </h3>
-                  <span className={cn(
-                    "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold",
-                    row.hasBlockingDebt
-                      ? "border border-rose-400/60 bg-rose-500/20 text-rose-100"
-                      : "border border-emerald-400/60 bg-emerald-500/20 text-emerald-100",
-                  )}>
-                    {row.hasBlockingRecessDebt
-                      ? "不能下課"
-                      : row.hasBlockingShopDebt
-                        ? "商店暫停"
-                        : "可以下課"}
-                  </span>
+                  <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                    <span className={cn(
+                      "rounded-full px-2 py-0.5 text-xs font-semibold",
+                      row.hasBlockingRecessDebt
+                        ? "border border-rose-400/60 bg-rose-500/20 text-rose-100"
+                        : "border border-emerald-400/60 bg-emerald-500/20 text-emerald-100",
+                    )}>
+                      {row.hasBlockingRecessDebt ? "不能下課" : "可以下課"}
+                    </span>
+                    {row.hasBlockingShopDebt && (
+                      <span className="rounded-full border border-amber-400/60 bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-100">
+                        商店暫停
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {row.hasDebt ? (
                   <div className="min-h-0 overflow-y-auto pr-1">
