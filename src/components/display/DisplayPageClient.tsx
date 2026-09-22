@@ -2279,7 +2279,8 @@ function PersonalChecklist({
     [];
 
   return (
-    <div className="self-end">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h2 className="text-3xl font-semibold">
           {row.seatNumber} {row.name}
@@ -2307,7 +2308,8 @@ function PersonalChecklist({
           />
         </div>
       </div>
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+      </div>
+      <div className="mt-4 grid min-h-0 flex-1 gap-4 sm:grid-cols-2">
         <ul className="space-y-3 text-xl">
           <CheckRow
             label="上午打掃"
@@ -2331,7 +2333,7 @@ function PersonalChecklist({
             }
           />
         </ul>
-        {data.isReturnDay ? null : <ul className="space-y-3 text-xl">
+        {data.isReturnDay ? null : <ul className="min-h-0 space-y-3 overflow-y-auto pr-1 text-xl">
           {hwCells.length === 0 ? (
             <li className="rounded-xl border border-slate-700 px-4 py-3 text-slate-400">
               今日無繳交項
