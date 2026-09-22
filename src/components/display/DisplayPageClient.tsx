@@ -638,7 +638,6 @@ export function DisplayPageClient() {
           ) : (
             <GamificationOverviewPanel
               rows={data.personal}
-              debts={data.debts}
               shopOpen={data.shop.open}
               layout={displayLayout}
               onOpenShop={() => setStudentView("shop")}
@@ -792,14 +791,12 @@ export function DisplayPageClient() {
 
 function GamificationOverviewPanel({
   rows,
-  debts,
   shopOpen,
   layout,
   onOpenShop,
   onOpenBackpack,
 }: {
   rows: DisplayPersonalRow[];
-  debts: DisplayDebtRow[];
   shopOpen: boolean;
   layout: DisplayLayout;
   onOpenShop: () => void;
@@ -808,10 +805,6 @@ function GamificationOverviewPanel({
   const sorted = useMemo(
     () => [...rows].sort((a, b) => a.seatNumber - b.seatNumber),
     [rows],
-  );
-  const debtStudentIds = useMemo(
-    () => new Set(debts.filter((debt) => debt.hasBlockingDebt).map((debt) => debt.studentId)),
-    [debts],
   );
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-3">
@@ -839,9 +832,6 @@ function GamificationOverviewPanel({
                 <h3 className="mt-1 text-2xl font-semibold">{row.name}</h3>
               </div>
               <div className="flex items-center gap-2">
-                {debtStudentIds.has(row.studentId) ? (
-                  <span className="rounded-full border border-rose-400/60 bg-rose-500/20 px-2.5 py-1 text-sm font-semibold text-rose-100">欠繳</span>
-                ) : null}
                 <span className="rounded-full border border-violet-400/50 bg-violet-500/20 px-3 py-1 font-semibold text-violet-200">
                   Lv.{row.gamification.level}
                 </span>
