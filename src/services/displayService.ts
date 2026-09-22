@@ -9,7 +9,7 @@ import {
 } from "@/services/calendarService";
 import { getClassSettings } from "@/services/classSettingsService";
 import { getContactBook } from "@/services/contactBookService";
-import { getDutyDay, getDutyLeaders, getDutySubstitutionDay } from "@/services/dutyService";
+import { getDutyDay, getDutyLeaders, getDutySubstitutionDay, syncDutySubstitutionsForDate } from "@/services/dutyService";
 import { getGamificationForStudents } from "@/services/gamificationService";
 import {
   getHomeworkDayView,
@@ -148,6 +148,10 @@ async function buildDisplayData(options: {
   // 黑板右側的作業進度必須對應這張聯絡簿的繳交日，
   // 不能固定查系統今天，否則週末／跨日會顯示空白。
   const contactBook = await getContactBook(contactBookDate);
+
+  // 既有缺席資料（例如匯入、舊版寫入）可能未曾觸發代班建立；
+  // 大屏讀取當日資料時一併補齊，確保請假值日一定會顯示自願代班。
+  await syncDutySubstitutionsForDate(contactBookDate);
 
   const [
     returnDay,

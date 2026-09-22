@@ -298,25 +298,41 @@ export async function syncDutySubstitutionsForDate(date: string) {
   if (day.isHoliday) return [];
   const absentIds = new Set(absentRows.map((row) => row.studentId));
   const affected = day.slots.filter((slot) => slot.studentId && absentIds.has(slot.studentId));
-  for (const slot of affected) {
-    await db.insert(dutySubstitutions).values({
-      date,
-      slotKey: slot.slotKey,
-      absentStudentId: slot.studentId!,
-    }).onConflictDoNothing();
-    await db.insert(dutyMakeups).values({
-      studentId: slot.studentId!,
-      sourceDate: date,
-      sourceSlotKey: slot.slotKey,
-    }).onConflictDoNothing();
-  }
   const current = await db.select().from(dutySubstitutions).where(eq(dutySubstitutions.date, date));
+  const currentBySlot = new Map(current.map((row) => [row.slotKey, row]));
+  let changed = false;
+
+  for (const slot of affected) {
+    const existing = currentBySlot.get(slot.slotKey);
+    if (!existing) {
+      await db.insert(dutySubstitutions).values({
+        date,
+        slotKey: slot.slotKey,
+        absentStudentId: slot.studentId!,
+      });
+      await db.insert(dutyMakeups).values({
+        studentId: slot.studentId!,
+        sourceDate: date,
+        sourceSlotKey: slot.slotKey,
+      }).onConflictDoNothing();
+      changed = true;
+    } else if (existing.status === "cancelled") {
+      await db.update(dutySubstitutions).set({
+        status: "open",
+        substituteStudentId: null,
+        isVolunteer: true,
+      }).where(eq(dutySubstitutions.id, existing.id));
+      changed = true;
+    }
+  }
+
   for (const row of current) {
     if (!absentIds.has(row.absentStudentId) && row.status !== "confirmed") {
       await db.update(dutySubstitutions).set({ status: "cancelled" }).where(eq(dutySubstitutions.id, row.id));
+      changed = true;
     }
   }
-  await touchDisplayVersion();
+  if (changed) await touchDisplayVersion();
   return substitutionViews(date);
 }
 
