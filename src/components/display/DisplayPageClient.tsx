@@ -624,7 +624,7 @@ export function DisplayPageClient() {
             <ShopDisplayPanel
               data={data}
               row={activePersonal}
-              hasDebt={Boolean(activePersonal && data.debts.find((debt) => debt.studentId === activePersonal.studentId)?.hasBlockingDebt)}
+              hasDebt={Boolean(activePersonal && data.debts.find((debt) => debt.studentId === activePersonal.studentId)?.hasBlockingShopDebt)}
               busyKey={busyKey}
               requestedItems={shopRequests}
               layout={displayLayout}
@@ -1061,7 +1061,11 @@ function DebtsPanel({
                       ? "border border-rose-400/60 bg-rose-500/20 text-rose-100"
                       : "border border-emerald-400/60 bg-emerald-500/20 text-emerald-100",
                   )}>
-                    {row.hasBlockingDebt ? "不能下課" : "可以下課"}
+                    {row.hasBlockingRecessDebt
+                      ? "不能下課"
+                      : row.hasBlockingShopDebt
+                        ? "商店暫停"
+                        : "可以下課"}
                   </span>
                 </div>
                 {row.hasDebt ? (

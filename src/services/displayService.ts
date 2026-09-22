@@ -287,7 +287,12 @@ async function buildDisplayData(options: {
 
   const debts: DisplayDebtRow[] = activeStudents.map((student) => {
     const homeworkItems = (homeworkDebts.get(student.studentId) ?? []).map(
-      (item) => ({ label: item.label, status: item.status }),
+      (item) => ({
+        label: item.label,
+        status: item.status,
+        blocksRecess: item.blocksRecess,
+        blocksShop: item.blocksShop,
+      }),
     );
     const chinesePassport = passportDebts(chineseMatrix, student.studentId);
     const englishPassport = passportDebts(englishMatrix, student.studentId);
@@ -299,16 +304,29 @@ async function buildDisplayData(options: {
     );
     // 回條仍列在欠繳清單，方便師生追蹤；但不屬於禁止下課／使用商店的項目。
     // 以簿本或作業名稱含「回條」辨識，避免日後建立不同名稱的回條時漏判。
-    const hasBlockingDebt =
+    const needsStudentAction = (item: typeof homeworkItems[number]) =>
+      item.status === "unsubmitted" || item.status === "correction_required";
+    // 回條未交仍可看見，但預設不限制下課；個別作業的兩個限制選項可覆寫。
+    const hasBlockingRecessDebt =
       homeworkItems.some(
         (item) =>
           !item.label.includes("回條") &&
-          (item.status === "unsubmitted" || item.status === "correction_required"),
+          item.blocksRecess !== false &&
+          needsStudentAction(item),
       ) ||
       chinesePassport.length > 0 ||
       englishPassport.length > 0 ||
       newspaper.length > 0 ||
       reflection.length > 0;
+    const hasBlockingShopDebt =
+      homeworkItems.some(
+        (item) => item.blocksShop !== false && needsStudentAction(item),
+      ) ||
+      chinesePassport.length > 0 ||
+      englishPassport.length > 0 ||
+      newspaper.length > 0 ||
+      reflection.length > 0;
+    const hasBlockingDebt = hasBlockingRecessDebt || hasBlockingShopDebt;
     const hasDebt =
       homeworkItems.some((item) => item.status !== "completed") ||
       chinesePassport.length > 0 ||
@@ -326,6 +344,8 @@ async function buildDisplayData(options: {
       reflection,
       hasDebt,
       hasBlockingDebt,
+      hasBlockingRecessDebt,
+      hasBlockingShopDebt,
     };
   });
 

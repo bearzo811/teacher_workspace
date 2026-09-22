@@ -30,7 +30,7 @@ export async function PUT(request: Request) {
       date?: string;
       notes?: string[];
       note?: string;
-      assignments?: { bookId: string; pageLabel: string }[];
+      assignments?: { bookId: string; pageLabel: string; blocksRecess?: boolean; blocksShop?: boolean }[];
       /** @deprecated */
       titles?: string[];
     };

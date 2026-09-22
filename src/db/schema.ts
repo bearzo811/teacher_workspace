@@ -170,6 +170,10 @@ export const homework = pgTable("homework", {
   date: date("date").notNull(),
   /** 聯絡簿上寫的那一天（可與繳交日不同） */
   contactBookDate: date("contact_book_date"),
+  /** 未交時是否限制下課；聯絡簿新增作業預設限制。 */
+  blocksRecess: boolean("blocks_recess").notNull().default(true),
+  /** 未交時是否限制班級商店；聯絡簿新增作業預設限制。 */
+  blocksShop: boolean("blocks_shop").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

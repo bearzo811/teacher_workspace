@@ -26,6 +26,8 @@ type AssignmentDraft = {
   bookName: string;
   pageLabel: string;
   title: string;
+  blocksRecess: boolean;
+  blocksShop: boolean;
 };
 
 type ContactBookData = {
@@ -47,6 +49,8 @@ export function ContactBookPageClient() {
   const [dueDate, setDueDate] = useState(() => nextSchoolDay(todayDateString()));
   const [selectedBookId, setSelectedBookId] = useState<string>("");
   const [pageLabel, setPageLabel] = useState("");
+  const [blocksRecess, setBlocksRecess] = useState(true);
+  const [blocksShop, setBlocksShop] = useState(true);
   const [customNote, setCustomNote] = useState("");
   const [newBookName, setNewBookName] = useState("");
   const [newBookSubjectId, setNewBookSubjectId] = useState("");
@@ -158,6 +162,8 @@ export function ContactBookPageClient() {
         bookName: selectedBook.name,
         pageLabel: cleaned,
         title,
+        blocksRecess,
+        blocksShop,
       },
     ]);
     setPageLabel("");
@@ -167,6 +173,21 @@ export function ContactBookPageClient() {
     setAssignments((prev) =>
       prev.filter(
         (item) => !(item.bookId === bookId && item.pageLabel === label),
+      ),
+    );
+  }
+
+  function updateAssignmentRule(
+    bookId: string,
+    label: string,
+    key: "blocksRecess" | "blocksShop",
+    value: boolean,
+  ) {
+    setAssignments((prev) =>
+      prev.map((item) =>
+        item.bookId === bookId && item.pageLabel === label
+          ? { ...item, [key]: value }
+          : item,
       ),
     );
   }
@@ -221,6 +242,8 @@ export function ContactBookPageClient() {
           assignments: assignments.map((item) => ({
             bookId: item.bookId,
             pageLabel: item.pageLabel,
+            blocksRecess: item.blocksRecess,
+            blocksShop: item.blocksShop,
           })),
         }),
       });
@@ -313,7 +336,7 @@ export function ContactBookPageClient() {
         <Card>
           <CardTitle>作業項目</CardTitle>
           <CardDescription>
-            選簿本＋填頁數（例：12-15、12,14、第3課）；會進作業打勾表
+            選簿本＋填頁數（例：12-15、12,14、第3課）；可個別設定未交時是否限制下課或商店
           </CardDescription>
 
           <div className="mt-4 flex flex-wrap gap-2">
@@ -364,6 +387,28 @@ export function ContactBookPageClient() {
             >
               加入
             </Button>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-gray-700">
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={blocksRecess}
+                onChange={(event) => setBlocksRecess(event.target.checked)}
+                className="h-4 w-4 accent-blue-600"
+              />
+              未交時影響下課
+            </label>
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={blocksShop}
+                onChange={(event) => setBlocksShop(event.target.checked)}
+                className="h-4 w-4 accent-blue-600"
+              />
+              未交時影響商店
+            </label>
+            <span className="text-gray-400">預設皆會影響；加入後仍可個別調整。</span>
           </div>
 
           {showCreateBook ? (
@@ -427,19 +472,43 @@ export function ContactBookPageClient() {
               assignments.map((item) => (
                 <li
                   key={`${item.bookId}:${item.pageLabel}`}
-                  className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-100 px-3 py-2 text-sm"
                 >
-                  <span>{item.title}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-600"
-                    onClick={() =>
-                      removeAssignment(item.bookId, item.pageLabel)
-                    }
-                  >
-                    移除
-                  </Button>
+                  <span className="font-medium">{item.title}</span>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <label className="flex cursor-pointer items-center gap-1.5 text-xs text-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={item.blocksRecess}
+                        onChange={(event) =>
+                          updateAssignmentRule(item.bookId, item.pageLabel, "blocksRecess", event.target.checked)
+                        }
+                        className="h-4 w-4 accent-blue-600"
+                      />
+                      影響下課
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-1.5 text-xs text-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={item.blocksShop}
+                        onChange={(event) =>
+                          updateAssignmentRule(item.bookId, item.pageLabel, "blocksShop", event.target.checked)
+                        }
+                        className="h-4 w-4 accent-blue-600"
+                      />
+                      影響商店
+                    </label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-600"
+                      onClick={() =>
+                        removeAssignment(item.bookId, item.pageLabel)
+                      }
+                    >
+                      移除
+                    </Button>
+                  </div>
                 </li>
               ))
             )}

@@ -35,6 +35,9 @@ export type DisplayDebtItem = {
   note?: string;
   /** 作業才有四種繳交狀態；其餘項目只有完成／未完成。 */
   status?: "unsubmitted" | "pending_confirmation" | "correction_required" | "completed";
+  /** 作業未交時的個別限制設定。 */
+  blocksRecess?: boolean;
+  blocksShop?: boolean;
 };
 
 export type DisplayDebtRow = {
@@ -48,8 +51,12 @@ export type DisplayDebtRow = {
   reflection: DisplayDebtItem[];
   /** 尚有待處理或待老師確認的項目。 */
   hasDebt: boolean;
-  /** 學生仍須自己完成的項目；此狀態才限制下課與商店。 */
+  /** 任一限制仍生效；供總覽顯示欠繳標記。 */
   hasBlockingDebt: boolean;
+  /** 學生仍須自己完成、且會限制下課的項目。 */
+  hasBlockingRecessDebt: boolean;
+  /** 學生仍須自己完成、且會限制商店的項目。 */
+  hasBlockingShopDebt: boolean;
 };
 
 export type DisplayProgressItem = {

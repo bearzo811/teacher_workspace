@@ -225,6 +225,13 @@
       "when": 1788192000000,
       "tag": "0031_reading_and_weekly_passport_rewards",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790035200000,
+      "tag": "0032_homework_blocking_rules",
+      "breakpoints": true
     }
   ]
 }

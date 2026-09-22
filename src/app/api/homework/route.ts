@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       date?: string;
-      assignments?: { bookId: string; pageLabel: string }[];
+      assignments?: { bookId: string; pageLabel: string; blocksRecess?: boolean; blocksShop?: boolean }[];
     };
 
     if (!Array.isArray(body.assignments)) {

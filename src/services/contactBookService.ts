@@ -24,6 +24,8 @@ export type ContactBookAssignment = {
   bookName: string;
   pageLabel: string;
   title: string;
+  blocksRecess: boolean;
+  blocksShop: boolean;
 };
 
 export type ContactBookView = {
@@ -42,6 +44,8 @@ export type ContactBookView = {
     pageLabel: string;
     title: string;
     dueDate: string;
+    blocksRecess: boolean;
+    blocksShop: boolean;
   }[];
   className: string;
   schoolYear: string;
@@ -99,6 +103,8 @@ export async function getContactBook(date: string): Promise<ContactBookView> {
         bookName: homeworkBooks.name,
         pageLabel: homework.pageLabel,
         dueDate: homework.date,
+        blocksRecess: homework.blocksRecess,
+        blocksShop: homework.blocksShop,
       })
       .from(homework)
       .innerJoin(homeworkBooks, eq(homework.bookId, homeworkBooks.id))
@@ -116,6 +122,8 @@ export async function getContactBook(date: string): Promise<ContactBookView> {
       pageLabel: item.pageLabel,
       title,
       dueDate: item.dueDate,
+      blocksRecess: item.blocksRecess,
+      blocksShop: item.blocksShop,
     };
   });
 
@@ -130,6 +138,8 @@ export async function getContactBook(date: string): Promise<ContactBookView> {
       bookName: item.bookName,
       pageLabel: item.pageLabel,
       title: item.title,
+      blocksRecess: item.blocksRecess,
+      blocksShop: item.blocksShop,
     })),
     items: mapped,
     className: settings.className,
@@ -203,6 +213,9 @@ export async function saveContactBook(input: {
     assignmentKey(item.bookId, item.pageLabel),
   );
   const desiredSet = new Set(desiredKeys);
+  const desiredByKey = new Map(
+    desired.map((item) => [assignmentKey(item.bookId, item.pageLabel), item] as const),
+  );
 
   const toDelete = existingItems.filter(
     (item) => !desiredSet.has(assignmentKey(item.bookId, item.pageLabel)),
@@ -229,10 +242,21 @@ export async function saveContactBook(input: {
   for (const item of existingItems) {
     const key = assignmentKey(item.bookId, item.pageLabel);
     if (!desiredSet.has(key)) continue;
-    if (item.date !== dueDate || item.contactBookDate !== day) {
+    const desiredItem = desiredByKey.get(key)!;
+    if (
+      item.date !== dueDate ||
+      item.contactBookDate !== day ||
+      item.blocksRecess !== desiredItem.blocksRecess ||
+      item.blocksShop !== desiredItem.blocksShop
+    ) {
       await db
         .update(homework)
-        .set({ date: dueDate, contactBookDate: day })
+        .set({
+          date: dueDate,
+          contactBookDate: day,
+          blocksRecess: desiredItem.blocksRecess !== false,
+          blocksShop: desiredItem.blocksShop !== false,
+        })
         .where(eq(homework.id, item.id));
     }
   }
@@ -247,6 +271,8 @@ export async function saveContactBook(input: {
         pageLabel: item.pageLabel,
         date: dueDate,
         contactBookDate: day,
+        blocksRecess: item.blocksRecess !== false,
+        blocksShop: item.blocksShop !== false,
       })),
     );
   }
@@ -272,6 +298,8 @@ export async function saveContactBook(input: {
       bookName: item.bookName,
       pageLabel: item.pageLabel,
       title: item.title,
+      blocksRecess: item.blocksRecess,
+      blocksShop: item.blocksShop,
     })),
     items: orderedItems,
   };
@@ -283,6 +311,11 @@ export async function copyContactBook(input: { fromDate: string; toDate: string 
   return saveContactBook({
     date: input.toDate,
     notes: source.notes,
-    assignments: source.assignments.map((item) => ({ bookId: item.bookId, pageLabel: item.pageLabel })),
+    assignments: source.assignments.map((item) => ({
+      bookId: item.bookId,
+      pageLabel: item.pageLabel,
+      blocksRecess: item.blocksRecess,
+      blocksShop: item.blocksShop,
+    })),
   });
 }

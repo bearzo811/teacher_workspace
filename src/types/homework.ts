@@ -14,4 +14,8 @@ export function assignmentKey(bookId: string, pageLabel: string) {
 export type HomeworkAssignmentInput = {
   bookId: string;
   pageLabel: string;
+  /** 未交時是否限制下課；未傳入時預設限制。 */
+  blocksRecess?: boolean;
+  /** 未交時是否限制商店；未傳入時預設限制。 */
+  blocksShop?: boolean;
 };

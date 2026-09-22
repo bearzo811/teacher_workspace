@@ -26,6 +26,8 @@ export type HomeworkDayItem = {
   pageLabel: string;
   title: string;
   date: string;
+  blocksRecess: boolean;
+  blocksShop: boolean;
 };
 
 export type HomeworkStudentCell = {
@@ -64,6 +66,8 @@ export type HomeworkDashboardSummary = {
 export type StudentHomeworkStatusItem = {
   label: string;
   status: "unsubmitted" | "pending_confirmation" | "correction_required" | "completed";
+  blocksRecess: boolean;
+  blocksShop: boolean;
 };
 
 export type HomeworkBookProgress = {
@@ -114,6 +118,8 @@ function normalizeAssignments(
     .map((item) => ({
       bookId: item.bookId.trim(),
       pageLabel: item.pageLabel.trim(),
+      blocksRecess: item.blocksRecess !== false,
+      blocksShop: item.blocksShop !== false,
     }))
     .filter((item) => item.bookId && item.pageLabel);
   const unique: HomeworkAssignmentInput[] = [];
@@ -140,6 +146,8 @@ export async function getHomeworkDayView(
         bookName: homeworkBooks.name,
         pageLabel: homework.pageLabel,
         date: homework.date,
+        blocksRecess: homework.blocksRecess,
+        blocksShop: homework.blocksShop,
       })
       .from(homework)
       .innerJoin(homeworkBooks, eq(homework.bookId, homeworkBooks.id))
@@ -163,6 +171,8 @@ export async function getHomeworkDayView(
     pageLabel: item.pageLabel,
     title: formatHomeworkTitle(item.bookName, item.pageLabel),
     date: String(item.date),
+    blocksRecess: item.blocksRecess,
+    blocksShop: item.blocksShop,
   }));
 
   let records: HomeworkRecord[] = [];
@@ -370,6 +380,8 @@ export async function listStudentHomeworkDebts(
         id: homework.id,
         bookName: homeworkBooks.name,
         pageLabel: homework.pageLabel,
+        blocksRecess: homework.blocksRecess,
+        blocksShop: homework.blocksShop,
         date: homework.date,
       })
       .from(homework)
@@ -412,6 +424,8 @@ export async function listStudentHomeworkDebts(
       assignments.push({
         label: formatHomeworkTitle(item.bookName, item.pageLabel),
         status: statusMap.get(`${student.studentId}:${item.id}`) ?? "unsubmitted",
+        blocksRecess: item.blocksRecess,
+        blocksShop: item.blocksShop,
       });
     }
     debts.set(student.studentId, assignments);
@@ -462,6 +476,8 @@ export async function createHomeworkItems(input: {
         pageLabel: item.pageLabel,
         date: day,
         contactBookDate: day,
+        blocksRecess: item.blocksRecess,
+        blocksShop: item.blocksShop,
       })),
     )
     .returning();
