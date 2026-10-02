@@ -1481,8 +1481,12 @@ function LunchPanel({
                 <div className="grid h-full min-h-0 grid-cols-3 grid-rows-3 gap-2">
                   {duties.map((slot) => (
                     <article key={slot.slotKey} className="flex min-h-0 min-w-0 flex-col justify-center overflow-y-auto break-words rounded-xl border border-slate-600/80 bg-slate-900/90 px-3 py-2">
-                      <p className="text-base font-semibold text-slate-50">{slot.name}</p>
-                      <p className="mt-0.5 text-lg font-semibold text-amber-200">{displayDutyLabel(slot.label)}</p>
+                      <p className="text-2xl font-bold leading-tight text-slate-50">{slot.name}</p>
+                      <p className="mt-2 text-3xl font-bold leading-snug text-amber-200">
+                        {displayDutyLabel(slot.label).split("・").map((task, index) => (
+                          <span key={`${index}-${task}`} className="block">{task.trim()}</span>
+                        ))}
+                      </p>
                     </article>
                   ))}
                 </div>
