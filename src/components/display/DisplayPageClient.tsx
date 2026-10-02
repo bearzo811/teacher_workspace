@@ -1478,9 +1478,9 @@ function LunchPanel({
               ) : data.dutyToday.isHoliday ? (
                 <p className="text-lg text-slate-400">今天放假，無午餐工作</p>
               ) : (
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid h-full min-h-0 grid-cols-3 grid-rows-3 gap-2">
                   {duties.map((slot) => (
-                    <article key={slot.slotKey} className="rounded-xl border border-slate-600/80 bg-slate-900/90 px-3 py-2">
+                    <article key={slot.slotKey} className="flex min-h-0 min-w-0 flex-col justify-center overflow-y-auto break-words rounded-xl border border-slate-600/80 bg-slate-900/90 px-3 py-2">
                       <p className="text-base font-semibold text-slate-50">{slot.name}</p>
                       <p className="mt-0.5 text-lg font-semibold text-amber-200">{displayDutyLabel(slot.label)}</p>
                     </article>
