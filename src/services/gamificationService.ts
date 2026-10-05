@@ -132,9 +132,11 @@ type SetEffectInput = {
  * 將來源的「目前應生效金額」調整為 amount。
  * advisory lock + effect PK 讓老師端、大屏與 cron 同時重送仍只結算一次。
  */
-export async function setGamificationEffect(input: SetEffectInput) {
+type EffectDatabase = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+export async function setGamificationEffect(input: SetEffectInput, database: EffectDatabase = db) {
   const desiredAmount = Math.trunc(input.amount);
-  return db.transaction(async (tx) => {
+  return database.transaction(async (tx) => {
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext(${input.effectKey}))`,
     );
@@ -477,8 +479,9 @@ export async function reconcileRoutineReward(input: {
 export async function clearGamificationEffectsForSource(
   sourceType: string,
   sourceId: string,
+  database: EffectDatabase = db,
 ) {
-  const effects = await db
+  const effects = await database
     .select()
     .from(gamificationEffects)
     .where(
@@ -494,7 +497,7 @@ export async function clearGamificationEffectsForSource(
       effectType: effect.effectType,
       amount: 0,
       reason: "來源刪除回沖",
-    });
+    }, database);
   }
 }
 

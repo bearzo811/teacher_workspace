@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray, lte } from "drizzle-orm";
 import { db } from "@/db";
+import { touchDisplayVersion } from "@/services/classSettingsService";
 import {
   homework,
   homeworkBooks,
@@ -486,9 +487,16 @@ export async function createHomeworkItems(input: {
 }
 
 export async function deleteHomeworkItem(id: string): Promise<void> {
-  await clearGamificationEffectsForSource("homework", id);
-  await db.delete(homeworkRecords).where(eq(homeworkRecords.homeworkId, id));
-  await db.delete(homework).where(eq(homework.id, id));
+  await db.transaction(async (tx) => {
+    const [item] = await tx.select({ id: homework.id }).from(homework)
+      .where(eq(homework.id, id)).for("update");
+    if (!item) return;
+    await clearGamificationEffectsForSource("homework", id, tx);
+    await tx.delete(homeworkRecordHistory).where(eq(homeworkRecordHistory.homeworkId, id));
+    await tx.delete(homeworkRecords).where(eq(homeworkRecords.homeworkId, id));
+    await tx.delete(homework).where(eq(homework.id, id));
+  });
+  await touchDisplayVersion();
 }
 
 export async function upsertHomeworkRecord(input: {
