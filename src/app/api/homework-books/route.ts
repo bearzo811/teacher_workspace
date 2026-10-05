@@ -3,9 +3,21 @@ import {
   createHomeworkBook,
   listHomeworkBooks,
   updateHomeworkBook,
+  deleteHomeworkBook,
 } from "@/services/homeworkBookService";
 
 export const dynamic = "force-dynamic";
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json() as { id?: string };
+    if (typeof body.id !== "string" || !body.id) return NextResponse.json({ error: "請提供簿本 id" }, { status: 400 });
+    await deleteHomeworkBook(body.id);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "刪除簿本失敗" }, { status: 400 });
+  }
+}
 
 export async function GET(request: Request) {
   try {

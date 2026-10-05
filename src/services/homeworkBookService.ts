@@ -1,6 +1,17 @@
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { homeworkBooks, homeworkSubjects, type HomeworkBook } from "@/db/schema";
+import { homeworkBooks, homeworkSubjects, homework, coursePlanAssignments, type HomeworkBook } from "@/db/schema";
+
+export async function deleteHomeworkBook(id: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [book] = await tx.select().from(homeworkBooks).where(eq(homeworkBooks.id, id)).for("update");
+    if (!book) throw new Error("找不到此簿本");
+    const used = await tx.select({ id: homework.id }).from(homework).where(eq(homework.bookId, id)).limit(1);
+    const planned = await tx.select({ id: coursePlanAssignments.id }).from(coursePlanAssignments).where(eq(coursePlanAssignments.bookId, id)).limit(1);
+    if (used.length || planned.length) throw new Error("此簿本已有作業或課程計劃，請改用停用，保留既有紀錄。");
+    await tx.delete(homeworkBooks).where(eq(homeworkBooks.id, id));
+  });
+}
 
 export type HomeworkBookView = {
   id: string;

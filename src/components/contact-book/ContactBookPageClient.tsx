@@ -62,6 +62,9 @@ export function ContactBookPageClient() {
   const [displayContactBookDate, setDisplayContactBookDate] = useState("");
   const [settingDisplay, setSettingDisplay] = useState(false);
   const [showCreateBook, setShowCreateBook] = useState(false);
+  const [showManageBooks, setShowManageBooks] = useState(false);
+  const [allBooks, setAllBooks] = useState<HomeworkBook[]>([]);
+  const [bookBusy, setBookBusy] = useState(false);
 
   const loadDisplayDate = useCallback(async () => {
     const response = await fetch("/api/settings");
@@ -79,7 +82,7 @@ export function ContactBookPageClient() {
 
   const loadBooks = useCallback(async () => {
     const [response, subjectResponse] = await Promise.all([
-      fetch("/api/homework-books?activeOnly=1"),
+      fetch("/api/homework-books?activeOnly=0"),
       fetch("/api/homework-subjects?activeOnly=1"),
     ]);
     const json = (await response.json()) as {
@@ -92,11 +95,36 @@ export function ContactBookPageClient() {
     };
     if (!response.ok) throw new Error(json.error ?? "讀取簿本失敗");
     if (!subjectResponse.ok) throw new Error(subjectJson.error ?? "讀取科目失敗");
-    const list = json.data ?? [];
+    setAllBooks(json.data ?? []);
+    const list = (json.data ?? []).filter((book) => book.isActive);
     setBooks(list);
     setSubjects(subjectJson.data ?? []);
-    setSelectedBookId((prev) => prev || list[0]?.id || "");
+    setSelectedBookId((prev) => list.some((book) => book.id === prev) ? prev : list[0]?.id || "");
   }, []);
+
+  async function manageBook(book: HomeworkBook, remove: boolean) {
+    if (remove && assignments.some((item) => item.bookId === book.id)) {
+      setError("此簿本仍在目前聯絡簿的作業中，請先移除該項目或改用停用。");
+      return;
+    }
+    if (remove && !window.confirm(`永久刪除「${book.name}」？只有沒有作業或課程計劃紀錄的簿本可刪除。`)) return;
+    setBookBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/homework-books", {
+        method: remove ? "DELETE" : "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(remove ? { id: book.id } : { id: book.id, isActive: !book.isActive }),
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error ?? "簿本更新失敗");
+      await loadBooks();
+      setMessage(`「${book.name}」已${remove ? "刪除" : book.isActive ? "停用" : "啟用"}`);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "簿本更新失敗");
+    } finally { setBookBusy(false); }
+  }
 
   const load = useCallback(
     async (selectedDate: string) => {
@@ -361,7 +389,27 @@ export function ContactBookPageClient() {
             >
               ＋新增簿本
             </button>
+            <button type="button" onClick={() => setShowManageBooks((value) => !value)} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700">
+              {showManageBooks ? "收起簿本管理" : "管理簿本"}
+            </button>
           </div>
+
+          {showManageBooks && (
+            <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="mb-3 text-sm text-gray-600">停用後不再出現在新增作業選單，既有作業與學生紀錄仍保留；可隨時重新啟用。沒有作業或課程計劃紀錄的簿本才可永久刪除。</p>
+              <ul className="space-y-2">
+                {allBooks.map((book) => (
+                  <li key={book.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-white p-3">
+                    <span>{book.subjectName ? `${book.subjectName}／` : ""}{book.name}{!book.isActive && <span className="ml-2 text-sm text-gray-500">已停用</span>}</span>
+                    <div className="flex gap-2">
+                      <Button variant="secondary" disabled={bookBusy} onClick={() => void manageBook(book, false)}>{book.isActive ? "停用" : "重新啟用"}</Button>
+                      <button type="button" disabled={bookBusy} onClick={() => void manageBook(book, true)} className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 disabled:opacity-50">永久刪除</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="mt-3 flex gap-2">
             <input
