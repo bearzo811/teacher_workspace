@@ -65,6 +65,8 @@ export type HomeworkDashboardSummary = {
 };
 
 export type StudentHomeworkStatusItem = {
+  id: string;
+  dueDate: string;
   label: string;
   status: "unsubmitted" | "pending_confirmation" | "correction_required" | "completed";
   blocksRecess: boolean;
@@ -423,6 +425,8 @@ export async function listStudentHomeworkDebts(
     const assignments: StudentHomeworkStatusItem[] = [];
     for (const item of items) {
       assignments.push({
+        id: item.id,
+        dueDate: item.date,
         label: formatHomeworkTitle(item.bookName, item.pageLabel),
         status: statusMap.get(`${student.studentId}:${item.id}`) ?? "unsubmitted",
         blocksRecess: item.blocksRecess,

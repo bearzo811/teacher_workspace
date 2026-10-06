@@ -30,6 +30,8 @@ export type DisplayPersonalRow = {
 };
 
 export type DisplayDebtItem = {
+  key?: string;
+  dueDate?: string;
   label: string;
   /** missing_parent 時標示 */
   note?: string;
@@ -41,6 +43,7 @@ export type DisplayDebtItem = {
 };
 
 export type DisplayDebtRow = {
+  priorityItems: (DisplayDebtItem & { key: string })[];
   studentId: string;
   name: string;
   seatNumber: number;

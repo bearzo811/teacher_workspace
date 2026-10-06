@@ -6,6 +6,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { StudentDetail } from "@/types/student";
+import { DebtOrderEditor } from "./DebtOrderEditor";
 
 type StudentDetailClientProps = {
   studentId: string;
@@ -71,6 +72,7 @@ export function StudentDetailClient({ studentId }: StudentDetailClientProps) {
           回列表
         </Link>
       </header>
+      <DebtOrderEditor key={studentId} studentId={studentId} />
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       {loading && !data ? (

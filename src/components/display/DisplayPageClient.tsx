@@ -1063,11 +1063,15 @@ function DebtsPanel({
                 </div>
                 {row.hasDebt ? (
                   <div className="min-h-0 overflow-y-auto pr-1">
-                    <HomeworkStatusGroups items={row.homework} />
-                    <DebtGroup label="國語護照" items={row.chinesePassport} />
-                    <DebtGroup label="英語護照" items={row.englishPassport} />
-                    <DebtGroup label="讀報" items={row.newspaper} />
-                    <DebtGroup label="閱讀心得" items={row.reflection} />
+                    {row.priorityItems?.[0] && (
+                      <div className="my-2 rounded-xl border border-sky-400/60 bg-sky-500/15 p-3">
+                        <p className="text-sm font-semibold text-sky-200">下一個先完成</p>
+                        <p className="mt-1 break-words text-2xl font-bold leading-snug text-white">{row.priorityItems[0].label}</p>
+                        {row.priorityItems[0].status === "correction_required" && <p className="text-base text-orange-200">請訂正後再交</p>}
+                      </div>
+                    )}
+                    <DebtGroup label="接下來完成" items={(row.priorityItems ?? []).slice(1).map((item, index) => ({ ...item, label: `${index + 2}. ${item.label}`, note: item.status === "correction_required" ? "需訂正" : item.note }))} />
+                    <HomeworkStatusGroups items={row.homework.filter((item) => item.status === "pending_confirmation")} />
                   </div>
                 ) : (
                   <p className="mt-2 text-sm text-emerald-200">所有需要完成的項目都已完成。</p>

@@ -83,6 +83,11 @@ export const students = pgTable("students", {
     .notNull(),
 });
 
+export const studentDebtOrders = pgTable("student_debt_orders", {
+  studentId: uuid("student_id").primaryKey().references(() => students.id),
+  itemKeys: text("item_keys").notNull().default("[]"),
+});
+
 export const passportRecords = pgTable(
   "passport_records",
   {

@@ -1,4 +1,7 @@
 import { monthDateRange, todayDateString } from "@/lib/dates";
+import { db } from "@/db";
+import { studentDebtOrders } from "@/db/schema";
+import { orderDebts } from "@/lib/debtOrder";
 import { formatWeekProgress, resolveSchoolWeek } from "@/lib/schoolWeek";
 import {
   listCalendarCountdown,
@@ -285,9 +288,12 @@ async function buildDisplayData(options: {
     };
   });
 
+  const savedOrders = new Map((await db.select().from(studentDebtOrders)).map((row) => [row.studentId, JSON.parse(row.itemKeys) as string[]]));
   const debts: DisplayDebtRow[] = activeStudents.map((student) => {
     const homeworkItems = (homeworkDebts.get(student.studentId) ?? []).map(
       (item) => ({
+        key: `homework:${item.id}`,
+        dueDate: item.dueDate,
         label: item.label,
         status: item.status,
         blocksRecess: item.blocksRecess,
@@ -333,7 +339,20 @@ async function buildDisplayData(options: {
       englishPassport.length > 0 ||
       newspaper.length > 0 ||
       reflection.length > 0;
+    const termKey = `${settings.schoolYear}:${settings.weekOneStartDate}`;
+    const passports = [
+      ...chinesePassport.map((item) => ({ ...item, key: `chinese:${termKey}:${item.label}`, label: `國語護照 ${item.label}`, week: Number(item.label.slice(1)) })),
+      ...englishPassport.map((item) => ({ ...item, key: `english:${termKey}:${item.label}`, label: `英語護照 ${item.label}`, week: Number(item.label.slice(1)) })),
+    ].sort((a, b) => a.week - b.week);
+    const reading = [
+      ...newspaper.map((item) => ({ ...item, key: `newspaper:${termKey}:${item.label}`, label: `讀報 ${item.label}`, month: Number(item.label.replace("月", "")) })),
+      ...reflection.map((item) => ({ ...item, key: `reflection:${termKey}:${item.label}`, label: `閱讀心得 ${item.label}`, month: Number(item.label.replace("月", "")) })),
+    ].sort((a, b) => ((a.month + 3) % 12) - ((b.month + 3) % 12));
+    const priorityItems = orderDebts([
+      ...homeworkItems.filter(needsStudentAction), ...passports, ...reading,
+    ], savedOrders.get(student.studentId) ?? []);
     return {
+      priorityItems,
       studentId: student.studentId,
       name: student.name,
       seatNumber: student.seatNumber,
