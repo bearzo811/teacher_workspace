@@ -1062,12 +1062,12 @@ function DebtsPanel({
                   </div>
                 </div>
                 {row.hasDebt ? (
-                  <div className="min-h-0 overflow-y-auto pr-1">
+                  <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                     {row.priorityItems?.[0] && (
-                      <div className="my-2 rounded-xl border border-sky-400/60 bg-sky-500/15 p-3">
-                        <p className="text-sm font-semibold text-sky-200">下一個先完成</p>
-                        <p className="mt-1 break-words text-2xl font-bold leading-snug text-white">{row.priorityItems[0].label}</p>
-                        {row.priorityItems[0].status === "correction_required" && <p className="text-base text-orange-200">請訂正後再交</p>}
+                      <div className="my-2 flex min-h-32 flex-col justify-center rounded-2xl border-2 border-sky-400/60 bg-sky-500/20 p-4">
+                        <p className="text-xl font-semibold text-sky-200">下一個先完成</p>
+                        <p className="mt-2 break-words text-3xl font-bold leading-snug text-white">{row.priorityItems[0].label}</p>
+                        {row.priorityItems[0].status === "correction_required" && <p className="mt-1 text-lg text-orange-200">請訂正後再交</p>}
                       </div>
                     )}
                     {row.showOtherItems !== false && <>
@@ -1078,6 +1078,12 @@ function DebtsPanel({
                 ) : (
                   <p className="mt-2 text-sm text-emerald-200">所有需要完成的項目都已完成。</p>
                 )}
+                <div className="mt-auto flex shrink-0 items-baseline justify-between gap-2 border-t border-slate-700 pt-2">
+                  <span className="text-base text-slate-300">尚待完成（含護照、閱讀）</span>
+                  <span className={cn("whitespace-nowrap text-3xl font-bold tabular-nums", row.priorityItems?.length ? "text-amber-200" : "text-emerald-200")}>
+                    {row.priorityItems?.length ?? 0}<span className="ml-1 text-lg">項</span>
+                  </span>
+                </div>
               </article>
           ))}
       </div>
