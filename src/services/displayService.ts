@@ -288,7 +288,9 @@ async function buildDisplayData(options: {
     };
   });
 
-  const savedOrders = new Map((await db.select().from(studentDebtOrders)).map((row) => [row.studentId, JSON.parse(row.itemKeys) as string[]]));
+  const debtPreferences = await db.select().from(studentDebtOrders);
+  const savedOrders = new Map(debtPreferences.map((row) => [row.studentId, JSON.parse(row.itemKeys) as string[]]));
+  const visibility = new Map(debtPreferences.map((row) => [row.studentId, row.showOtherItems]));
   const debts: DisplayDebtRow[] = activeStudents.map((student) => {
     const homeworkItems = (homeworkDebts.get(student.studentId) ?? []).map(
       (item) => ({
@@ -353,6 +355,7 @@ async function buildDisplayData(options: {
     ], savedOrders.get(student.studentId) ?? []);
     return {
       priorityItems,
+      showOtherItems: visibility.get(student.studentId) ?? true,
       studentId: student.studentId,
       name: student.name,
       seatNumber: student.seatNumber,

@@ -12,19 +12,23 @@ export async function GET(_request: Request, context: Context) {
   const data = await getDisplayData();
   const row = data.debts.find((item) => item.studentId === id);
   if (!row) return NextResponse.json({ error: "找不到學生" }, { status: 404 });
-  return NextResponse.json({ items: row.priorityItems });
+  return NextResponse.json({ items: row.priorityItems, showOtherItems: row.showOtherItems ?? true });
 }
 export async function PUT(request: Request, context: Context) {
   try {
     const { id } = await context.params;
-    const { keys } = await request.json();
+    const { keys, showOtherItems } = await request.json();
+    if (showOtherItems !== undefined && typeof showOtherItems !== "boolean") {
+      return NextResponse.json({ error: "顯示設定格式不正確" }, { status: 400 });
+    }
     if (!Array.isArray(keys) || keys.length > 2000 || keys.some((key) => typeof key !== "string" || key.length > 200) || new Set(keys).size !== keys.length) {
       return NextResponse.json({ error: "排序資料格式不正確" }, { status: 400 });
     }
     const [student] = await db.select({ id: students.id }).from(students).where(eq(students.id, id));
     if (!student) return NextResponse.json({ error: "找不到學生" }, { status: 404 });
-    await db.insert(studentDebtOrders).values({ studentId: id, itemKeys: JSON.stringify(keys) })
-      .onConflictDoUpdate({ target: studentDebtOrders.studentId, set: { itemKeys: JSON.stringify(keys) } });
+    const visibility = showOtherItems === undefined ? {} : { showOtherItems };
+    await db.insert(studentDebtOrders).values({ studentId: id, itemKeys: JSON.stringify(keys), ...visibility })
+      .onConflictDoUpdate({ target: studentDebtOrders.studentId, set: { itemKeys: JSON.stringify(keys), ...visibility } });
     await touchDisplayVersion();
     return NextResponse.json({ ok: true });
   } catch {

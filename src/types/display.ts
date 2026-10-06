@@ -44,6 +44,7 @@ export type DisplayDebtItem = {
 
 export type DisplayDebtRow = {
   priorityItems: (DisplayDebtItem & { key: string })[];
+  showOtherItems?: boolean;
   studentId: string;
   name: string;
   seatNumber: number;

@@ -8,12 +8,13 @@ export function DebtOrderEditor({ studentId }: { studentId: string }) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [dirty, setDirty] = useState(false);
+  const [showOtherItems, setShowOtherItems] = useState(true);
   const url = `/api/students/${studentId}/debt-order`;
   const load = useCallback(async () => {
     const response = await fetch(url);
     const json = await response.json();
     if (!response.ok) throw new Error(json.error ?? "讀取排序失敗");
-    setItems(json.items); setDirty(false);
+    setItems(json.items); setShowOtherItems(json.showOtherItems ?? true); setDirty(false);
   }, [url]);
   useEffect(() => { setBusy(true); void load().catch((e) => setError(e.message)).finally(() => setBusy(false)); }, [load]);
   function move(index: number, target: number) {
@@ -23,7 +24,7 @@ export function DebtOrderEditor({ studentId }: { studentId: string }) {
   async function save(reset = false) {
     setBusy(true); setError(""); setMessage("");
     try {
-      const response = await fetch(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ keys: reset ? [] : items.map((item) => item.key) }) });
+      const response = await fetch(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ keys: reset ? [] : items.map((item) => item.key), showOtherItems }) });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error);
       await load(); setMessage(reset ? "已恢復預設排序" : "已儲存，大屏將同步更新");
@@ -32,6 +33,11 @@ export function DebtOrderEditor({ studentId }: { studentId: string }) {
   }
   return <section className="rounded-xl border border-gray-200 bg-white p-5">
     <h2 className="text-lg font-semibold">欠繳優先順序</h2>
+    <label className="my-3 flex items-center gap-2">
+      <input type="checkbox" checked={showOtherItems} disabled={busy} onChange={(event) => { setShowOtherItems(event.target.checked); setDirty(true); setMessage(""); }} />
+      顯示其他欠繳項目
+    </label>
+    <p className="text-sm text-gray-500">關閉後，大屏只保留「下一個先完成」，隱藏下方其他項目與待確認清單；不影響下課或商店限制。儲存後生效。</p>
     <p className="mt-1 text-sm text-gray-500">只調整這位學生。第一項會在大屏放大顯示；完成或送出待確認後自動接續下一項。預設：最早作業 → 護照 → 讀報／閱讀心得。</p>
     {error && <p role="alert" className="mt-2 text-red-600">{error}</p>}
     {message && <p role="status" className="mt-2 text-green-700">{message}</p>}
