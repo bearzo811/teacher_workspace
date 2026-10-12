@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiErrorMessage } from "@/lib/apiError";
-import { settleGamificationOverdue } from "@/services/gamificationService";
+import { settleScheduledPassportOverdue } from "@/services/gamificationService";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const data = await settleGamificationOverdue();
+    const data = await settleScheduledPassportOverdue();
     return NextResponse.json({ data });
   } catch (error) {
     return NextResponse.json(

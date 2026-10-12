@@ -21,6 +21,11 @@ function isPublicPath(pathname: string) {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  // Vercel Cron 以 Bearer CRON_SECRET 驗證，沒有教師 cookie。
+  // 僅放行這個精確入口，由 route 驗證密鑰；不可放行整個 /api/cron。
+  if (pathname === "/api/cron/gamification-settle") {
+    return NextResponse.next();
+  }
   if (isPublicPath(pathname) || DISPLAY_API_PATHS.includes(pathname)) {
     return NextResponse.next();
   }

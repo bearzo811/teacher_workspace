@@ -698,6 +698,14 @@ async function settlePassportDailyOverduePenalties(
   return changed;
 }
 
+/** 自動排程專用：僅結算前一天護照；不掃歷史日期，也不補扣舊作業。 */
+export async function settleScheduledPassportOverdue(now = new Date()) {
+  const settings = await getGamificationSettings();
+  const passportChanged = await settlePassportDailyOverduePenalties(now, settings);
+  return { homeworkChanged: 0, passportChanged };
+}
+
+/** 完整手動結算入口：會掃描舊作業，不可由自動排程呼叫。 */
 export async function settleGamificationOverdue(now = new Date()) {
   const settings = await getGamificationSettings();
   const [homeworkChanged, passportChanged] = await Promise.all([
