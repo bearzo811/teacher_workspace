@@ -1041,8 +1041,8 @@ function DebtsPanel({
                   row.hasBlockingDebt ? "border-rose-400/40" : "border-emerald-400/40",
                 )}
               >
-                <div className="flex shrink-0 items-center justify-between gap-2">
-                  <h3 className="truncate text-xl font-semibold">
+                <div className="flex shrink-0 flex-wrap items-center justify-between gap-1">
+                  <h3 className="text-xl font-semibold">
                   {row.seatNumber} {row.name}
                   </h3>
                   <div className="flex shrink-0 flex-wrap justify-end gap-1">
@@ -1064,10 +1064,10 @@ function DebtsPanel({
                 {row.hasDebt ? (
                   <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                     {row.priorityItems?.[0] && (
-                      <div className="my-2 flex min-h-32 flex-col justify-center rounded-2xl border-2 border-sky-400/60 bg-sky-500/20 p-4">
-                        <p className="text-xl font-semibold text-sky-200">下一個先完成</p>
-                        <p className="mt-2 break-words text-3xl font-bold leading-snug text-white">{row.priorityItems[0].label}</p>
-                        {row.priorityItems[0].status === "correction_required" && <p className="mt-1 text-lg text-orange-200">請訂正後再交</p>}
+                      <div className="my-1 flex flex-col justify-center rounded-xl border-2 border-sky-400/60 bg-sky-500/20 p-2">
+                        <p className="text-base font-semibold text-sky-200">下一個先完成</p>
+                        <p className="mt-1 break-words text-2xl font-bold leading-tight text-white">{row.priorityItems[0].label}</p>
+                        {row.priorityItems[0].status === "correction_required" && <p className="mt-1 text-sm text-orange-200">請訂正後再交</p>}
                       </div>
                     )}
                     {row.showOtherItems !== false && <>
@@ -1079,7 +1079,7 @@ function DebtsPanel({
                   <p className="mt-2 text-sm text-emerald-200">所有需要完成的項目都已完成。</p>
                 )}
                 <div className="mt-auto flex shrink-0 items-baseline justify-between gap-2 border-t border-slate-700 pt-2">
-                  <span className="text-base text-slate-300">尚待完成（含護照、閱讀）</span>
+                  <span className="text-sm text-slate-300" title="包含作業、護照、讀報與閱讀心得">尚待完成</span>
                   <span className={cn("whitespace-nowrap text-3xl font-bold tabular-nums", row.priorityItems?.length ? "text-amber-200" : "text-emerald-200")}>
                     {row.priorityItems?.length ?? 0}<span className="ml-1 text-lg">項</span>
                   </span>
@@ -1545,7 +1545,7 @@ function LunchTaskMatrix({
   return (
     <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950/50 p-3">
       <h2 className="shrink-0 text-xl font-semibold text-slate-100">午餐任務</h2>
-      <div className="mt-2 grid min-h-0 flex-1 gap-1" style={{ gridTemplateColumns: `4.5rem repeat(${rows.length}, minmax(0, 1fr))` }}>
+      <div className="mt-auto grid min-h-0 gap-2 pt-4" style={{ gridTemplateColumns: `4.5rem repeat(${rows.length}, minmax(0, 1fr))`, gridTemplateRows: "auto repeat(2, minmax(3rem, 1fr))" }}>
         <div aria-hidden />
         {rows.map((row) => <div key={row.studentId} className="flex items-center justify-center text-sm font-bold text-amber-200">{row.seatNumber}</div>)}
         {LUNCH_TASKS.flatMap((task) => [
@@ -1553,7 +1553,7 @@ function LunchTaskMatrix({
           ...rows.map((row) => {
             const done = task.key === "lunch_brushing" ? row.lunchBrushing : row.noonCleaning;
             const key = `${row.studentId}:${task.key}`;
-            return <button key={key} type="button" disabled={busyKey === key} onClick={() => onRoutineCell(row.studentId, task.key, !done)} className={cn("mx-auto flex h-8 w-[88%] max-w-10 items-center justify-center rounded-md border text-sm font-bold transition active:scale-95", done ? "border-emerald-300 bg-emerald-500 text-white" : "border-slate-600 bg-slate-800 text-slate-500")}>{done ? "✓" : ""}</button>;
+            return <button key={key} type="button" aria-label={`${row.seatNumber} 號 ${task.label}`} aria-pressed={done} disabled={busyKey === key} onClick={() => onRoutineCell(row.studentId, task.key, !done)} className={cn("flex min-h-12 w-full items-center justify-center rounded-md border text-lg font-bold transition active:scale-95", done ? "border-emerald-300 bg-emerald-500 text-white" : "border-slate-600 bg-slate-800 text-slate-500")}>{done ? "✓" : ""}</button>;
           }),
         ])}
       </div>

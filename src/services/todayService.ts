@@ -7,7 +7,7 @@ import { getContactBook } from "@/services/contactBookService";
 import { getHomeworkDashboardSummary } from "@/services/homeworkService";
 import { listPendingRewardRequests } from "@/services/shopService";
 import {
-  getTaskCompletionCount,
+  getRoutineDayView,
   upsertTodayManual,
 } from "@/services/routineService";
 import type { TodayManualKey } from "@/types/today";
@@ -107,10 +107,7 @@ export async function getTodayBoard(date = todayDateString()): Promise<TodayBoar
     homework,
     chinese,
     english,
-    contactCopied,
-    morning,
-    brushing,
-    noon,
+    routines,
     contactBook,
     contactSaved,
     pendingRewardRequests,
@@ -122,10 +119,7 @@ export async function getTodayBoard(date = todayDateString()): Promise<TodayBoar
     passportWeek > 0
       ? passportWeekStats("English", passportWeek)
       : Promise.resolve({ completed: 0, total: 0, missingNames: [] as string[] }),
-    getTaskCompletionCount(date, "contact_book_copied"),
-    getTaskCompletionCount(date, "morning_cleaning"),
-    getTaskCompletionCount(date, "lunch_brushing"),
-    getTaskCompletionCount(date, "noon_cleaning"),
+    getRoutineDayView(date),
     getContactBook(date),
     db
       .select({ id: contactBookDays.id })
@@ -135,6 +129,18 @@ export async function getTodayBoard(date = todayDateString()): Promise<TodayBoar
     listPendingRewardRequests(),
   ]);
 
+  const routineCount = (key: string) => {
+    const task = routines.tasks.find((task) => task.taskKey === key);
+    return {
+      completed: task?.completedCount ?? 0,
+      total: task?.totalCount ?? 0,
+      missingNames: task?.students.filter((s) => !s.absent && !s.completed).map((s) => s.name) ?? [],
+    };
+  };
+  const contactCopied = routineCount("contact_book_copied");
+  const morning = routineCount("morning_cleaning");
+  const brushing = routineCount("lunch_brushing");
+  const noon = routineCount("noon_cleaning");
   const hwCompleted = homework.hasItems ? homework.completed : 0;
   const hwTotal = homework.hasItems ? homework.total : 0;
   const hwMissing = homework.hasItems

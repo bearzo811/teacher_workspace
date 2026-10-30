@@ -9,6 +9,7 @@ import { ProgressBar } from "@/components/passport/ProgressBar";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { todayDateString } from "@/lib/dates";
+import { unsubmittedTitles } from "@/lib/homeworkSubmission";
 
 type HomeworkDayView = {
   date: string;
@@ -129,14 +130,12 @@ export function HomeworkPageClient() {
               }
             : cell,
         );
-        const missingTitles = cells
-          .filter((cell) => !cell.completed)
-          .map((cell) => cell.title);
+        const missingTitles = unsubmittedTitles(cells);
         return {
           ...student,
           cells,
           missingTitles,
-          allDone: prev.items.length > 0 && missingTitles.length === 0,
+          allDone: prev.items.length > 0 && cells.every((cell) => cell.completed),
         };
       });
       return {
@@ -530,7 +529,7 @@ export function HomeworkPageClient() {
               <CardDescription>
                 {view.items.length === 0
                   ? "請先到聯絡簿建立作業"
-                  : `${view.completedStudentCount} / ${view.totalStudentCount} 全交`}
+                  : `${view.totalStudentCount - missing.length} / ${view.totalStudentCount} 已交齊`}
               </CardDescription>
               {view.items.length === 0 ? (
                 <p className="mt-3 text-sm text-gray-400">—</p>

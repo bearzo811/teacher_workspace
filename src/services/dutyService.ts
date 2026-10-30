@@ -181,18 +181,17 @@ export async function getDutyRange(
   from: string,
   to: string,
 ): Promise<DutyRangeView> {
-  const settings = await getClassSettings();
-  const activeTerm = await getActiveTerm();
+  const [settings, activeTerm, roster, overrides] = await Promise.all([
+    getClassSettings(), getActiveTerm(), listActiveDutyStudents(), loadOverrides(from, to),
+  ]);
   // 學期設定是正式來源；保留舊設定作為尚未建立學期時的相容後備。
   const termStart = activeTerm?.startsOn ?? settings.weekOneStartDate.trim();
-  const roster = await listActiveDutyStudents();
   const holidayFrom =
     termStart && termStart < from ? termStart : from;
   const holidayOverrides = await listHolidayOverridesInRange(
     holidayFrom,
     to,
   );
-  const overrides = await loadOverrides(from, to);
   const studentById = new Map(roster.map((s) => [s.studentId, s]));
 
   const warning = !termStart
@@ -290,9 +289,9 @@ export async function getDutySubstitutionDay(date: string) {
 }
 
 /** 缺席異動後建立／取消當日代班與補值日待辦；不影響原輪值表。 */
-export async function syncDutySubstitutionsForDate(date: string) {
+export async function syncDutySubstitutionsForDate(date: string, knownDay?: DutyDayView) {
   const [day, absentRows] = await Promise.all([
-    getDutyDay(date),
+    knownDay ?? getDutyDay(date),
     db.select({ studentId: dailyAbsences.studentId }).from(dailyAbsences).where(eq(dailyAbsences.taskDate, date)),
   ]);
   if (day.isHoliday) return [];

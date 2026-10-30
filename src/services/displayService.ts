@@ -12,7 +12,7 @@ import {
 } from "@/services/calendarService";
 import { getClassSettings } from "@/services/classSettingsService";
 import { getContactBook } from "@/services/contactBookService";
-import { getDutyDay, getDutyLeaders, getDutySubstitutionDay, syncDutySubstitutionsForDate } from "@/services/dutyService";
+import { getDutyDay, getDutySubstitutionDay, syncDutySubstitutionsForDate } from "@/services/dutyService";
 import { getGamificationForStudents } from "@/services/gamificationService";
 import {
   getHomeworkDayView,
@@ -108,7 +108,7 @@ export async function getDisplayData(options?: {
 }): Promise<DisplayData> {
   const settings = await getClassSettings();
   const version = settings.updatedAt.toISOString();
-  const cacheKey = options?.contactBookDate?.trim() || "system-today";
+  const cacheKey = `${todayDateString()}:${options?.contactBookDate?.trim() || "system-today"}`;
   const cached = displayCache.get(cacheKey);
   if (
     cached &&
@@ -150,16 +150,16 @@ async function buildDisplayData(options: {
 
   // 黑板右側的作業進度必須對應這張聯絡簿的繳交日，
   // 不能固定查系統今天，否則週末／跨日會顯示空白。
-  const contactBook = await getContactBook(contactBookDate);
+  const [contactBook, dutyToday] = await Promise.all([
+    getContactBook(contactBookDate), getDutyDay(contactBookDate),
+  ]);
 
   // 既有缺席資料（例如匯入、舊版寫入）可能未曾觸發代班建立；
   // 大屏讀取當日資料時一併補齊，確保請假值日一定會顯示自願代班。
-  await syncDutySubstitutionsForDate(contactBookDate);
+  await syncDutySubstitutionsForDate(contactBookDate, dutyToday);
 
   const [
     returnDay,
-    dutyLeaders,
-    dutyToday,
     dutySubstitutions,
     calendarEvents,
     calendarMonthEvents,
@@ -182,8 +182,6 @@ async function buildDisplayData(options: {
     termEnglishPassport,
   ] = await Promise.all([
     isReturnDay(today),
-    getDutyLeaders(contactBookDate),
-    getDutyDay(contactBookDate),
     getDutySubstitutionDay(contactBookDate),
     listCalendarEventsByDate(contactBookDate),
     listCalendarEventsInRange(from, to),
@@ -385,7 +383,7 @@ async function buildDisplayData(options: {
       dueDate: contactBook.dueDate,
       notes: contactBook.notes,
       titles: contactBook.titles,
-      dutyLeaders: dutyLeaders.map((leader) => ({
+      dutyLeaders: dutyToday.leaders.map((leader) => ({
         name: leader.name,
         seatNumber: leader.seatNumber,
       })),

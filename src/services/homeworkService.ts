@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, lte } from "drizzle-orm";
+import { unsubmittedTitles } from "@/lib/homeworkSubmission";
 import { db } from "@/db";
 import { touchDisplayVersion } from "@/services/classSettingsService";
 import {
@@ -200,15 +201,13 @@ export async function getHomeworkDayView(
       const status = statusMap.get(`${student.studentId}:${item.id}`) ?? "unsubmitted";
       return { homeworkId: item.id, title: item.title, status, completed: status === "completed" };
     });
-    const missingTitles = cells
-      .filter((cell) => !cell.completed)
-      .map((cell) => cell.title);
+    const missingTitles = unsubmittedTitles(cells);
     return {
       studentId: student.studentId,
       name: student.name,
       seatNumber: student.seatNumber,
       cells,
-      allDone: items.length > 0 && missingTitles.length === 0,
+      allDone: items.length > 0 && cells.every((cell) => cell.completed),
       missingTitles,
     };
   });
@@ -231,7 +230,7 @@ export async function getHomeworkDashboardSummary(
   const view = await getHomeworkDayView(date);
   return {
     date: view.date,
-    completed: view.completedStudentCount,
+    completed: view.items.length > 0 ? view.students.filter((s) => s.missingTitles.length === 0).length : 0,
     total: view.totalStudentCount,
     hasItems: view.items.length > 0,
     missing: view.students
@@ -360,12 +359,36 @@ export async function getHomeworkBookProgress(
 export async function listAllHomeworkBookProgress(): Promise<
   HomeworkBookProgress[]
 > {
-  const books = await db
-    .select()
-    .from(homeworkBooks)
-    .where(eq(homeworkBooks.isActive, true))
-    .orderBy(asc(homeworkBooks.sortOrder), asc(homeworkBooks.name));
-  return Promise.all(books.map((book) => getHomeworkBookProgress(book.id)));
+  // 一次載入所有簿本的資料，避免每一本重查名冊、作業及完成紀錄。
+  const [books, assignments, roster, records] = await Promise.all([
+    db.select().from(homeworkBooks).where(eq(homeworkBooks.isActive, true))
+      .orderBy(asc(homeworkBooks.sortOrder), asc(homeworkBooks.name)),
+    db.select({ id: homework.id, bookId: homework.bookId, pageLabel: homework.pageLabel, date: homework.date })
+      .from(homework).innerJoin(homeworkBooks, eq(homework.bookId, homeworkBooks.id))
+      .where(eq(homeworkBooks.isActive, true)).orderBy(asc(homework.date), asc(homework.createdAt)),
+    db.select({ studentId: students.id, name: students.name, seatNumber: students.seatNumber })
+      .from(students).where(eq(students.isActive, true)).orderBy(asc(students.seatNumber)),
+    db.select({ studentId: homeworkRecords.studentId, homeworkId: homeworkRecords.homeworkId })
+      .from(homeworkRecords).innerJoin(homework, eq(homeworkRecords.homeworkId, homework.id))
+      .innerJoin(homeworkBooks, eq(homework.bookId, homeworkBooks.id))
+      .where(and(eq(homeworkBooks.isActive, true), eq(homeworkRecords.completed, true))),
+  ]);
+  const done = new Set(records.map((row) => `${row.studentId}:${row.homeworkId}`));
+  return books.map((book) => {
+    const items = assignments.filter((item) => item.bookId === book.id);
+    const rows = roster.map((student) => {
+      const cells = items.map((item) => ({ homeworkId: item.id, completed: done.has(`${student.studentId}:${item.id}`) }));
+      const completedCount = cells.filter((cell) => cell.completed).length;
+      return { ...student, cells, completedCount, totalCount: items.length,
+        completedPercent: items.length ? Math.round(completedCount / items.length * 100) : 0 };
+    });
+    const total = items.length * roster.length;
+    const completedRatio = total ? rows.reduce((sum, row) => sum + row.completedCount, 0) / total : 0;
+    return { bookId: book.id, bookName: book.name, assignmentCount: items.length,
+      completedRatio, completedPercent: Math.round(completedRatio * 100),
+      assignments: items.map((item) => ({ id: item.id, pageLabel: item.pageLabel, date: String(item.date), title: formatHomeworkTitle(book.name, item.pageLabel) })),
+      students: rows };
+  });
 }
 
 /**

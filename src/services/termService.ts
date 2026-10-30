@@ -9,7 +9,7 @@ import {
 } from "@/db/schema";
 import { nextSchoolDay, parseDateInput } from "@/lib/dates";
 import { resolveIsHoliday } from "@/types/calendar";
-import { getHolidayOverride } from "@/services/calendarService";
+import { getHolidayOverride, listHolidayOverridesInRange } from "@/services/calendarService";
 import { getClassSettings } from "@/services/classSettingsService";
 
 export type TermView = Pick<
@@ -172,14 +172,18 @@ export async function isActiveTermSchoolDay(date: string): Promise<boolean> {
 /** 依啟用學期的行事曆找下一個上課日（包含補課與放假覆寫）。 */
 export async function nextActiveTermSchoolDay(date: string): Promise<string> {
   parseDateInput(date);
-  if (!(await getActiveTerm())) return nextSchoolDay(date);
+  const term = await getActiveTerm();
+  if (!term) return nextSchoolDay(date);
+  if (date >= term.endsOn) throw new Error("目前學期找不到下一個上課日");
+  const overrides = await listHolidayOverridesInRange(date < term.startsOn ? term.startsOn : date, term.endsOn);
   const cursor = new Date(`${date}T12:00:00+08:00`);
   for (let offset = 1; offset <= 370; offset += 1) {
     cursor.setDate(cursor.getDate() + 1);
     const candidate = cursor.toLocaleDateString("en-CA", {
       timeZone: "Asia/Taipei",
     });
-    if (await isActiveTermSchoolDay(candidate)) return candidate;
+    if (candidate > term.endsOn) break;
+    if (candidate >= term.startsOn && !resolveIsHoliday(candidate, overrides)) return candidate;
   }
   throw new Error("目前學期找不到下一個上課日");
 }
