@@ -14,7 +14,6 @@
 .slip tr { break-inside: avoid; page-break-inside: avoid; }
 .slip .item { text-align: left; }
 .checkColumn { width: 12mm; }
-.dateColumn { width: 23mm; }
 .statusColumn { width: 17mm; }
 .checkbox { display: inline-block; width: 4mm; height: 4mm; border: 1px solid #222; vertical-align: middle; }
 .note { font-size: 9pt; }

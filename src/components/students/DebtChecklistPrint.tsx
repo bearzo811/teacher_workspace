@@ -22,13 +22,12 @@ export function DebtChecklistPrint({ data, studentId }: { data: Checklist; stude
         </div>
         {data.items.length === 0 ? <p className={styles.empty}>目前沒有欠繳項目。</p> : (
           <table>
-            <colgroup><col className={styles.checkColumn} /><col className={styles.dateColumn} /><col /><col className={styles.statusColumn} /></colgroup>
-            <thead><tr><th scope="col">完成</th><th scope="col">聯絡簿日期</th><th scope="col">待完成項目</th><th scope="col">狀態</th></tr></thead>
+            <colgroup><col className={styles.checkColumn} /><col /><col className={styles.statusColumn} /></colgroup>
+            <thead><tr><th scope="col">完成</th><th scope="col">待完成項目</th><th scope="col">狀態</th></tr></thead>
             <tbody>
               {data.items.map((item) => (
                 <tr key={item.key}>
                   <td><span className={styles.checkbox} aria-label="完成勾選格" /></td>
-                  <td>{item.contactBookDate ? item.contactBookDate.slice(5).replace("-", "/") : "—"}</td>
                   <td className={styles.item}>{item.label}{item.note && <span className={styles.note}>（{item.note}）</span>}</td>
                   <td>{item.status === "correction_required" ? "需訂正" : item.category === "作業" ? "未交" : "未完成"}</td>
                 </tr>
