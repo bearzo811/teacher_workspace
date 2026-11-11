@@ -170,35 +170,6 @@ export function HomeworkPageClient() {
     }
   }
 
-  async function handleBatchSetStatus(
-    studentIds: string[],
-    status: "correction_required" | "completed",
-  ) {
-    if (!view || view.items.length === 0) return;
-    setError(null);
-    try {
-      const responses = await Promise.all(
-        studentIds.flatMap((studentId) =>
-          view.items.map(async (item) => {
-            const response = await fetch("/api/homework-record", {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ studentId, homeworkId: item.id, status }),
-            });
-            if (!response.ok) {
-              const json = (await response.json()) as { error?: string };
-              throw new Error(json.error ?? "批次更新失敗");
-            }
-          }),
-        ),
-      );
-      await Promise.all(responses);
-      await load(date);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "批次更新失敗");
-    }
-  }
-
   function applyBookMatrixToggle(
     bookId: string,
     studentId: string,
@@ -543,9 +514,6 @@ export function HomeworkPageClient() {
               }}
               onSetStatus={(studentId, homeworkId, status) => {
                 void handleSetStatus(studentId, homeworkId, status);
-              }}
-              onBatchSetStatus={(studentIds, status) => {
-                void handleBatchSetStatus(studentIds, status);
               }}
               onDeleteItem={(homeworkId) => {
                 void handleDeleteItem(homeworkId);

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -36,10 +35,6 @@ type HomeworkChecklistProps = {
     homeworkId: string,
     status: "unsubmitted" | "pending_confirmation" | "correction_required" | "completed",
   ) => void;
-  onBatchSetStatus?: (
-    studentIds: string[],
-    status: "correction_required" | "completed",
-  ) => void;
   onDeleteItem?: (homeworkId: string) => void;
 };
 
@@ -49,10 +44,8 @@ export function HomeworkChecklist({
   busyKey,
   onToggle,
   onSetStatus,
-  onBatchSetStatus,
   onDeleteItem,
 }: HomeworkChecklistProps) {
-  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   if (items.length === 0) {
     return (
       <Card>
@@ -87,40 +80,22 @@ export function HomeworkChecklist({
             ))}
           </div>
         ) : null}
-        {onBatchSetStatus && selectedStudentIds.length > 0 ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-gray-600">已選 {selectedStudentIds.length} 位</span>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => onBatchSetStatus(selectedStudentIds, "completed")}
-            >
-              批次改已完成
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => onBatchSetStatus(selectedStudentIds, "correction_required")}
-            >
-              批次改未訂正
-            </Button>
-          </div>
-        ) : null}
       </div>
 
       <div className="overflow-auto">
-        <table className="min-w-full border-collapse text-center text-sm">
+        <table
+          className="w-full table-fixed border-collapse text-center text-sm"
+          style={{ minWidth: `${10 + items.length * 8}rem` }}
+        >
+          <colgroup>
+            <col style={{ width: "4rem" }} />
+            <col style={{ width: "6rem" }} />
+            {items.map((item) => <col key={item.id} />)}
+          </colgroup>
           <thead>
             <tr className="bg-gray-50">
               <th className="sticky left-0 z-10 border-b border-r border-gray-200 bg-gray-50 px-3 py-2 font-medium text-gray-600">
-                <input
-                  aria-label="全選學生"
-                  type="checkbox"
-                  checked={students.length > 0 && selectedStudentIds.length === students.length}
-                  onChange={(event) =>
-                    setSelectedStudentIds(event.target.checked ? students.map((student) => student.studentId) : [])
-                  }
-                />
+                座號
               </th>
               <th className="sticky left-16 z-10 border-b border-r border-gray-200 bg-gray-50 px-3 py-2 font-medium text-gray-600">
                 姓名
@@ -128,7 +103,7 @@ export function HomeworkChecklist({
               {items.map((item) => (
                 <th
                   key={item.id}
-                  className="border-b border-gray-200 px-2 py-2 font-medium text-gray-600"
+                  className="break-words border-b border-gray-200 px-2 py-2 font-medium text-gray-600"
                 >
                   {item.title}
                 </th>
@@ -139,21 +114,7 @@ export function HomeworkChecklist({
             {students.map((student) => (
               <tr key={student.studentId} className="hover:bg-gray-50/80">
                 <td className="sticky left-0 z-10 border-b border-r border-gray-100 bg-white px-3 py-1 text-gray-500">
-                  <label className="flex items-center justify-center gap-1">
-                    <input
-                      aria-label={`選取${student.name}`}
-                      type="checkbox"
-                      checked={selectedStudentIds.includes(student.studentId)}
-                      onChange={(event) =>
-                        setSelectedStudentIds((current) =>
-                          event.target.checked
-                            ? [...new Set([...current, student.studentId])]
-                            : current.filter((id) => id !== student.studentId),
-                        )
-                      }
-                    />
-                    {student.seatNumber}
-                  </label>
+                  {student.seatNumber}
                 </td>
                 <td className="sticky left-16 z-10 border-b border-r border-gray-100 bg-white px-3 py-1 font-medium text-gray-900 whitespace-nowrap">
                   {student.name}
