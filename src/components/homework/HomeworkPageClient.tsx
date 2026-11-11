@@ -422,12 +422,16 @@ export function HomeworkPageClient() {
                   );
                 }
                 return (
-                  <div className="mt-4 max-w-full overflow-auto rounded-xl border border-gray-200">
+                  <div className="mt-4 max-w-full overflow-hidden rounded-xl border border-gray-200">
+                    <h3 id={`book-progress-${book.bookId}`} className="p-3 text-sm font-semibold text-gray-900">
+                      {book.bookName}・學生完成進度
+                    </h3>
+                    <div className="overflow-auto">
                     <table
+                      aria-labelledby={`book-progress-${book.bookId}`}
                       className="w-full table-fixed border-collapse text-center text-sm"
                       style={{ minWidth: `${17 + book.assignments.length * 6}rem` }}
                     >
-                      <caption className="p-3 text-left font-semibold text-gray-900">{book.bookName}・學生完成進度</caption>
                       <colgroup>
                         <col style={{ width: "3rem" }} />
                         <col style={{ width: "6rem" }} />
@@ -514,6 +518,7 @@ export function HomeworkPageClient() {
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 );
               })()
