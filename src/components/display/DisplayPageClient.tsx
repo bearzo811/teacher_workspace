@@ -578,7 +578,7 @@ export function DisplayPageClient() {
         ref={contentScrollRef}
         className={cn(
           "flex min-h-0 flex-1 flex-col overscroll-none",
-          needsScroll || displayLayout === "compact" ? "overflow-auto" : "overflow-hidden",
+          panel !== "calendar" && (needsScroll || displayLayout === "compact") ? "overflow-auto" : "overflow-hidden",
         )}
       >
         {panel === "today" ? (
@@ -1710,9 +1710,9 @@ function CalendarOverviewPanel({ data }: { data: DisplayData }) {
   );
 
   return (
-    <section className="grid h-full min-h-0 gap-6 overflow-auto lg:grid-cols-[1.5fr_1fr]">
-      <div className="rounded-2xl border border-slate-700 bg-slate-900/80 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className="grid h-full min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-4 overflow-hidden lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]">
+      <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80 p-5">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-3xl font-semibold">
               {formatMonthTitle(cursor.year, cursor.month)}
@@ -1755,9 +1755,9 @@ function CalendarOverviewPanel({ data }: { data: DisplayData }) {
           </div>
         </div>
         {monthError ? (
-          <p className="mt-2 text-base text-rose-300">{monthError}</p>
+          <p className="mt-2 shrink-0 text-base text-rose-300">{monthError}</p>
         ) : null}
-        <div className="mt-4">
+        <div role="region" aria-label="月份行事曆" tabIndex={0} className="mt-4 min-h-0 flex-1 overflow-auto overscroll-contain">
           <MonthCalendarGrid
             cells={cells}
             today={data.today}
@@ -1766,10 +1766,10 @@ function CalendarOverviewPanel({ data }: { data: DisplayData }) {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-700 bg-slate-900/80 p-5">
-        <h2 className="text-3xl font-semibold">倒數</h2>
-        <p className="mt-1 text-base text-slate-400">今天起未來活動</p>
-        <ul className="mt-4 space-y-3">
+      <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80 p-5">
+        <h2 className="shrink-0 text-3xl font-semibold">倒數</h2>
+        <p className="mt-1 shrink-0 text-base text-slate-400">今天起未來活動</p>
+        <ul aria-label="活動倒數" tabIndex={0} className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1">
           {data.calendarCountdown.length === 0 ? (
             <li className="text-xl text-slate-500">近期沒有活動</li>
           ) : (
@@ -1778,8 +1778,8 @@ function CalendarOverviewPanel({ data }: { data: DisplayData }) {
                 key={item.id}
                 className="rounded-xl border border-slate-600 bg-slate-950/50 px-4 py-3"
               >
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-2xl font-semibold text-stone-50">
+                <div className="flex flex-wrap items-baseline justify-between gap-3">
+                  <p className="min-w-0 break-words text-2xl font-semibold text-stone-50">
                     {item.title}
                   </p>
                   <p className="shrink-0 text-xl font-bold text-amber-300">
