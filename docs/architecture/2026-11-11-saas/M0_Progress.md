@@ -19,7 +19,7 @@
 - Git push 自動觸發目前仍為 disabled；本次為明確指定新版專案及 Git 分支的部署，不代表自動部署已驗收。
 - Google OAuth、應用環境變數與雲端端對端隔離驗收尚未完成。
 - Google Cloud 專案 `Teacher Workspace Pilot`（`spatial-yew-514405-j3`）已獨立建立；使用者已同意以其目前 Google 帳號信箱作為 OAuth 支援聯絡信箱。OAuth 憑證尚未建立，不記錄密鑰於此文件。
-- 使用者已接受 Google 政策並完成 OAuth 初始化。網頁用戶端表單已填妥新版網域與新版 Supabase 回呼 URL，停在建立憑證前，交由使用者建立與保存 Client Secret；尚未啟用 Supabase Google provider。
+- 使用者已接受 Google 政策、建立網頁 OAuth 用戶端並自行保存／填入憑證；新版 Supabase Google provider 已由頁面確認 ENABLED，未讀取或記錄 Client Secret。
 - 完整舊站瀏覽器回歸、跨班授權、登入、裝置配對尚未驗收。
 - 目前僅可預覽開發狀態，不能邀請老師操作真實資料。
 
