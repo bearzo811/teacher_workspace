@@ -1033,7 +1033,11 @@ function DebtsPanel({
             : "grid-cols-5 grid-rows-2 overflow-hidden",
         )}
       >
-          {debts.map((row) => (
+          {debts.map((row) => {
+            const passportCount = row.chinesePassport.length + row.englishPassport.length;
+            const homeworkCount = row.homework.filter((item) => item.status === "unsubmitted" || item.status === "correction_required").length
+              + row.newspaper.length + row.reflection.length;
+            return (
               <article
                 key={row.studentId}
                 className={cn(
@@ -1093,14 +1097,19 @@ function DebtsPanel({
                 ) : (
                   <p className="mt-2 text-sm text-emerald-200">所有需要完成的項目都已完成。</p>
                 )}
-                <div className="mt-auto flex shrink-0 items-baseline justify-between gap-2 border-t border-slate-700 pt-2">
-                  <span className="text-sm text-slate-300" title="包含作業、護照、讀報與閱讀心得">尚待完成</span>
-                  <span className={cn("whitespace-nowrap text-3xl font-bold tabular-nums", row.priorityItems?.length ? "text-amber-200" : "text-emerald-200")}>
-                    {row.priorityItems?.length ?? 0}<span className="ml-1 text-lg">項</span>
-                  </span>
+                <div className="mt-auto grid shrink-0 grid-cols-2 gap-2 border-t border-slate-700 pt-2">
+                  {[{ label: "護照", count: passportCount, title: "國語與英語護照" }, { label: "作業", count: homeworkCount, title: "未交、需訂正作業，以及讀報與閱讀心得" }].map(({ label, count, title }) => (
+                    <div key={label} title={title} className="flex flex-wrap items-baseline justify-between gap-x-1">
+                      <span className="text-sm text-slate-300">{label}</span>
+                      <span className={cn("whitespace-nowrap text-2xl font-bold tabular-nums", count ? "text-amber-200" : "text-emerald-200")}>
+                        {count}<span className="ml-1 text-sm">項</span>
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </article>
-          ))}
+            );
+          })}
       </div>
     </section>
   );
