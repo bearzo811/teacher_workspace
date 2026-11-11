@@ -1,17 +1,18 @@
 # 邀請試用版：獨立應用
 
-目前只完成 M0 的本機應用邊界，尚未完成雲端隔離驗收，不可邀請老師使用。
+M0 獨立雲端入口已部署；M1 第一段的登入／邀請程式已建立，尚待新版環境變數、資料庫 migration 與真實 Google 登入驗收，不可邀請老師使用。
 
 在專案根目錄先安裝既有依賴，再執行 `npm --prefix pilot run dev`，開啟 http://localhost:3010 。Next 的專案根目錄為 pilot，因此不讀取上一層的 `.env.local`。不要將舊站的環境檔複製進來。
 
 ## 部署界線
 
 - 新建 Vercel 專案，Root Directory 指定 `pilot`。不要修改舊 Vercel 專案的 Root Directory、網域、環境變數或分支設定。
-- 新專案尚未建立；本輪不部署舊專案，也不執行任何資料庫指令。
-- 本應用沒有資料庫程式，也不載入 `../src`。禁止匯入舊站服務以暫時接通功能。
+- 新專案已建立，Production 分支為 `codex/saas-pilot-foundation`。部署不得使用根目錄的舊 `.vercel` 綁定。
+- 本應用只透過新版 Supabase SDK 驗證登入／邀請，不載入 `../src`。禁止匯入舊站服務以暫時接通功能。
 - 本機依賴可由父目錄解析；雲端部署前須確認本目錄的獨立 lockfile 已提交。
 - `vercel.json` 沒有 Cron；舊站的扣點排程不得複製到新版。
-- M1 才加入新版專用的資料庫、Google OAuth、邀請、班級設定與獨立 cookie；所有新憑證均不可沿用舊站。
+- 新版使用獨立 `teacher-pilot-auth` cookie，伺服器驗證使用者且禁止共用快取；環境檢查只接受新版 Supabase URL 與 publishable key，不能將舊站或高權限 key 當成替代品。
+- OAuth 與邀請部署步驟、驗收限制見 [supabase/README.md](supabase/README.md)。班級設定與舊業務模組尚未接入。
 
 ## 舊站回歸基準
 
