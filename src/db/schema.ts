@@ -3,6 +3,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -10,6 +11,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { DisplayPanelKey } from "@/lib/displayPanels";
 
 export const passportTypeEnum = pgEnum("passport_type", ["Chinese", "English"]);
 
@@ -370,6 +372,8 @@ export const classSettings = pgTable("class_settings", {
   displayFontScale: text("display_font_scale").notNull().default("medium"),
   /** 大屏整體基準字級（px） */
   displayFontSize: integer("display_font_size").notNull().default(16),
+  /** 大屏隱藏分頁；空陣列代表全部顯示。 */
+  displayHiddenPanels: jsonb("display_hidden_panels").$type<DisplayPanelKey[]>().notNull().default([]),
   /** 大屏聯絡簿顯示日（空白＝跟系統今天） */
   displayContactBookDate: text("display_contact_book_date")
     .notNull()

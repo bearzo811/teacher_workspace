@@ -1,4 +1,5 @@
 -- 正式站 DB 若停在舊 schema，在 Supabase SQL Editor 執行此檔（可重複執行）
+ALTER TABLE "class_settings" ADD COLUMN IF NOT EXISTS "display_hidden_panels" jsonb DEFAULT '[]'::jsonb NOT NULL;
 ALTER TABLE "class_settings" ADD COLUMN IF NOT EXISTS "allow_display_homework_toggle" boolean DEFAULT false NOT NULL;
 ALTER TABLE "class_settings" ADD COLUMN IF NOT EXISTS "allow_display_passport_toggle" boolean DEFAULT false NOT NULL;
 ALTER TABLE "class_settings" ADD COLUMN IF NOT EXISTS "display_carousel_enabled" boolean DEFAULT false NOT NULL;

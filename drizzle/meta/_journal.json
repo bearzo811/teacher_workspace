@@ -246,6 +246,13 @@
       "when": 1791244800001,
       "tag": "0034_student_debt_visibility",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1794355200000,
+      "tag": "0035_display_hidden_panels",
+      "breakpoints": true
     }
   ]
 }

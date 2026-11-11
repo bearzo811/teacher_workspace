@@ -508,6 +508,7 @@ async function buildDisplayData(options: {
       })),
     })),
     displaySettings: {
+      hiddenPanels: settings.displayHiddenPanels,
       allowStudentHomeworkToggle: settings.allowDisplayHomeworkToggle,
       allowStudentPassportToggle: settings.allowDisplayPassportToggle,
       allowStudentRoutineToggle: settings.allowDisplayRoutineToggle,

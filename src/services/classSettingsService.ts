@@ -8,6 +8,7 @@ import {
   type SchoolWeekState,
 } from "@/lib/schoolWeek";
 import { hashSecret, matchesSecret } from "@/lib/auth";
+import { isDisplayHiddenPanels, type DisplayPanelKey } from "@/lib/displayPanels";
 
 const DEFAULT_SETTINGS = {
   schoolYear: "114",
@@ -162,6 +163,7 @@ export type ClassSettingsUpdate = Partial<{
   displayRefreshSeconds: number;
   displayFontScale: "small" | "medium" | "large";
   displayFontSize: number;
+  displayHiddenPanels: DisplayPanelKey[];
   displayContactBookDate: string;
   shopOpen: boolean;
   lunchVideoQuery: string;
@@ -172,6 +174,9 @@ export async function updateClassSettings(
 ): Promise<ClassSettingsView> {
   const current = await getClassSettings();
   const { displayToken, ...rest } = patch;
+  if (rest.displayHiddenPanels !== undefined && !isDisplayHiddenPanels(rest.displayHiddenPanels)) {
+    throw new Error("大屏分頁設定格式不正確");
+  }
   if (rest.displayFontScale !== undefined && !["small", "medium", "large"].includes(rest.displayFontScale)) {
     throw new Error("大屏字體大小無效");
   }

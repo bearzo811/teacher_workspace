@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiErrorMessage } from "@/lib/apiError";
+import { isDisplayHiddenPanels, type DisplayPanelKey } from "@/lib/displayPanels";
 import { SCHOOL_WEEK_MAX, SCHOOL_WEEK_MIN } from "@/lib/schoolWeek";
 import {
   getClassSettings,
@@ -56,6 +57,7 @@ export async function PATCH(request: Request) {
       displayRefreshSeconds?: number;
       displayFontScale?: "small" | "medium" | "large";
       displayFontSize?: number;
+      displayHiddenPanels?: DisplayPanelKey[];
       displayContactBookDate?: string;
       shopOpen?: boolean;
       lunchVideoQuery?: string;
@@ -72,6 +74,9 @@ export async function PATCH(request: Request) {
         { error: `目前週數須為 ${SCHOOL_WEEK_MIN}～${SCHOOL_WEEK_MAX}` },
         { status: 400 },
       );
+    }
+    if (body.displayHiddenPanels !== undefined && !isDisplayHiddenPanels(body.displayHiddenPanels)) {
+      return NextResponse.json({ error: "大屏分頁設定格式不正確" }, { status: 400 });
     }
     if (body.displayFontScale !== undefined && !["small", "medium", "large"].includes(body.displayFontScale)) {
       return NextResponse.json({ error: "大屏字體大小無效" }, { status: 400 });

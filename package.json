@@ -16,6 +16,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:migrate:production": "vercel env run --environment=production -- drizzle-kit migrate",
     "db:ensure-class-settings:production": "vercel env run --environment=production -- tsx scripts/ensure-class-settings-columns.ts",
+    "db:ensure-display-panels:production": "vercel env run --environment=production -- tsx scripts/ensure-display-panels.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:reset-keep-students": "tsx scripts/reset-data-keep-students.ts",

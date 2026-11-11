@@ -16,6 +16,7 @@ import {
   monthDateRange,
 } from "@/lib/dates";
 import { cn } from "@/lib/utils";
+import { DISPLAY_PANEL_LABEL as PANEL_LABEL, visibleDisplayPanels, resolveDisplayPanel, type DisplayPanelKey as PanelKey } from "@/lib/displayPanels";
 import { MonthCalendarGrid } from "@/components/calendar/MonthCalendarGrid";
 import { buildMonthGrid } from "@/lib/calendarMonth";
 import type {
@@ -97,25 +98,6 @@ function updateHomeworkStatus(
   };
 }
 
-type PanelKey =
-  "today" | "passport" | "lunch" | "student" | "debts" | "calendar";
-
-const PANEL_ORDER: PanelKey[] = [
-  "today",
-  "passport",
-  "lunch",
-  "student",
-  "debts",
-  "calendar",
-];
-const PANEL_LABEL: Record<PanelKey, string> = {
-  today: "聯絡簿",
-  passport: "護照與閱讀",
-  lunch: "午餐",
-  student: "學生資訊",
-  debts: "欠繳作業",
-  calendar: "行事曆",
-};
 const SEAT_IDLE_MS = 30_000;
 const CAROUSEL_MS = 60_000;
 
@@ -148,7 +130,7 @@ export function DisplayPageClient() {
   );
   const [data, setData] = useState<DisplayData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [panel, setPanel] = useState<PanelKey>("today");
+  const [selectedPanel, setPanel] = useState<PanelKey>("today");
   const [studentView, setStudentView] = useState<"overview" | "shop" | "backpack">("overview");
   const [backpackStudentId, setBackpackStudentId] = useState<string | null>(null);
   const [progressPanel, setProgressPanel] = useState<"passport" | "reading">(
@@ -165,6 +147,16 @@ export function DisplayPageClient() {
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const displayVersionRef = useRef("");
   const contentScrollRef = useRef<HTMLDivElement>(null);
+  const visiblePanels = useMemo(() => visibleDisplayPanels(data?.displaySettings.hiddenPanels), [data?.displaySettings.hiddenPanels]);
+  // 儲存設定後立即停止呈現隱藏分頁，不等下一次點擊或輪播。
+  const panel = resolveDisplayPanel(selectedPanel, visiblePanels);
+
+  useEffect(() => {
+    if (!data || selectedPanel === panel) return;
+    if (panel) setPanel(panel);
+    setActiveStudentId(null);
+    setStudentView("overview");
+  }, [data, selectedPanel, panel]);
 
   const displayLayout = getDisplayLayout(viewport.width, viewport.height, viewport.devicePixelRatio);
   const configuredFontSize = data?.displaySettings.fontSize ?? 16;
@@ -245,15 +237,15 @@ export function DisplayPageClient() {
   }, [displaySyncInterval, checkDisplayVersion]);
 
   useEffect(() => {
-    if (!data?.displaySettings.carouselEnabled || activeStudentId) return;
+    if (!data?.displaySettings.carouselEnabled || activeStudentId || visiblePanels.length < 2) return;
     const id = setInterval(() => {
       setPanel((prev) => {
-        const index = PANEL_ORDER.indexOf(prev);
-        return PANEL_ORDER[(index + 1) % PANEL_ORDER.length];
+        const index = visiblePanels.indexOf(prev);
+        return visiblePanels[(index + 1) % visiblePanels.length];
       });
     }, CAROUSEL_MS);
     return () => clearInterval(id);
-  }, [activeStudentId, data?.displaySettings.carouselEnabled]);
+  }, [activeStudentId, data?.displaySettings.carouselEnabled, visiblePanels]);
 
   function bumpIdle() {
     if (idleTimer.current) clearTimeout(idleTimer.current);
@@ -273,7 +265,7 @@ export function DisplayPageClient() {
     }
     setActiveStudentId(studentId);
     bumpIdle();
-    setPanel((prev) => (prev === "passport" || prev === "student" || prev === "lunch" ? prev : "today"));
+    setPanel((prev) => resolveDisplayPanel(prev === "passport" || prev === "student" || prev === "lunch" ? prev : "today", visiblePanels) ?? prev);
   }
 
   const activePersonal = useMemo(
@@ -522,7 +514,7 @@ export function DisplayPageClient() {
   }
 
   const showSeatPicker = Boolean(
-    data &&
+    data && panel &&
     panel !== "calendar" && panel !== "lunch" && panel !== "debts" &&
     !(panel === "student" && studentView === "overview") &&
     data.students.length > 0,
@@ -581,6 +573,7 @@ export function DisplayPageClient() {
           panel !== "calendar" && (needsScroll || displayLayout === "compact") ? "overflow-auto" : "overflow-hidden",
         )}
       >
+        {panel === null && <div className="flex min-h-0 flex-1 items-center justify-center text-2xl text-slate-300">目前沒有開放的分頁</div>}
         {panel === "today" ? (
           <TodayPanel
             data={data}
@@ -731,13 +724,13 @@ export function DisplayPageClient() {
         ) : null}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-700 bg-slate-950/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_30px_rgba(0,0,0,0.35)] backdrop-blur">
+      <div className={cn("fixed inset-x-0 bottom-0 z-20 border-t border-slate-700 bg-slate-950/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_30px_rgba(0,0,0,0.35)] backdrop-blur", visiblePanels.length === 0 && "hidden")}>
         <div className="mx-auto flex w-full items-end gap-3">
           <nav
             className="flex shrink-0 gap-2 overflow-x-auto"
             aria-label="大屏頁面"
           >
-            {PANEL_ORDER.map((key) => (
+            {visiblePanels.map((key) => (
               <button
                 key={key}
                 type="button"

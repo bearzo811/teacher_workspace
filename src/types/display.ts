@@ -10,6 +10,7 @@ import type {
 import type { PassportStatus } from "@/types/passport";
 import type { ReadingMatrixView } from "@/types/reading";
 import type { GamificationView } from "@/types/gamification";
+import type { DisplayPanelKey } from "@/lib/displayPanels";
 
 export type DisplayPersonalRow = {
   studentId: string;
@@ -157,6 +158,7 @@ export type DisplayData = {
   };
   backpacks: DisplayBackpackRow[];
   displaySettings: {
+    hiddenPanels: DisplayPanelKey[];
     allowStudentHomeworkToggle: boolean;
     allowStudentPassportToggle: boolean;
     allowStudentRoutineToggle: boolean;

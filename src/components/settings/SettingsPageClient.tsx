@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { TermManagerCard } from "@/components/calendar/TermManagerCard";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { DISPLAY_PANEL_ORDER, DISPLAY_PANEL_LABEL, type DisplayPanelKey } from "@/lib/displayPanels";
 
 type SettingsForm = {
   schoolYear: string;
@@ -19,6 +20,7 @@ type SettingsForm = {
   allowDisplayReadingToggle: boolean;
   displayCarouselEnabled: boolean;
   displayFontSize: string;
+  displayHiddenPanels: DisplayPanelKey[];
   displayRefreshSeconds: string;
   homeworkOnTimeCoins: string;
   homeworkLateCoins: string;
@@ -65,6 +67,7 @@ const emptyForm: SettingsForm = {
   allowDisplayReadingToggle: false,
   displayCarouselEnabled: false,
   displayFontSize: "16",
+  displayHiddenPanels: [],
   displayRefreshSeconds: "20",
   homeworkOnTimeCoins: "2",
   homeworkLateCoins: "1",
@@ -117,6 +120,7 @@ export function SettingsPageClient() {
           allowDisplayReadingToggle: boolean;
           displayCarouselEnabled: boolean;
           displayFontSize: number;
+          displayHiddenPanels: DisplayPanelKey[];
           displayRefreshSeconds: number;
           gamification: {
             homeworkOnTimeCoins: number;
@@ -166,6 +170,7 @@ export function SettingsPageClient() {
         allowDisplayReadingToggle: data.allowDisplayReadingToggle ?? false,
         displayCarouselEnabled: data.displayCarouselEnabled,
         displayFontSize: String(data.displayFontSize ?? 16),
+        displayHiddenPanels: data.displayHiddenPanels ?? [],
         displayRefreshSeconds: String(data.displayRefreshSeconds ?? 20),
         homeworkOnTimeCoins: String(data.gamification.homeworkOnTimeCoins),
         homeworkLateCoins: String(data.gamification.homeworkLateCoins),
@@ -301,6 +306,7 @@ export function SettingsPageClient() {
           allowDisplayReadingToggle: form.allowDisplayReadingToggle,
           displayCarouselEnabled: form.displayCarouselEnabled,
           displayFontSize,
+          displayHiddenPanels: form.displayHiddenPanels,
           displayRefreshSeconds,
           gamification: gameNumbers,
         }),
@@ -498,6 +504,16 @@ export function SettingsPageClient() {
 
       <Card>
         <CardTitle>教室大屏</CardTitle>
+        <fieldset className="my-4 rounded-xl border border-gray-200 p-4">
+          <legend className="px-1 font-semibold text-gray-900">底部分頁顯示</legend>
+          <p className="mb-3 text-sm text-gray-500">勾選要顯示的分頁，儲存後大屏會同步更新。隱藏分頁不會出現在自動輪播中。</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {DISPLAY_PANEL_ORDER.map((key) => (
+              <Toggle key={key} label={DISPLAY_PANEL_LABEL[key]} checked={!form.displayHiddenPanels.includes(key)} onChange={(show) => updateField("displayHiddenPanels", show ? form.displayHiddenPanels.filter((item) => item !== key) : [...form.displayHiddenPanels, key])} />
+            ))}
+          </div>
+          {form.displayHiddenPanels.length === DISPLAY_PANEL_ORDER.length && <p className="mt-3 text-sm text-amber-700">全部隱藏時，大屏會顯示「目前沒有開放的分頁」。</p>}
+        </fieldset>
         <CardDescription>
           教室電腦開{" "}
           <a
