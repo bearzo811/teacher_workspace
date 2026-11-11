@@ -361,7 +361,7 @@ export function HomeworkPageClient() {
         <Card>
           <CardTitle>簿本進度</CardTitle>
           <CardDescription>
-            點簿本展開矩陣（橫＝指派作業、縱＝學生）；進度以份數計算
+            點簿本查看每位學生的完成率與作業明細；完成率＝已完成份數／已指派份數，待確認與未訂正不算完成。
           </CardDescription>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {bookProgress.map((book) => {
@@ -370,6 +370,7 @@ export function HomeworkPageClient() {
                 <button
                   key={book.bookId}
                   type="button"
+                  aria-expanded={expanded}
                   onClick={() =>
                     setExpandedBookId((prev) =>
                       prev === book.bookId ? null : book.bookId,
@@ -421,15 +422,19 @@ export function HomeworkPageClient() {
                   );
                 }
                 return (
-                  <div className="mt-4 overflow-auto rounded-xl border border-gray-200">
+                  <div className="mt-4 max-w-full overflow-auto rounded-xl border border-gray-200">
                     <table className="min-w-full border-collapse text-center text-sm">
+                      <caption className="p-3 text-left font-semibold text-gray-900">{book.bookName}・學生完成進度</caption>
                       <thead>
                         <tr className="bg-gray-50">
-                          <th className="sticky left-0 z-10 border-b border-r border-gray-200 bg-gray-50 px-2 py-2">
+                          <th scope="col" className="sticky left-0 z-10 w-12 min-w-12 border-b border-r border-gray-200 bg-gray-50 px-2 py-2 whitespace-nowrap">
                             座號
                           </th>
-                          <th className="sticky left-12 z-10 border-b border-r border-gray-200 bg-gray-50 px-2 py-2 text-left">
+                          <th scope="col" className="sticky left-12 z-10 w-24 min-w-24 border-b border-r border-gray-200 bg-gray-50 px-2 py-2 text-left whitespace-nowrap">
                             姓名
+                          </th>
+                          <th scope="col" className="min-w-32 border-b border-r border-gray-200 bg-blue-50 px-3 py-2 text-blue-900">
+                            完成率
                           </th>
                           {book.assignments.map((item) => (
                             <th
@@ -451,11 +456,20 @@ export function HomeworkPageClient() {
                             key={student.studentId}
                             className="border-t border-gray-100"
                           >
-                            <td className="sticky left-0 z-10 bg-white px-2 py-1 font-medium">
+                            <td className="sticky left-0 z-10 w-12 min-w-12 bg-white px-2 py-1 font-medium">
                               {student.seatNumber}
                             </td>
-                            <td className="sticky left-12 z-10 bg-white px-2 py-1 text-left">
+                            <td className="sticky left-12 z-10 w-24 min-w-24 bg-white px-2 py-1 text-left whitespace-nowrap">
                               {student.name}
+                            </td>
+                            <td className="min-w-32 border-r border-gray-200 bg-blue-50/50 px-3 py-2">
+                              <div className="flex items-baseline justify-between gap-2 whitespace-nowrap">
+                                <span className="font-bold tabular-nums text-blue-700">{student.completedPercent}%</span>
+                                <span className="text-xs tabular-nums text-gray-600">{student.completedCount}／{student.totalCount} 份</span>
+                              </div>
+                              <div role="progressbar" aria-label={`${student.name} ${book.bookName}完成率`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={student.completedPercent} className="mt-1 h-1.5 overflow-hidden rounded-full bg-gray-200">
+                                <div className="h-full rounded-full bg-blue-500" style={{ width: `${student.completedPercent}%` }} />
+                              </div>
                             </td>
                             {student.cells.map((cell) => {
                               const key = `book:${student.studentId}:${cell.homeworkId}`;
