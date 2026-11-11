@@ -1515,8 +1515,19 @@ function LunchPanel({
                 <p className="text-lg text-slate-400">今天放假，無午餐工作</p>
               ) : (
                 <div className="grid h-full min-h-0 grid-cols-3 grid-rows-3 gap-2">
-                  {duties.map((slot) => (
-                    <article key={slot.slotKey} className="flex min-h-0 min-w-0 flex-col justify-center overflow-y-auto break-words rounded-xl border border-slate-600/80 bg-slate-900/90 px-3 py-2">
+                  {duties.map((slot) => {
+                    const student = rows.find((row) => row.seatNumber === slot.seatNumber);
+                    // 只淡淡填入綠色，保留白字與工作黃字在深底上的對比。
+                    const completedFill = "rgba(167, 243, 208, 0.16)";
+                    const topFill = student?.lunchBrushing ? completedFill : "transparent";
+                    const bottomFill = student?.noonCleaning ? completedFill : "transparent";
+                    return (
+                    <article
+                      key={slot.slotKey}
+                      aria-label={`${slot.name}的午餐工作：刷牙${student?.lunchBrushing ? "已完成" : "未完成"}、中午打掃${student?.noonCleaning ? "已完成" : "未完成"}`}
+                      style={{ backgroundImage: `linear-gradient(to bottom, ${topFill} 0%, ${topFill} 50%, ${bottomFill} 50%, ${bottomFill} 100%)` }}
+                      className="flex min-h-0 min-w-0 flex-col justify-center overflow-y-auto break-words rounded-xl border border-slate-600/80 bg-slate-900/90 px-3 py-2"
+                    >
                       <p className="text-2xl font-bold leading-tight text-slate-50">{slot.name}</p>
                       <p className="mt-2 text-3xl font-bold leading-snug text-amber-200">
                         {displayDutyLabel(slot.label).split("・").map((task, index) => (
@@ -1524,7 +1535,8 @@ function LunchPanel({
                         ))}
                       </p>
                     </article>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
           </div>
