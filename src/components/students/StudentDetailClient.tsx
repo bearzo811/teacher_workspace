@@ -65,12 +65,17 @@ export function StudentDetailClient({ studentId }: StudentDetailClientProps) {
           <h1 className="text-2xl font-semibold text-gray-900">學生詳細</h1>
           <p className="mt-1 text-sm text-gray-500">護照與作業進度總覽</p>
         </div>
+        <div className="flex flex-wrap gap-2">
+        <Link href={`/students/${studentId}/debt-print`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>
+          列印欠繳清單
+        </Link>
         <Link
           href="/students"
           className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
         >
           回列表
         </Link>
+        </div>
       </header>
       <DebtOrderEditor key={studentId} studentId={studentId} />
 

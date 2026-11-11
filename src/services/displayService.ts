@@ -50,7 +50,7 @@ const displayCache = new Map<
   { version: string; expiresAt: number; data: DisplayData }
 >();
 
-function passportDebts(
+export function passportDebts(
   matrix: PassportMatrixView,
   studentId: string,
 ): DisplayDebtItem[] {
@@ -66,7 +66,7 @@ function passportDebts(
     }));
 }
 
-function readingDebts(
+export function readingDebts(
   matrix: ReadingMatrixView,
   studentId: string,
   asOfMonth: number,

@@ -39,7 +39,7 @@ export function StudentList({
           return (
             <li
               key={student.id}
-              className="flex items-center justify-between gap-3 px-5 py-3"
+              className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
             >
               <Link
                 href={`/students/${student.id}`}
@@ -53,6 +53,9 @@ export function StudentList({
                 </p>
               </Link>
               <div className="flex shrink-0 gap-2">
+                <Link href={`/students/${student.id}/debt-print`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                  列印欠繳清單
+                </Link>
                 <Button
                   variant="secondary"
                   size="sm"

@@ -68,6 +68,7 @@ export type HomeworkDashboardSummary = {
 export type StudentHomeworkStatusItem = {
   id: string;
   dueDate: string;
+  contactBookDate: string | null;
   label: string;
   status: "unsubmitted" | "pending_confirmation" | "correction_required" | "completed";
   blocksRecess: boolean;
@@ -409,6 +410,7 @@ export async function listStudentHomeworkDebts(
         blocksRecess: homework.blocksRecess,
         blocksShop: homework.blocksShop,
         date: homework.date,
+        contactBookDate: homework.contactBookDate,
       })
       .from(homework)
       .innerJoin(homeworkBooks, eq(homework.bookId, homeworkBooks.id))
@@ -450,6 +452,7 @@ export async function listStudentHomeworkDebts(
       assignments.push({
         id: item.id,
         dueDate: item.date,
+        contactBookDate: item.contactBookDate,
         label: formatHomeworkTitle(item.bookName, item.pageLabel),
         status: statusMap.get(`${student.studentId}:${item.id}`) ?? "unsubmitted",
         blocksRecess: item.blocksRecess,
