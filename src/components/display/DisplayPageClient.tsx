@@ -1517,8 +1517,8 @@ function LunchPanel({
                 <div className="grid h-full min-h-0 grid-cols-3 grid-rows-3 gap-2">
                   {duties.map((slot) => {
                     const student = rows.find((row) => row.seatNumber === slot.seatNumber);
-                    // 只淡淡填入綠色，保留白字與工作黃字在深底上的對比。
-                    const completedFill = "rgba(167, 243, 208, 0.16)";
+                    // 加強綠色辨識度，仍保留白字與工作黃字的對比。
+                    const completedFill = "rgba(52, 211, 153, 0.36)";
                     const topFill = student?.lunchBrushing ? completedFill : "transparent";
                     const bottomFill = student?.noonCleaning ? completedFill : "transparent";
                     return (
