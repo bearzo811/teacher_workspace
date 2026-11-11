@@ -423,8 +423,17 @@ export function HomeworkPageClient() {
                 }
                 return (
                   <div className="mt-4 max-w-full overflow-auto rounded-xl border border-gray-200">
-                    <table className="min-w-full border-collapse text-center text-sm">
+                    <table
+                      className="w-full table-fixed border-collapse text-center text-sm"
+                      style={{ minWidth: `${17 + book.assignments.length * 6}rem` }}
+                    >
                       <caption className="p-3 text-left font-semibold text-gray-900">{book.bookName}・學生完成進度</caption>
+                      <colgroup>
+                        <col style={{ width: "3rem" }} />
+                        <col style={{ width: "6rem" }} />
+                        <col style={{ width: "8rem" }} />
+                        {book.assignments.map((item) => <col key={item.id} />)}
+                      </colgroup>
                       <thead>
                         <tr className="bg-gray-50">
                           <th scope="col" className="sticky left-0 z-10 w-12 min-w-12 border-b border-r border-gray-200 bg-gray-50 px-2 py-2 whitespace-nowrap">
@@ -433,13 +442,13 @@ export function HomeworkPageClient() {
                           <th scope="col" className="sticky left-12 z-10 w-24 min-w-24 border-b border-r border-gray-200 bg-gray-50 px-2 py-2 text-left whitespace-nowrap">
                             姓名
                           </th>
-                          <th scope="col" className="min-w-32 border-b border-r border-gray-200 bg-blue-50 px-3 py-2 text-blue-900">
+                          <th scope="col" className="sticky left-36 z-10 min-w-32 border-b border-r border-gray-200 bg-blue-50 px-3 py-2 text-blue-900">
                             完成率
                           </th>
                           {book.assignments.map((item) => (
                             <th
                               key={item.id}
-                              className="border-b border-gray-200 px-2 py-2 font-medium text-gray-700"
+                              className="break-words border-b border-gray-200 px-2 py-2 font-medium text-gray-700"
                               title={`${item.date} · ${item.title}`}
                             >
                               <div>{item.pageLabel}</div>
@@ -462,7 +471,7 @@ export function HomeworkPageClient() {
                             <td className="sticky left-12 z-10 w-24 min-w-24 bg-white px-2 py-1 text-left whitespace-nowrap">
                               {student.name}
                             </td>
-                            <td className="min-w-32 border-r border-gray-200 bg-blue-50/50 px-3 py-2">
+                            <td className="sticky left-36 z-10 min-w-32 border-r border-gray-200 bg-blue-50 px-3 py-2">
                               <div className="flex items-baseline justify-between gap-2 whitespace-nowrap">
                                 <span className="font-bold tabular-nums text-blue-700">{student.completedPercent}%</span>
                                 <span className="text-xs tabular-nums text-gray-600">{student.completedCount}／{student.totalCount} 份</span>
