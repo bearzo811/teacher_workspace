@@ -1070,8 +1070,23 @@ function DebtsPanel({
                         {row.priorityItems[0].status === "correction_required" && <p className="mt-1 text-sm text-orange-200">請訂正後再交</p>}
                       </div>
                     )}
+                    {(row.priorityItems ?? []).length > 1 && (
+                      <ol aria-label="接下來兩項欠繳作業" start={2} className="mb-1 space-y-1">
+                        {(row.priorityItems ?? []).slice(1, 3).map((item, index) => (
+                          <li key={`${index}-${item.label}`} className="flex items-start gap-2 rounded-lg border border-sky-300/20 bg-sky-400/10 px-2 py-1.5">
+                            <span className="shrink-0 text-sm font-semibold text-sky-200/80">{index + 2}.</span>
+                            <div className="min-w-0">
+                              <p className="break-words text-base font-medium leading-snug text-slate-200">{item.label}</p>
+                              {(item.status === "correction_required" || item.note) && (
+                                <p className="text-xs text-orange-200">{item.status === "correction_required" ? "請訂正後再交" : item.note}</p>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
+                    )}
                     {row.showOtherItems !== false && <>
-                      <DebtGroup label="接下來完成" items={(row.priorityItems ?? []).slice(1).map((item, index) => ({ ...item, label: `${index + 2}. ${item.label}`, note: item.status === "correction_required" ? "需訂正" : item.note }))} />
+                      <DebtGroup label="其他待完成" items={(row.priorityItems ?? []).slice(3).map((item, index) => ({ ...item, label: `${index + 4}. ${item.label}`, note: item.status === "correction_required" ? "需訂正" : item.note }))} />
                       <HomeworkStatusGroups items={row.homework.filter((item) => item.status === "pending_confirmation")} />
                     </>}
                   </div>
