@@ -396,7 +396,7 @@ export function ContactBookPageClient() {
 
           {showManageBooks && (
             <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-              <p className="mb-3 text-sm text-gray-600">停用後不再出現在新增作業選單，既有作業與學生紀錄仍保留；可隨時重新啟用。沒有作業或課程計劃紀錄的簿本才可永久刪除。</p>
+              <p className="mb-3 text-sm text-gray-600">停用後不再出現在新增作業選單與欠繳清單，也不限制下課、購物或新增未交扣點。既有作業與學生紀錄仍保留，可隨時重新啟用並恢復追蹤。沒有作業或課程計劃紀錄的簿本才可永久刪除。</p>
               <ul className="space-y-2">
                 {allBooks.map((book) => (
                   <li key={book.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-white p-3">

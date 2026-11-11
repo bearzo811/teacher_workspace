@@ -412,7 +412,7 @@ export async function listStudentHomeworkDebts(
       })
       .from(homework)
       .innerJoin(homeworkBooks, eq(homework.bookId, homeworkBooks.id))
-      .where(lte(homework.date, day))
+      .where(and(lte(homework.date, day), eq(homeworkBooks.isActive, true)))
       .orderBy(asc(homework.date), asc(homework.createdAt)),
     db
       .select({ studentId: students.id })

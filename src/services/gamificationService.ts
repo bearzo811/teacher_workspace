@@ -5,6 +5,7 @@ import {
   gamificationLedger,
   gamificationSettings,
   homework,
+  homeworkBooks,
   homeworkRecords,
   passportRecords,
   studentGameProfiles,
@@ -572,7 +573,8 @@ async function settleHomeworkPenalties(
     db
       .select({ id: homework.id, dueDate: homework.date })
       .from(homework)
-      .where(and(gte(homework.date, enabledDate), lt(homework.date, today))),
+      .innerJoin(homeworkBooks, eq(homework.bookId, homeworkBooks.id))
+      .where(and(gte(homework.date, enabledDate), lt(homework.date, today), eq(homeworkBooks.isActive, true))),
     db
       .select({ studentId: students.id })
       .from(students)

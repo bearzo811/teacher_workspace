@@ -1,5 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
+import { touchDisplayVersion } from "@/services/classSettingsService";
 import { homeworkBooks, homeworkSubjects, homework, coursePlanAssignments, type HomeworkBook } from "@/db/schema";
 
 export async function deleteHomeworkBook(id: string): Promise<void> {
@@ -120,5 +121,6 @@ export async function updateHomeworkBook(input: {
     .set(patch)
     .where(eq(homeworkBooks.id, input.id))
     .returning();
+  await touchDisplayVersion();
   return toView(row);
 }
