@@ -6,7 +6,7 @@
 
 - `pilot/` 獨立 Next.js 應用根目錄、設定與套件資訊，預設 port 3010。
 - 不匯入舊站服務，不讀取上一層的環境檔；無資料庫連線或寫入 API。
-- 獨立 Vercel 設定不包含 Cron，尚未綁定或部署雲端專案。
+- 獨立 Vercel 設定不包含 Cron；雲端建立與部署驗證結果如下。
 - 原站 TypeScript 排除新版目錄，保留原站路由與功能。
 - 新版 production build 成功；原站 TypeScript 檢查通過；6 個測試檔共 23 項測試通過，未執行有資料庫寫入的整合測試。
 
@@ -18,6 +18,8 @@
 - 開發入口部署 `dpl_9AxV534or1rYiqPWmULMzqprrp5U` 為 Ready，東京執行區域；瀏覽器確認 https://teacher-workspace-pilot.vercel.app 可開啟且無資料庫功能。Vercel 既有部署保護保留。
 - Git push 自動觸發目前仍為 disabled；本次為明確指定新版專案及 Git 分支的部署，不代表自動部署已驗收。
 - Google OAuth、應用環境變數與雲端端對端隔離驗收尚未完成。
+- Google Cloud 專案 `Teacher Workspace Pilot`（`spatial-yew-514405-j3`）已獨立建立；使用者已同意以其目前 Google 帳號信箱作為 OAuth 支援聯絡信箱。OAuth 憑證尚未建立，不記錄密鑰於此文件。
+- OAuth 初始化表單已填寫應用名稱、支援／通知信箱與外部測試模式；停在 Google 使用者資料政策同意步驟，等待使用者接受，尚未提交建立品牌。
 - 完整舊站瀏覽器回歸、跨班授權、登入、裝置配對尚未驗收。
 - 目前僅可預覽開發狀態，不能邀請老師操作真實資料。
 
