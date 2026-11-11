@@ -15,6 +15,10 @@
 
 # next.js
 /.next/
+/pilot/.next/
+/pilot/node_modules/
+/pilot/.vercel/
+/pilot/next-env.d.ts
 /out/
 
 # production
