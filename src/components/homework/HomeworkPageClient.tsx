@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { HomeworkChecklist } from "@/components/homework/HomeworkChecklist";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { ProgressBar } from "@/components/passport/ProgressBar";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { todayDateString } from "@/lib/dates";
@@ -499,11 +498,6 @@ export function HomeworkPageClient() {
 
       {view ? (
         <>
-          <ProgressBar
-            completed={view.completedStudentCount}
-            total={view.totalStudentCount}
-          />
-
           <div className="grid gap-4 lg:grid-cols-[1fr_240px]">
             <HomeworkChecklist
               items={view.items}
