@@ -13,8 +13,10 @@
 ## 尚未完成／不可以宣稱已通過
 
 - Supabase `teacher-workspace-pilot`（`yqogdgvkeghyuibydqhw`）已由使用者建立，頁面顯示 Healthy，東京區域。
-- Vercel `teacher-workspace-pilot` 已建立，Root Directory=`pilot`、Next.js、Node 24.x；未部署、未接入資料庫。
-- Vercel CLI 連接 GitHub repository 回報無存取權，需由使用者登入 Vercel 網頁後確認 GitHub 整合授權。不得為此改動舊專案設定。
+- Vercel `teacher-workspace-pilot` 已建立，Root Directory=`pilot`、Next.js、Node 24.x；未接入資料庫。
+- 使用者已完成 GitHub application 授權，repository 連線成功；Production 分支已確認為 `codex/saas-pilot-foundation`，不再是 `main`。
+- 開發入口部署 `dpl_9AxV534or1rYiqPWmULMzqprrp5U` 為 Ready，東京執行區域；瀏覽器確認 https://teacher-workspace-pilot.vercel.app 可開啟且無資料庫功能。Vercel 既有部署保護保留。
+- Git push 自動觸發目前仍為 disabled；本次為明確指定新版專案及 Git 分支的部署，不代表自動部署已驗收。
 - Google OAuth、應用環境變數與雲端端對端隔離驗收尚未完成。
 - 完整舊站瀏覽器回歸、跨班授權、登入、裝置配對尚未驗收。
 - 目前僅可預覽開發狀態，不能邀請老師操作真實資料。
