@@ -1004,16 +1004,10 @@ function DebtsPanel({
   debts: DisplayDebtRow[];
   layout: DisplayLayout;
 }) {
-  const debtCount = debts.filter((row) => row.hasBlockingDebt).length;
-
   return (
     <section className="flex h-full min-h-0 flex-1 flex-col gap-2 overflow-hidden">
       <div className="shrink-0">
         <h2 className="text-2xl font-semibold">欠繳作業</h2>
-        <p className="text-sm text-slate-400">
-          作業狀態、護照與閱讀進度一覽 ·
-          {` ${debtCount} 人尚有需要自己完成的項目`}
-        </p>
       </div>
 
       <div
