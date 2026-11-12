@@ -27,3 +27,13 @@
 - 新 Vercel 專案 Production 已加入新版 URL 與 publishable key；沒有讀取或複製 service-role、secret key、Google Client Secret 或舊站環境變數。
 - Google 真實帳號登入／登出、建立班級／虛構名冊、雙班真實隔離與並行驗收仍待執行。
 - 啟用環境後部署 `dpl_2RVpUg6PE2jQjJtF9dBPFjT5jjy4` 為 Ready；新版 `/login` 按鈕可用，實際點擊可到 Google 帳號選擇頁，client ID 與新版 Supabase callback 對應正確。尚未代使用者選帳號／同意授權，等待使用者登入驗收。
+
+## 真實 Google 帳號 A 驗收（2026-11-12）
+
+- 使用者完成 Google 授權並返回 `/workspace`，註冊成功，不需要邀請名單。
+- 透過畫面建立「開發驗收測試班（虛構）」與「1 號 測試學生01」，重新開啟工作台仍存在。
+- 再送出相同座號被拒絕，顯示錯誤，名冊維持 1／15，沒有建立重複資料。
+- 畫面可即時顯示「儲存中…」；尚未將此觀察當成效能 P95 通過。
+- 登出返回 `/login`；再直接開 `/workspace` 仍回到 `/login`，不能讀取班級。
+- 虛構班級及 1 位虛構學生保留於新版作隔離驗收 fixture，未輸入真實學生資料，舊站未操作。
+- 已停在第二個 Google 帳號選擇頁，等待使用者登入帳號 B；雙帳號雲端隔離與真實並行上限仍未宣稱完成。
