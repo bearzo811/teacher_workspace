@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
 import { serverClient } from "../../lib/supabase";
 import { logout } from "../login/actions";
-import { createClass, addStudent, renameClass, updateStudent, archiveStudent, restoreStudent } from "./actions";
+import { createClass, addStudent, renameClass, updateStudent, archiveStudent, restoreStudent, configureModules } from "./actions";
 import { Submit } from "./submit";
+import { ModuleFields } from "./module-fields";
+import { modules } from "../../lib/modules";
 
 export const dynamic = "force-dynamic";
 
-export default async function Workspace({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+export default async function Workspace({ searchParams }: { searchParams: Promise<{ error?: string; notice?: string }> }) {
   const params = await searchParams;
   let client;
   try { client = await serverClient(); } catch { redirect("/login?error=unavailable"); }
@@ -19,7 +21,8 @@ export default async function Workspace({ searchParams }: { searchParams: Promis
     allowed = !result.error && result.data === true;
     unavailable = Boolean(result.error);
   }
-  const classes = allowed ? await client.from("pilot_classes").select("id,name").is("deleted_at", null) : null;
+  const moduleSelectionReady = process.env.PILOT_MODULE_SELECTION_ENABLED === "true";
+  const classes = allowed ? await client.from("pilot_classes").select("*").is("deleted_at", null) : null;
   const classroom = classes?.data?.[0];
   const students = classroom ? await client.from("pilot_students").select("id,seat,name,deleted_at").eq("class_id", classroom.id).order("seat") : null;
   const activeStudents = students?.data?.filter(student => !student.deleted_at) ?? [];
@@ -30,14 +33,30 @@ export default async function Workspace({ searchParams }: { searchParams: Promis
     <p>Teacher Workspace ／ 小班試用版</p>
     <h1>{allowed ? classroom?.name ?? "建立你的班級" : unavailable ? "註冊服務尚未就緒" : "目前無法使用此帳號"}</h1>
     <p>目前登入：{user.email}</p>
+    {params.notice === "modules" && <p role="status">功能選擇已儲存。</p>}
+    {params.error === "modules" && <p role="alert">功能選擇未能儲存，請稍後重試。</p>}
     {!allowed && <p>{unavailable ? "新版資料庫尚未完成設定或連線失敗，請稍後重試。" : "請使用 Google 帳號；若帳號已被停用，請聯絡管理者。"}</p>}
     {readError && <p role="alert">資料暫時無法載入，請重新整理；目前不顯示建立表單，避免重複建立。</p>}
     {params.error && <p role="alert">{params.error === "student" ? "學生資料未能儲存：請確認座號未重複、名冊未滿 15 人，再重試。" : params.error === "restore" ? "無法復原：請確認名冊未滿 15 人，且原座號沒有被使用。" : params.error === "archive" ? "學生尚未移除，請稍後重試。" : params.error === "confirm" ? "請先勾選確認移除；資料會保留供復原。" : params.error === "rename" ? "班級名稱未能儲存，請稍後重試。" : params.error === "create" ? "班級未能建立：每人限一個使用中的班級，請重新整理確認。" : params.error === "logout" ? "登出未完成，請重試。" : "請檢查輸入內容後重試。"}</p>}
     {allowed && !readError && !classroom && <form action={createClass}>
-      <label>班級名稱 <input name="name" required maxLength={80} placeholder="例如：四年甲班" style={{ padding: 10, maxWidth: "100%" }} /></label> <Submit>建立班級</Submit>
+      <label>班級名稱 <input name="name" required maxLength={80} placeholder="例如：四年甲班" style={{ padding: 10, maxWidth: "100%" }} /></label>
+      {moduleSelectionReady && <ModuleFields />}
+      <Submit>建立班級</Submit>
       <p>每位老師一個使用中的班級；首版最多 15 位學生。</p>
     </form>}
     {allowed && !readError && classroom && <section>
+      {moduleSelectionReady && <section aria-label="班級功能設定">
+        <h2>{classroom.modules_configured_at ? "班級功能" : "先選擇你的班級需要哪些功能"}</h2>
+        {classroom.modules_configured_at && <p>已選擇：{modules.filter(module => classroom.enabled_modules?.includes(module.id)).map(module => module.name).join("、") || "僅基本功能"}（選用模組尚在開發）</p>}
+        <details open={!classroom.modules_configured_at}>
+          <summary>調整功能模組</summary>
+          <form action={configureModules}>
+            <input type="hidden" name="classId" value={classroom.id} />
+            <ModuleFields selected={classroom.enabled_modules ?? []} />
+            <Submit>儲存功能選擇</Submit>
+          </form>
+        </details>
+      </section>}
       {managementReady && <details><summary>修改班級名稱</summary><form action={renameClass}>
         <input type="hidden" name="classId" value={classroom.id} />
         <label>班級名稱 <input name="name" defaultValue={classroom.name} required maxLength={80} style={{ padding: 8, maxWidth: "100%" }} /></label> <Submit>儲存班名</Submit>

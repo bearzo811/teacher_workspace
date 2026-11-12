@@ -2,6 +2,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { serverClient } from "../../lib/supabase";
+import { validateModules } from "../../lib/modules";
 
 async function teacherClient() {
   const client = await serverClient(true);
@@ -14,10 +15,26 @@ export async function createClass(form: FormData) {
   const client = await teacherClient();
   const name = String(form.get("name") ?? "").trim();
   if (!name || name.length > 80) redirect("/workspace?error=input");
-  const { error } = await client.rpc("create_pilot_class", { class_name: name });
+  const selected = validateModules(form.getAll("modules"));
+  if (!selected) redirect("/workspace?error=input");
+  const { error } = process.env.PILOT_MODULE_SELECTION_ENABLED === "true"
+    ? await client.rpc("create_pilot_class_with_modules", { class_name: name, selected_modules: selected })
+    : await client.rpc("create_pilot_class", { class_name: name });
   if (error) redirect("/workspace?error=create");
   revalidatePath("/workspace");
   redirect("/workspace");
+}
+
+export async function configureModules(form: FormData) {
+  if (process.env.PILOT_MODULE_SELECTION_ENABLED !== "true") redirect("/workspace?error=unavailable");
+  const client = await teacherClient();
+  const id = uuid(form.get("classId"));
+  const selected = validateModules(form.getAll("modules"));
+  if (!selected) redirect("/workspace?error=input");
+  const { error } = await client.rpc("configure_pilot_modules", { target_class: id, selected_modules: selected });
+  if (error) redirect("/workspace?error=modules");
+  revalidatePath("/workspace");
+  redirect("/workspace?notice=modules");
 }
 
 export async function addStudent(form: FormData) {

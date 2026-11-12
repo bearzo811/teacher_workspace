@@ -110,5 +110,35 @@ for (const management of [false, true]) test(`Google registration boundaries (ro
     await login(b);
     assert.equal((await db.query("select * from public.pilot_students")).rows.length,1,"active B cannot see A active or archived students");
     await assert.rejects(db.query("select public.restore_pilot_student($1)",[aStudent]),/access denied/);
+    await db.exec("reset role");
+    await db.exec(await readFile(new URL("../supabase/migrations/0003_class_modules.sql", import.meta.url), "utf8"));
+    await login(b);
+    const beforeModules = (await db.query<{enabled_modules:string[];modules_configured_at:string|null}>("select enabled_modules,modules_configured_at from public.pilot_classes")).rows[0];
+    assert.deepEqual(beforeModules.enabled_modules, []);
+    assert.equal(beforeModules.modules_configured_at, null);
+    await assert.rejects(db.query("select public.configure_pilot_modules($1,array['passport'])",[ca]),/access denied/);
+    await assert.rejects(db.query("select public.configure_pilot_modules($1,array['unknown'])",[cb]),/check constraint/);
+    await assert.rejects(db.query("select public.configure_pilot_modules($1,null)",[cb]),/Modules required/);
+    await db.query("select public.configure_pilot_modules($1,array['homework','reading'])",[cb]);
+    assert.deepEqual((await db.query<{enabled_modules:string[]}>("select enabled_modules from public.pilot_classes")).rows[0].enabled_modules,["homework","reading"]);
+    await db.query("select public.configure_pilot_modules($1,array[]::text[])",[cb]);
+    assert.equal((await db.query("select * from public.pilot_students")).rows.length,1,"disabling modules preserves roster");
+    await assert.rejects(db.query("update public.pilot_classes set enabled_modules=array['passport']"),/permission denied/);
+    await db.exec("reset role; set role anon");
+    await assert.rejects(db.query("select public.configure_pilot_modules($1,array[]::text[])",[cb]),/permission denied/);
+    await assert.rejects(db.query("select public.create_pilot_class_with_modules('匿名',array[]::text[])"),/permission denied/);
+    await db.exec(`reset role; update public.pilot_teachers set active=false where id='${b}'`);
+    await login(b);
+    await assert.rejects(db.query("select public.configure_pilot_modules($1,array[]::text[])",[cb]),/access denied/);
+    // A fresh teacher's class and selected modules are committed atomically.
+    const c = "00000000-0000-0000-0000-000000000003";
+    await db.exec(`reset role; insert into auth.users values ('${c}',now()); insert into auth.identities values ('${c}','google')`);
+    await login(c);
+    assert.equal(await register(),true);
+    await assert.rejects(db.query("select public.create_pilot_class_with_modules('無效模組',array['unknown'])"),/check constraint/);
+    assert.equal((await db.query("select * from public.pilot_classes")).rows.length,0,"failed setup leaves no partial class");
+    await db.query("select public.create_pilot_class_with_modules('新老師測試班',array['routines'])");
+    assert.deepEqual((await db.query<{enabled_modules:string[]}>("select enabled_modules from public.pilot_classes")).rows[0].enabled_modules,["routines"]);
+    await assert.rejects(db.query("select public.create_pilot_class_with_modules('第二班',array[]::text[])"),/unique constraint/);
   } finally { await db.close(); }
 });
