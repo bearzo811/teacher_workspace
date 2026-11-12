@@ -14,9 +14,9 @@ test("open Google registration retains ownership, one-class and 15-student datab
       create table auth.users(id uuid primary key, email_confirmed_at timestamptz);
       create table auth.identities(user_id uuid, provider text);
       create function auth.uid() returns uuid language sql as
-        'select nullif(current_setting(''test.uid'', true), '''')::uuid';
+        'select (nullif(current_setting(''request.jwt.claims'', true), '''')::jsonb->>''sub'')::uuid';
       create function auth.jwt() returns jsonb language sql as
-        'select coalesce(nullif(current_setting(''test.jwt'', true), ''''), ''{}'')::jsonb';
+        'select coalesce(nullif(current_setting(''request.jwt.claims'', true), ''''), ''{}'')::jsonb';
       grant usage on schema auth to authenticated;
       insert into auth.users values ('${a}',now()),('${b}',now());
       insert into auth.identities values ('${a}','google'),('${b}','google');
@@ -24,7 +24,7 @@ test("open Google registration retains ownership, one-class and 15-student datab
     await db.exec(await readFile(new URL("../supabase/migrations/0001_registration.sql", import.meta.url), "utf8"));
     async function login(id: string, provider = "google") {
       await db.exec("reset role");
-      await db.query("select set_config('test.uid',$1,false),set_config('test.jwt',$2,false)", [id, JSON.stringify({ app_metadata: { provider } })]);
+      await db.query("select set_config('request.jwt.claims',$1,false)", [JSON.stringify({ sub: id, app_metadata: { provider } })]);
       await db.exec("set role authenticated");
     }
     async function register() { return (await db.query<{ ok: boolean }>("select public.register_pilot_teacher() as ok")).rows[0].ok; }
@@ -47,7 +47,7 @@ test("open Google registration retains ownership, one-class and 15-student datab
     await login(a);
     assert.equal(await register(), true, "no invitation required");
     assert.equal(await register(), true, "idempotent registration");
-    const ca = await create("A班");
+    const ca = await create("開發驗收測試班（虛構）");
     await assert.rejects(create("重複班級"), /unique constraint/);
     await assert.rejects(db.query("insert into public.pilot_classes(owner_id,name) values ($1,'繞過')", [a]), /permission denied/);
     for (let seat = 1; seat <= 15; seat++) await add(ca, seat);
@@ -62,8 +62,13 @@ test("open Google registration retains ownership, one-class and 15-student datab
     assert.equal((await db.query("select * from public.pilot_classes")).rows.length, 0);
     assert.equal((await db.query("select * from public.pilot_students")).rows.length, 0);
     await assert.rejects(add(ca,1), /access denied/);
-    const cb = await create("B班");
+    const cb = await create("隔離驗收 B 班（虛構）");
     await add(cb,1);
+    await db.exec("reset role");
+    const rollbackTest = await db.exec(await readFile(new URL("../supabase/tests/cloud-isolation.sql", import.meta.url), "utf8"));
+    assert.match(JSON.stringify(rollbackTest.at(-1)?.rows), /PASS:/);
+    await login(b);
+    assert.equal((await db.query("select * from public.pilot_students")).rows.length,1,"cloud test rolls all temporary writes back");
     await assert.rejects(add(cb,1), /unique constraint/);
     await assert.rejects(add(cb,0), /check constraint/);
     await assert.rejects(db.query("update public.pilot_teachers set active=true"), /permission denied/);

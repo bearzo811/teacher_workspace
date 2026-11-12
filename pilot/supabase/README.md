@@ -15,3 +15,5 @@
 ## 雲端狀態
 
 2026-11-12 已在新版空資料庫執行 registration migration，並驗證 RLS、grants 及六項匿名 API 請求皆拒絕。不要重複執行初始化；真實登入與雙班隔離仍待驗收。舊邀請版本僅保留於 Git 歷史，不可執行。
+
+同日補驗：兩個真實 Google 帳號已各自建立虛構班級；`tests/cloud-isolation.sql` 在雲端回傳 PASS，驗證雙向 policy、限定寫入與名冊上限並回滾臨時資料。它使用 SQL 交易內測試 claims，不能代替真正並行負載或其他業務模組的隔離驗收。
