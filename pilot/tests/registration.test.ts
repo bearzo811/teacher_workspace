@@ -140,5 +140,36 @@ for (const management of [false, true]) test(`Google registration boundaries (ro
     await db.query("select public.create_pilot_class_with_modules('新老師測試班',array['routines'])");
     assert.deepEqual((await db.query<{enabled_modules:string[]}>("select enabled_modules from public.pilot_classes")).rows[0].enabled_modules,["routines"]);
     await assert.rejects(db.query("select public.create_pilot_class_with_modules('第二班',array[]::text[])"),/unique constraint/);
+    await db.exec("reset role");
+    await db.exec(await readFile(new URL("../supabase/migrations/0004_academic_calendar.sql",import.meta.url),"utf8"));
+    await login(a);
+    const ta=(await db.query<{id:string}>("select public.create_pilot_term($1,'上學期','2026-09-01','2027-01-22') as id",[ca])).rows[0].id;
+    const ta2=(await db.query<{id:string}>("select public.create_pilot_term($1,'下學期','2027-02-15','2027-06-30') as id",[ca])).rows[0].id;
+    assert.equal((await db.query("select * from public.pilot_terms where active")).rows.length,1);
+    await db.query("select public.activate_pilot_term($1)",[ta2]);
+    assert.equal((await db.query<{id:string}>("select id from public.pilot_terms where active")).rows[0].id,ta2);
+    await assert.rejects(db.query("select public.create_pilot_term($1,'錯誤','2027-06-30','2027-02-15')",[ca]),/check constraint/);
+    await assert.rejects(db.query("select public.create_pilot_term($1,'過長','2026-01-01','2028-01-01')",[ca]),/check constraint/);
+    await db.query("select public.set_pilot_day($1,'2026-09-05',true,'補課')",[ta]);
+    await assert.rejects(db.query("select public.set_pilot_day($1,'2026-08-28',true,'學期外')",[ta]),/outside term/);
+    await assert.rejects(db.query("select public.update_pilot_term($1,'縮短','2026-09-07','2027-01-22')",[ta]),/outside term/);
+    await login(c);
+    assert.equal((await db.query("select * from public.pilot_terms")).rows.length,0);
+    assert.equal((await db.query("select * from public.pilot_day_overrides")).rows.length,0);
+    for (const sql of ["select public.activate_pilot_term($1)","select public.set_pilot_day($1,'2026-09-05',false,'跨班')","select public.update_pilot_term($1,'跨班','2026-09-01','2027-01-22')"]) {
+      await assert.rejects(db.query(sql,[ta]),/access denied/);
+    }
+    await assert.rejects(db.query("select public.create_pilot_term($1,'跨班','2026-09-01','2027-01-22')",[ca]),/access denied/);
+    await assert.rejects(db.query("insert into public.pilot_terms(class_id,name,start_date,end_date) values ($1,'繞過','2026-09-01','2027-01-22')",[ca]),/permission denied/);
+    await login(a);
+    await db.query("select public.set_pilot_day($1,'2026-09-05',null,'')",[ta]);
+    assert.equal((await db.query("select * from public.pilot_day_overrides")).rows.length,0);
+    await db.query("select public.update_pilot_term($1,'任意日期','2026-09-02','2027-01-20')",[ta]);
+    assert.equal((await db.query("select * from public.pilot_terms")).rows.length,2,"switching and editing preserves terms");
+    await login(b);
+    await assert.rejects(db.query("select public.create_pilot_term($1,'停用','2026-09-01','2027-01-22')",[cb]),/access denied/);
+    await db.exec("reset role; set role anon");
+    await assert.rejects(db.query("select * from public.pilot_terms"),/permission denied/);
+    await assert.rejects(db.query("select public.activate_pilot_term($1)",[ta]),/permission denied/);
   } finally { await db.close(); }
 });

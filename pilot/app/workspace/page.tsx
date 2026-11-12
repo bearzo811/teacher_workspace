@@ -5,6 +5,7 @@ import { createClass, addStudent, renameClass, updateStudent, archiveStudent, re
 import { Submit } from "./submit";
 import { ModuleFields } from "./module-fields";
 import { modules } from "../../lib/modules";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,7 @@ export default async function Workspace({ searchParams }: { searchParams: Promis
       <p>每位老師一個使用中的班級；首版最多 15 位學生。</p>
     </form>}
     {allowed && !readError && classroom && <section>
+      {process.env.PILOT_CALENDAR_ENABLED === "true" && <p><Link href="/workspace/calendar">學期與行事曆 →</Link></p>}
       {moduleSelectionReady && <section aria-label="班級功能設定">
         <h2>{classroom.modules_configured_at ? "班級功能" : "先選擇你的班級需要哪些功能"}</h2>
         {classroom.modules_configured_at && <p>已選擇：{modules.filter(module => classroom.enabled_modules?.includes(module.id)).map(module => module.name).join("、") || "僅基本功能"}（選用模組尚在開發）</p>}
