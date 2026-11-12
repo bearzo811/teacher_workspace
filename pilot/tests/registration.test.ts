@@ -171,5 +171,28 @@ for (const management of [false, true]) test(`Google registration boundaries (ro
     await db.exec("reset role; set role anon");
     await assert.rejects(db.query("select * from public.pilot_terms"),/permission denied/);
     await assert.rejects(db.query("select public.activate_pilot_term($1)",[ta]),/permission denied/);
+    await db.exec("reset role");
+    await db.exec(await readFile(new URL("../supabase/migrations/0005_calendar_events.sql",import.meta.url),"utf8"));
+    await login(a);
+    const event=(await db.query<{id:string}>("select public.save_pilot_event($1,null,'跨年活動','2027-01-25','學期外也能倒數',true) as id",[ca])).rows[0].id;
+    assert.equal((await db.query("select * from public.pilot_calendar_events")).rows.length,1);
+    await db.query("select public.save_pilot_event($1,$2,'修改活動','2027-01-26','',false)",[ca,event]);
+    await db.query("select public.archive_pilot_event($1,true)",[event]);
+    assert.equal((await db.query<{archived:boolean}>("select archived from public.pilot_calendar_events")).rows[0].archived,true);
+    await db.query("select public.archive_pilot_event($1,false)",[event]);
+    await assert.rejects(db.query("select public.save_pilot_event($1,null,'','2027-01-25','',true)",[ca]),/check constraint/);
+    await assert.rejects(db.query("select public.save_pilot_event($1,null,'日期','1999-12-31','',true)",[ca]),/check constraint/);
+    await login(c);
+    const cc=(await db.query<{id:string}>("select id from public.pilot_classes")).rows[0].id;
+    assert.equal((await db.query("select * from public.pilot_calendar_events")).rows.length,0);
+    await assert.rejects(db.query("select public.save_pilot_event($1,$2,'跨班','2027-01-25','',true)",[cc,event]),/access denied/);
+    await assert.rejects(db.query("select public.save_pilot_event($1,null,'跨班','2027-01-25','',true)",[ca]),/access denied/);
+    await assert.rejects(db.query("select public.archive_pilot_event($1,true)",[event]),/access denied/);
+    await assert.rejects(db.query("update public.pilot_calendar_events set archived=true"),/permission denied/);
+    await login(b);
+    await assert.rejects(db.query("select public.save_pilot_event($1,null,'停用','2027-01-25','',true)",[cb]),/access denied/);
+    await db.exec("reset role; set role anon");
+    await assert.rejects(db.query("select * from public.pilot_calendar_events"),/permission denied/);
+    await assert.rejects(db.query("select public.archive_pilot_event($1,false)",[event]),/permission denied/);
   } finally { await db.close(); }
 });
