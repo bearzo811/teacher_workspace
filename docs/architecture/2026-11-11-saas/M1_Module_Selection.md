@@ -19,4 +19,8 @@ Google 註冊不增加步驟；首次建立班級時勾選需要的選用模組�
 
 本機 SQL 測試涵蓋跨班與停用帳號拒絕、匿名無執行權、資料表禁止直接寫入、無效／空值模組拒絕、空清單允許、不刪名冊、建立失敗無半成品、一人一班限制。單元測試驗證未知 ID 拒絕、重複 ID 正規化、未設定不啟用。Production build 通過。
 
-0003 雲端遷移、實際登入操作及不同尺寸的畫面尚待驗證。
+## 雲端啟用（2026-11-12）
+
+使用者確認後，僅於新版 Supabase `yqogdgvkeghyuibydqhw` 執行 0003，成功後開啟 `PILOT_MODULE_SELECTION_ENABLED=true`。部署 `dpl_9mk9C5AawztefZ3hn3Cku6PbkZqT` 已 Ready，舊站未變更。
+
+雲端核對兩個函式皆為 security definer、空 search_path，匿名無 EXECUTE，authenticated 有 EXECUTE。B 班虛構資料實測首次全部未勾、勾選兩模組儲存成功、重新載入保留原選擇、取消全部後仍保留原有學生名冊。不同尺寸及全新 Google 帳號的建立班級畫面尚待驗證；初次建立交易由本機 SQL 測試涵蓋。
