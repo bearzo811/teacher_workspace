@@ -14,4 +14,4 @@
 
 ## 雲端狀態
 
-以上為待執行的 registration migration 與驗收計畫，不代表雲端已通過。舊邀請版本保留於 Git 歷史，不再提供可複製的邀請 SQL。
+2026-11-12 已在新版空資料庫執行 registration migration，並驗證 RLS、grants 及六項匿名 API 請求皆拒絕。不要重複執行初始化；真實登入與雙班隔離仍待驗收。舊邀請版本僅保留於 Git 歷史，不可執行。

@@ -16,3 +16,13 @@
 ## 尚未完成
 
 新版雲端 migration／RLS 真實驗證、環境變數與 URL 設定、實際 Google 登入、真實並行壓力；尚未提供名冊編輯刪除與其他教室模組。不能宣稱 M1 全部完成，也不能搬入真實學生資料。
+
+## 2026-11-12 雲端初始化結果（更新上述待辦狀態）
+
+- 使用者授權只操作新版、不影響舊站。先查新版 `public`／`pilot_private` 業務表為 0，再執行 `0001_registration.sql`，交易成功。
+- 三張新版資料表 RLS=true；anon 沒有 SELECT；authenticated 只有 SELECT、無直接 INSERT／UPDATE／DELETE，寫入需限定函式。
+- 三個公開函式 anon EXECUTE=false、authenticated EXECUTE=true，SECURITY DEFINER 皆固定空 search_path。
+- 真實新版 Data API 的三個匿名 SELECT 與三個匿名 RPC 呼叫，全部回傳 401，沒有建立測試帳號或班級。
+- 新版 Supabase Site URL 與唯一 Redirect URL 已設定為新版網域及 `/auth/callback`，不含萬用字元。
+- 新 Vercel 專案 Production 已加入新版 URL 與 publishable key；沒有讀取或複製 service-role、secret key、Google Client Secret 或舊站環境變數。
+- Google 真實帳號登入／登出、建立班級／虛構名冊、雙班真實隔離與並行驗收仍待執行。
