@@ -10,6 +10,8 @@
 - RLS 及限定寫入函式，帳號停用時不能重註冊恢復；跨班讀取為空，跨班新增被拒絕。
 - 工作台新增建立班級、座號／姓名新增名冊；送出按鈕即時顯示儲存中，失敗顯示錯誤。
 - 本機 PGlite 雙帳號測試通過，涵蓋 Google 直接註冊、私有讀寫、非 Google／未驗證拒絕、重註冊、一人一班、座號重複、第 16 人拒絕、停用與跨班存取。
+- 新舊共 27 項測試與 production build 通過。部署 `dpl_FSxA1pU4DsFGe2zWm2Hz4RwdkZ5y` 為 Ready，瀏覽器確認新版 `/login` 已顯示註冊制文案，環境尚未設定時按鈕保持停用。
+- Supabase SQL 草稿已換成 registration migration，未執行；舊邀請 migration 不會執行。
 
 ## 尚未完成
 
