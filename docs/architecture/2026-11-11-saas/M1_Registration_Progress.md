@@ -26,3 +26,4 @@
 - 新版 Supabase Site URL 與唯一 Redirect URL 已設定為新版網域及 `/auth/callback`，不含萬用字元。
 - 新 Vercel 專案 Production 已加入新版 URL 與 publishable key；沒有讀取或複製 service-role、secret key、Google Client Secret 或舊站環境變數。
 - Google 真實帳號登入／登出、建立班級／虛構名冊、雙班真實隔離與並行驗收仍待執行。
+- 啟用環境後部署 `dpl_2RVpUg6PE2jQjJtF9dBPFjT5jjy4` 為 Ready；新版 `/login` 按鈕可用，實際點擊可到 Google 帳號選擇頁，client ID 與新版 Supabase callback 對應正確。尚未代使用者選帳號／同意授權，等待使用者登入驗收。
