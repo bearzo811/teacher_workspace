@@ -32,3 +32,59 @@ export async function addStudent(form: FormData) {
   revalidatePath("/workspace");
   redirect("/workspace");
 }
+
+function uuid(value: FormDataEntryValue | null) {
+  const id = String(value ?? "");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) redirect("/workspace?error=input");
+  return id;
+}
+
+function requireRosterManagement() {
+  if (process.env.PILOT_ROSTER_MANAGEMENT_ENABLED !== "true") redirect("/workspace?error=unavailable");
+}
+
+export async function renameClass(form: FormData) {
+  requireRosterManagement();
+  const client = await teacherClient();
+  const id = uuid(form.get("classId"));
+  const name = String(form.get("name") ?? "").trim();
+  if (!name || name.length > 80) redirect("/workspace?error=input");
+  const { error } = await client.rpc("rename_pilot_class", { target_class: id, class_name: name });
+  if (error) redirect("/workspace?error=rename");
+  revalidatePath("/workspace");
+  redirect("/workspace");
+}
+
+export async function updateStudent(form: FormData) {
+  requireRosterManagement();
+  const client = await teacherClient();
+  const id = uuid(form.get("studentId"));
+  const seat = Number(form.get("seat"));
+  const name = String(form.get("name") ?? "").trim();
+  if (!Number.isInteger(seat) || seat < 1 || seat > 99 || !name || name.length > 80) redirect("/workspace?error=input");
+  const { error } = await client.rpc("update_pilot_student", { target_student: id, student_seat: seat, student_name: name });
+  if (error) redirect("/workspace?error=student");
+  revalidatePath("/workspace");
+  redirect("/workspace");
+}
+
+export async function archiveStudent(form: FormData) {
+  requireRosterManagement();
+  const client = await teacherClient();
+  const id = uuid(form.get("studentId"));
+  if (form.get("confirm") !== "yes") redirect("/workspace?error=confirm");
+  const { error } = await client.rpc("archive_pilot_student", { target_student: id });
+  if (error) redirect("/workspace?error=archive");
+  revalidatePath("/workspace");
+  redirect("/workspace");
+}
+
+export async function restoreStudent(form: FormData) {
+  requireRosterManagement();
+  const client = await teacherClient();
+  const id = uuid(form.get("studentId"));
+  const { error } = await client.rpc("restore_pilot_student", { target_student: id });
+  if (error) redirect("/workspace?error=restore");
+  revalidatePath("/workspace");
+  redirect("/workspace");
+}

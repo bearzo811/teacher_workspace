@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-test("open Google registration retains ownership, one-class and 15-student database boundaries", async () => {
+for (const management of [false, true]) test(`Google registration boundaries (roster management ${management ? "enabled" : "disabled"})`, async () => {
   const db = new PGlite();
   const a = "00000000-0000-0000-0000-000000000001";
   const b = "00000000-0000-0000-0000-000000000002";
@@ -22,6 +22,7 @@ test("open Google registration retains ownership, one-class and 15-student datab
       insert into auth.identities values ('${a}','google'),('${b}','google');
     `);
     await db.exec(await readFile(new URL("../supabase/migrations/0001_registration.sql", import.meta.url), "utf8"));
+    if (management) await db.exec(await readFile(new URL("../supabase/migrations/0002_roster_management.sql", import.meta.url), "utf8"));
     async function login(id: string, provider = "google") {
       await db.exec("reset role");
       await db.query("select set_config('request.jwt.claims',$1,false)", [JSON.stringify({ sub: id, app_metadata: { provider } })]);
@@ -63,7 +64,7 @@ test("open Google registration retains ownership, one-class and 15-student datab
     assert.equal((await db.query("select * from public.pilot_students")).rows.length, 0);
     await assert.rejects(add(ca,1), /access denied/);
     const cb = await create("隔離驗收 B 班（虛構）");
-    await add(cb,1);
+    const bStudent = (await add(cb,1)).rows[0].add_pilot_student;
     await db.exec("reset role");
     const rollbackTest = await db.exec(await readFile(new URL("../supabase/tests/cloud-isolation.sql", import.meta.url), "utf8"));
     assert.match(JSON.stringify(rollbackTest.at(-1)?.rows), /PASS:/);
@@ -80,5 +81,34 @@ test("open Google registration retains ownership, one-class and 15-student datab
     await assert.rejects(add(cb,2), /access denied/);
     await login(a);
     assert.equal((await db.query("select * from public.pilot_students")).rows.length,15);
+    if (!management) return;
+    for (const sql of ["select public.update_pilot_student($1,90,'跨班')", "select public.archive_pilot_student($1)", "select public.restore_pilot_student($1)"]) {
+      await assert.rejects(db.query(sql,[bStudent]),/access denied/);
+    }
+    await assert.rejects(db.query("select public.rename_pilot_class($1,'跨班')",[cb]),/access denied/);
+    await db.query("select public.rename_pilot_class($1,'改名測試')",[ca]);
+    assert.equal((await db.query<{name:string}>("select name from public.pilot_classes")).rows[0].name,"改名測試");
+    const aStudent = (await db.query<{id:string}>("select id from public.pilot_students where seat=1")).rows[0].id;
+    await assert.rejects(db.query("select public.update_pilot_student($1,2,'重複座號')",[aStudent]),/unique constraint/);
+    await db.query("select public.update_pilot_student($1,17,'修改後的學生')",[aStudent]);
+    await db.query("select public.archive_pilot_student($1)",[aStudent]);
+    assert.equal((await db.query("select * from public.pilot_students where deleted_at is null")).rows.length,14);
+    assert.equal((await db.query("select * from public.pilot_students where deleted_at is not null")).rows.length,1,"owner can see their recovery list");
+    const replacement = (await add(ca,17)).rows[0].add_pilot_student;
+    await assert.rejects(db.query("select public.restore_pilot_student($1)",[aStudent]),/Student limit/);
+    const spare = (await db.query<{id:string}>("select id from public.pilot_students where seat=2")).rows[0].id;
+    await db.query("select public.archive_pilot_student($1)",[spare]);
+    await assert.rejects(db.query("select public.restore_pilot_student($1)",[aStudent]),/unique constraint/);
+    await db.query("select public.archive_pilot_student($1)",[replacement]);
+    await db.query("select public.restore_pilot_student($1)",[aStudent]);
+    await db.query("select public.restore_pilot_student($1)",[spare]);
+    assert.equal((await db.query("select * from public.pilot_students where deleted_at is null")).rows.length,15);
+    await login(b);
+    assert.equal((await db.query("select * from public.pilot_students")).rows.length,0,"suspended teacher cannot see A recovery records");
+    await assert.rejects(db.query("select public.restore_pilot_student($1)",[bStudent]),/access denied/);
+    await db.exec(`reset role; update public.pilot_teachers set active=true where id='${b}'`);
+    await login(b);
+    assert.equal((await db.query("select * from public.pilot_students")).rows.length,1,"active B cannot see A active or archived students");
+    await assert.rejects(db.query("select public.restore_pilot_student($1)",[aStudent]),/access denied/);
   } finally { await db.close(); }
 });
