@@ -18,8 +18,8 @@
 
 同日補驗：兩個真實 Google 帳號已各自建立虛構班級；`tests/cloud-isolation.sql` 在雲端回傳 PASS，驗證雙向 policy、限定寫入與名冊上限並回滾臨時資料。它使用 SQL 交易內測試 claims，不能代替真正並行負載或其他業務模組的隔離驗收。
 
-## 名冊編輯與可復原移除（待核准）
+## 名冊編輯與可復原移除（已核准啟用）
 
 `migrations/0002_roster_management.sql` 新增僅同班老師可用的改名、學生修改、移除與復原函式；資料保留不永久刪除，恢復仍檢查 15 人及座號衝突。會允許老師讀自己班級的已移除資料，不會讓其他班或匿名讀取。
 
-先核准、執行並驗證 migration，再設定新版 Vercel 的 `PILOT_ROSTER_MANAGEMENT_ENABLED=true` 並重新部署。未設定時新 UI 與 server actions 均維持關閉。不要在舊站執行。
+2026-11-12 使用者同意後，已於新版執行並驗證 0002，再設定新版 Vercel 的 `PILOT_ROSTER_MANAGEMENT_ENABLED=true` 並部署。四個函式匿名無執行權限，遷移後隔離測試再次 PASS。未設定時新 UI 與 server actions 均維持關閉。不要重跑 migration，也不要在舊站執行。
