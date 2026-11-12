@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 export const metadata = {
-  title: "Teacher Workspace · 邀請試用版開發",
+  title: "Teacher Workspace · 小班試用版",
   robots: { index: false, follow: false },
 };
 
