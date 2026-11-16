@@ -266,5 +266,35 @@ for (const management of [false, true]) test(`Google registration boundaries (ro
     await db.exec("reset role; set role anon");
     await assert.rejects(db.query("select * from public.pilot_contact_days"),/permission denied/);
     await assert.rejects(db.query("select public.archive_pilot_assignment($1,$2,false)",[ca,hw]),/permission denied/);
+    await db.exec("reset role");
+    await db.exec(await readFile(new URL("../supabase/migrations/0008_homework_checks.sql",import.meta.url),"utf8"));
+    await login(a);
+    for(const status of ["missing","pending","correction","completed"]) {
+      await db.query("select public.set_pilot_homework_check($1,$2,$3,$4)",[ca,hw,aStudent,status]);
+      assert.equal((await db.query<{status:string}>("select status from public.pilot_homework_checks")).rows[0].status,status);
+    }
+    assert.equal((await db.query("select * from public.pilot_homework_checks")).rows.length,1,"updates are idempotent upserts");
+    await assert.rejects(db.query("select public.set_pilot_homework_check($1,$2,$3,'unknown')",[ca,hw,aStudent]),/check constraint/);
+    await assert.rejects(db.query("select public.set_pilot_homework_check($1,$2,$3,'pending')",[ca,hw,bStudent]),/access denied/);
+    await db.query("select public.archive_pilot_assignment($1,$2,true)",[ca,hw]);
+    await assert.rejects(db.query("select public.set_pilot_homework_check($1,$2,$3,'pending')",[ca,hw,aStudent]),/access denied/);
+    await db.query("select public.archive_pilot_assignment($1,$2,false)",[ca,hw]);
+    await db.query("select public.archive_pilot_student($1)",[aStudent]);
+    await assert.rejects(db.query("select public.set_pilot_homework_check($1,$2,$3,'pending')",[ca,hw,aStudent]),/access denied/);
+    await db.query("select public.restore_pilot_student($1)",[aStudent]);
+    assert.equal((await db.query<{status:string}>("select status from public.pilot_homework_checks")).rows[0].status,"completed","archiving/restoring preserves history");
+    await db.query("select public.configure_pilot_modules($1,array[]::text[])",[ca]);
+    assert.equal((await db.query("select * from public.pilot_homework_checks")).rows.length,0);
+    await assert.rejects(db.query("select public.set_pilot_homework_check($1,$2,$3,'pending')",[ca,hw,aStudent]),/access denied/);
+    await db.query("select public.configure_pilot_modules($1,array['homework'])",[ca]);
+    await login(c);
+    assert.equal((await db.query("select * from public.pilot_homework_checks")).rows.length,0);
+    await assert.rejects(db.query("select public.set_pilot_homework_check($1,$2,$3,'pending')",[cc,hw,aStudent]),/access denied/);
+    await assert.rejects(db.query("update public.pilot_homework_checks set status='pending'"),/permission denied/);
+    await login(b);
+    await assert.rejects(db.query("select public.set_pilot_homework_check($1,$2,$3,'pending')",[cb,hw,bStudent]),/access denied/);
+    await db.exec("reset role; set role anon");
+    await assert.rejects(db.query("select * from public.pilot_homework_checks"),/permission denied/);
+    await assert.rejects(db.query("select public.set_pilot_homework_check($1,$2,$3,'pending')",[ca,hw,aStudent]),/permission denied/);
   } finally { await db.close(); }
 });
