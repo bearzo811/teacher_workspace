@@ -71,6 +71,6 @@ export default async function Calendar({ searchParams }: { searchParams: Promise
         <h3>此學期的例外日期</h3>{!days.length?<p>尚無放假或補課調整。</p>:<ul>{days.map(day=><li key={day.day}>{day.day}：{day.is_school_day?"上課／補課":"放假"} {day.note}</li>)}</ul>}
       </section>}
     </>}
-    {process.env.PILOT_EVENTS_ENABLED === "true" && <Events classId={classroom.id} today={today} month={month}/>}
+    {process.env.PILOT_EVENTS_ENABLED === "true" && <Events classId={classroom.id} today={today} month={month} termId={selected?.id}/>}
   </main>;
 }
