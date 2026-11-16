@@ -13,4 +13,12 @@
 
 本機 14 項新版測試（含擴充整合案例）及 build 通過，涵蓋學期外返校日與模組全關仍能記錄、修改不重複、超出日期拒絕、跨班學生替換、移除拒絕與復原保留、停用老師／匿名及直接改表拒絕。
 
-尚待雲端操作及不同尺寸驗收。舊站與舊資料庫不變。
+## 雲端啟用驗收（2026-11-16）
+
+- 使用者確認後，0009 已套用至新版 Supabase `yqogdgvkeghyuibydqhw`；執行成功。
+- 雲端權限查核：匿名 execute=false，authenticated execute=true；函式內仍驗證有效老師、所屬班級及有效學生。
+- 新版 Vercel production 設定 `PILOT_ATTENDANCE_ENABLED=true`，部署 `dpl_2irvMqHGyQeFXGH5g6BzvP6umUEM` Ready，正式測試網址 alias 已更新。
+- 隔離驗收 B 班虛構學生在學期外 2026-08-28，可由未確認改為請假，統計隨之更新，再改回已確認出席並保存。
+- 僅異動虛構測試紀錄；未連動每日任務、作業、代班或獎勵。
+
+仍待不同尺寸及整體 UI／UX 驗收。舊站與舊資料庫不變。
