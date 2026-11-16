@@ -62,7 +62,7 @@ export default async function ContactBook({searchParams}:{searchParams:Promise<{
    <h2>叮嚀／備註</h2><p>每行一項，不進入作業繳交表。</p>
    {writable?<form action={saveNotes}>{scope()}<textarea name="notes" defaultValue={notes?.data?.notes??""} maxLength={3000} rows={6} style={{width:"100%",boxSizing:"border-box",padding:12}} aria-label="叮嚀與備註"/><Submit>儲存叮嚀</Submit></form>:<p style={{whiteSpace:"pre-wrap"}}>{notes?.data?.notes||"尚無叮嚀。"}</p>}
    {!!archived.length&&<details><summary>已移除作業（{archived.length}）</summary><ul>{archived.map(item=><li key={item.id}>{title(item)}<form action={archiveAssignment}>{scope(item)}<input type="hidden" name="mode" value="restore"/><input type="hidden" name="confirm" value="yes"/><Submit>復原作業</Submit></form></li>)}</ul></details>}
-   <p>目前完成老師端指派；學生繳交狀態、欠繳限制與大屏尚未接上，勾選限制會先保存設定。已儲存作業的繳交日不會因行事曆調整自動更動，需編輯該作業重新計算。</p>
+   <p>老師可在作業檢核調整狀態，待完成總覽會依限制設定提示；學生大屏與實際商店門禁尚未接上。已儲存作業的繳交日不會因行事曆調整自動更動，需編輯該作業重新計算。</p>
   </>}
  </main>;
 }

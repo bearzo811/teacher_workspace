@@ -9,6 +9,6 @@ export function ModuleFields({ selected = [] }: { selected?: readonly string[] }
       <span style={{ display: "block", marginLeft: 24, color: "#475569" }}>{module.description}</span>
     </label>)}
     <p>關閉不刪資料；相關獎勵及欠繳限制也應停用。大屏顯示設定將另外管理。</p>
-    <p>目前僅開放班級與名冊；勾選會保存使用偏好，其餘模組仍在開發，尚不能操作。</p>
+    <p>功能將分階段開放；勾選會保存使用偏好，不代表尚在開發的模組已可操作。可用入口會出現在工作台。</p>
   </fieldset>;
 }

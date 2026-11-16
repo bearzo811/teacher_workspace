@@ -42,7 +42,7 @@ export default async function Homework({searchParams}:{searchParams:Promise<{day
      <label>調整狀態 <select name="status" defaultValue={status(item.id,student.id)} style={{padding:8,maxWidth:"100%"}}>{homeworkStatuses.map(option=><option key={option.id} value={option.id}>{option.name}</option>)}</select></label> <Submit>儲存</Submit>
     </form>)}</div>
    </section>;})}
-   <p>目前為老師端檢核；學生大屏自助、欠繳清單及金幣尚未串接。本次儲存不會發放或扣除金幣。</p>
+   <p>目前為老師端檢核；可從工作台查看待完成總覽。學生大屏自助及金幣尚未串接，本次儲存不會發放或扣除金幣。</p>
   </>}
  </main>;
 }

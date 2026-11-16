@@ -94,7 +94,7 @@ export default async function Workspace({ searchParams }: { searchParams: Promis
           <form action={restoreStudent}><input type="hidden" name="studentId" value={student.id} /><Submit>復原至名冊</Submit></form>
         </li>)}</ul>
       </details>}
-      <p>目前僅開放註冊、班級與名冊；其他教室功能仍在開發。請先用虛構名冊驗收。</p>
+      <p>目前開放註冊、班級名冊及上方列出的功能；其他教室模組仍在開發。請先用虛構名冊驗收。</p>
     </section>}
     <form action={logout}><button style={{ padding: "12px 24px" }}>登出／更換帳號</button></form>
   </main>;
