@@ -46,6 +46,7 @@ export default async function Workspace({ searchParams }: { searchParams: Promis
       <p>每位老師一個使用中的班級；首版最多 15 位學生。</p>
     </form>}
     {allowed && !readError && classroom && <section>
+      {process.env.PILOT_CONTACT_BOOK_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"homework") && <p><Link href="/workspace/contact-book">聯絡簿 →</Link></p>}
       {process.env.PILOT_WORKBOOKS_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"homework") && <p><Link href="/workspace/workbooks">簿本管理 →</Link></p>}
       {process.env.PILOT_CALENDAR_ENABLED === "true" && <p><Link href="/workspace/calendar">學期與行事曆 →</Link></p>}
       {moduleSelectionReady && <section aria-label="班級功能設定">
