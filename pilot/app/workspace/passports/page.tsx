@@ -42,6 +42,6 @@ export default async function Passports({searchParams}:{searchParams:Promise<{no
     {!roster.length&&<p>班級尚無使用中學生。</p>}
    </section>;})}
   </>}
-  <p>此頁目前僅提供老師端記錄；學生大屏、護照欠繳判定與獎勵結算尚未串接。出缺席不會自動變更護照狀態。</p>
+  <p>此頁目前僅提供老師端記錄；學生大屏、下課／商店限制與獎勵結算尚未串接。出缺席不會自動變更護照狀態。未完成明細可至<Link href="/workspace/debts">待完成總覽</Link>查看。</p>
  </main>;
 }

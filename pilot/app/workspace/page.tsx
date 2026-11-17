@@ -51,7 +51,7 @@ export default async function Workspace({ searchParams }: { searchParams: Promis
       {process.env.PILOT_ROUTINES_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"routines") && <p><Link href="/workspace/routines">每日任務 →</Link></p>}
       {process.env.PILOT_PASSPORTS_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"passport") && <p><Link href="/workspace/passports">護照 →</Link></p>}
       {process.env.PILOT_READING_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"reading") && <p><Link href="/workspace/reading">閱讀／讀報 →</Link></p>}
-      {process.env.PILOT_HOMEWORK_CHECKS_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"homework") && <p><Link href="/workspace/debts">待完成作業總覽 →</Link></p>}
+      {((process.env.PILOT_HOMEWORK_CHECKS_ENABLED === "true"&&moduleEnabled(classroom.enabled_modules,"homework"))||(process.env.PILOT_PASSPORTS_ENABLED === "true"&&moduleEnabled(classroom.enabled_modules,"passport"))||(process.env.PILOT_READING_ENABLED === "true"&&moduleEnabled(classroom.enabled_modules,"reading"))) && <p><Link href="/workspace/debts">待完成總覽 →</Link></p>}
       {process.env.PILOT_HOMEWORK_CHECKS_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"homework") && <p><Link href="/workspace/homework">作業檢核 →</Link></p>}
       {process.env.PILOT_CONTACT_BOOK_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"homework") && <p><Link href="/workspace/contact-book">聯絡簿 →</Link></p>}
       {process.env.PILOT_WORKBOOKS_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"homework") && <p><Link href="/workspace/workbooks">簿本管理 →</Link></p>}
