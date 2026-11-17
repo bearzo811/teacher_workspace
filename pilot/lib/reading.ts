@@ -11,3 +11,8 @@ export function readingMonthOverdue(month:string,today:string){
  if(!validDate(month)||!month.endsWith('-01')||!validDate(today))return false;
  const next=new Date(month+'T00:00:00Z');next.setUTCMonth(next.getUTCMonth()+1);return next.toISOString().slice(0,10)<=today;
 }
+export function readingSummary(students:readonly {id:string;name:string}[],checks:readonly {student_id:string;kind:string;month:string;status:string}[],months:readonly string[],kind:string,day:string){
+ const statuses=new Map(checks.filter(row=>row.kind===kind).map(row=>[`${row.student_id}:${row.month}`,row.status]));
+ const results=months.map(month=>{const missing=students.filter(student=>statuses.get(`${student.id}:${month}`)!=="completed");return {month,completed:students.length-missing.length,total:students.length,missing,overdue:readingMonthOverdue(month,day)};});
+ return {months:results,overdue:results.filter(result=>result.overdue),overdueCount:results.filter(result=>result.overdue).reduce((sum,result)=>sum+result.missing.length,0)};
+}
