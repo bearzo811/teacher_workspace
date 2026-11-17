@@ -17,3 +17,5 @@
 0012 已在新版 Supabase `yqogdgvkeghyuibydqhw` 成功執行；匿名 execute=false，authenticated execute=true，函式內仍限制老師自己的班級。新版 Vercel `PILOT_READING_ENABLED=true`，部署 `dpl_HwL3yf2jRvHEs2MGRd2zKVUz2YhD` Ready。
 
 虛構 B 班閱讀模組已開啟，頁面列出 2026-09～2027-01，11 月尚未結束標示尚未到期。9 月讀報可保存缺家長與已完成；Today 的讀報／心得分別統計，當月不列逾期。未發扣任何金幣，舊站不變。
+
+9 月閱讀心得亦可獨立完成，讀報／心得均已測試改回未開始。Today 選 9/30 時兩者到期未完成皆為 0，不提前計入 9 月。
