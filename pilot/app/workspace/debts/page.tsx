@@ -50,7 +50,7 @@ export default async function Debts({searchParams}:{searchParams:Promise<{term?:
    <p>範圍：{term.name}，繳交日 {from}～{cutoff}。待確認及未訂正完成已算交出，但尚未完成；以下僅依此範圍作業設定提示，不含護照、閱讀及其他學期，也尚未實際限制大屏或商店。</p>
    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,320px),1fr))",gap:16,marginTop:20}}>
     {(students?.data??[]).map(student=>{const work=studentWork(items,checkRows,student.id,cutoff);return <article key={student.id} style={{border:"1px solid #cbd5e1",borderRadius:12,padding:16,overflowWrap:"anywhere"}}>
-     <h2>{student.seat} 號 {student.name}</h2><p><strong>{work.blocksBreak?"不能下課":"可以下課"}</strong> · <strong>{work.blocksShop?"商店暫停":"可以兌換"}</strong>（所選作業範圍）</p>
+     <h2>{student.seat} 號 {student.name}</h2><p><Link href={`/workspace/debts/print?${new URLSearchParams({student:student.id,term:term.id,from,day:cutoff})}`}>列印個人作業清單</Link></p><p><strong>{work.blocksBreak?"不能下課":"可以下課"}</strong> · <strong>{work.blocksShop?"商店暫停":"可以兌換"}</strong>（所選作業範圍）</p>
      {work.unfinished.length?<><p>下一個先完成</p><div style={{fontSize:24,fontWeight:700}}>{label(work.unfinished[0])}</div><p>{homeworkStatuses.find(item=>item.id===work.unfinished[0].status)?.name} · 聯絡簿 {work.unfinished[0].contact_day}</p>
       {work.unfinished.slice(1,3).map(item=><p key={item.id} style={{opacity:0.75}}>{label(item)} · {homeworkStatuses.find(option=>option.id===item.status)?.name}</p>)}</>:<p>所選範圍的作業都已完成。</p>}
      <p>未交 {work.missing} 項 · 待確認 {work.pending} 項 · 未訂正完成 {work.correction} 項</p>
