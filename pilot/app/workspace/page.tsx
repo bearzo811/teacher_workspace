@@ -46,9 +46,11 @@ export default async function Workspace({ searchParams }: { searchParams: Promis
       <p>每位老師一個使用中的班級；首版最多 15 位學生。</p>
     </form>}
     {allowed && !readError && classroom && <section>
+      <p><Link href="/workspace/today">Today · 日常總覽 →</Link></p>
       {process.env.PILOT_ATTENDANCE_ENABLED === "true" && <p><Link href="/workspace/attendance">出缺席 →</Link></p>}
       {process.env.PILOT_ROUTINES_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"routines") && <p><Link href="/workspace/routines">每日任務 →</Link></p>}
       {process.env.PILOT_PASSPORTS_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"passport") && <p><Link href="/workspace/passports">護照 →</Link></p>}
+      {process.env.PILOT_READING_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"reading") && <p><Link href="/workspace/reading">閱讀／讀報 →</Link></p>}
       {process.env.PILOT_HOMEWORK_CHECKS_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"homework") && <p><Link href="/workspace/debts">待完成作業總覽 →</Link></p>}
       {process.env.PILOT_HOMEWORK_CHECKS_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"homework") && <p><Link href="/workspace/homework">作業檢核 →</Link></p>}
       {process.env.PILOT_CONTACT_BOOK_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"homework") && <p><Link href="/workspace/contact-book">聯絡簿 →</Link></p>}
