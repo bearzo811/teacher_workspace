@@ -27,7 +27,7 @@ export default async function Homework({searchParams}:{searchParams:Promise<{day
  const statusMap=new Map(checkBatches.flatMap(batch=>batch.data??[]).map(check=>[`${check.assignment_id}:${check.student_id}`,check.status]));
  const status=(assignment:string,student:string):HomeworkStatus=>{const value=statusMap.get(`${assignment}:${student}`)??"missing";return validHomeworkStatus(value)?value:"missing";};
  return <main style={{maxWidth:1200,margin:"auto",padding:24,lineHeight:1.8}}>
-  <Link href="/workspace">← 返回工作台</Link><h1>作業檢核</h1><p>{classroom?.name}</p>
+  <Link href="/workspace">← 返回工作台</Link><h1>作業檢核</h1><p>{classroom?.name}</p><p><Link href="/workspace/homework/progress">查看各簿本學生完成率</Link></p>
   <form method="get"><label>繳交日期 <input type="date" name="day" defaultValue={day} required style={{padding:8}}/></label> <button>查看應繳作業</button></form>
   {params.notice==="saved"&&<p role="status">狀態已儲存。</p>}{params.error&&<p role="alert">狀態未能儲存，請重新整理後確認作業、學生及模組仍可使用，再重試。</p>}
   {unavailable?<p role="alert">作業資料暫時無法載入，目前不顯示檢核表，避免誤判為未交。</p>:!enabled?<p>請先在工作台開啟「聯絡簿與作業」。</p>:<>

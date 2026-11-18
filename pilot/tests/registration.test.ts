@@ -472,6 +472,17 @@ for (const management of [false, true]) test(`Google registration boundaries (ro
     await db.query("select public.save_pilot_return_day($1,'2026-09-07','假日返校',true)",[ca]);
     await db.query("select public.set_pilot_day($1,'2026-09-07',true,'補課')",[ta]);
     await assert.rejects(db.query("select public.set_pilot_return_check($1,$2,'2026-09-07','morning_cleaning',true)",[ca,aStudent]),/return day required/);
+    await assert.rejects(db.query("select public.save_pilot_return_day($1,'2026-08-28','返校日',null)",[ca]),/state required/);
+    await assert.rejects(db.query("select public.save_pilot_return_day($1,'1999-12-31','日期錯誤',false)",[ca]),/check constraint/);
+    await db.query("select public.save_pilot_return_day($1,'2026-08-28','返校日',true)",[ca]);
+    await assert.rejects(db.query("select public.set_pilot_return_check($1,$2,'2026-08-28','morning_cleaning',null)",[ca,aStudent]),/null value/);
+    await db.query("select public.archive_pilot_student($1)",[aStudent]);
+    await assert.rejects(db.query("select public.set_pilot_return_check($1,$2,'2026-08-28','morning_cleaning',true)",[ca,aStudent]),/access denied/);
+    await db.query("select public.restore_pilot_student($1)",[aStudent]);
+    for(let offset=0;offset<58;offset++)await db.query("select public.save_pilot_return_day($1,date '2025-07-01'+$2::int,'上限測試',false)",[ca,offset]);
+    await assert.rejects(db.query("select public.save_pilot_return_day($1,'2025-12-01','第61天',false)",[ca]),/limit reached/);
+    await db.query("select public.save_pilot_return_day($1,'2026-08-28','可更新既有日期',false)",[ca]);
+    assert.equal((await db.query("select * from public.pilot_return_checks")).rows.length,2,"settings and archiving preserve existing checks");
     await db.query("select public.configure_pilot_modules($1,array[]::text[])",[ca]);
     assert.equal((await db.query("select * from public.pilot_return_checks")).rows.length,0);
     await login(c);
