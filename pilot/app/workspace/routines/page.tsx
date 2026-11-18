@@ -27,10 +27,11 @@ export default async function Routines({searchParams}:{searchParams:Promise<{day
  const school=term&&schoolDay(day,term,overrides?.data??[]);
  return <main style={{maxWidth:1200,margin:"auto",padding:24,lineHeight:1.8}}>
   <Link href="/workspace">← 返回工作台</Link><h1>每日任務</h1><p>{classroom?.name}</p>
+  {process.env.PILOT_RETURN_DAYS_ENABLED==="true"&&<p><Link href={`/workspace/return-days?day=${day}`}>返校日專屬任務與設定 →</Link></p>}
   <form method="get"><label>日期 <input type="date" name="day" defaultValue={day} min="2000-01-01" max="2100-12-31" required style={{padding:8}}/></label> <button>查看任務</button></form>
   {params.notice==="saved"&&<p role="status">任務已儲存。</p>}{params.error&&<p role="alert">未能儲存，請確認模組、學期、上課日與出缺席，再重試；抄聯絡簿需先建立當日聯絡簿。</p>}
   <p>出缺席請到<Link href={`/workspace/attendance?day=${day}`}>獨立出缺席頁</Link>設定。請假者不計入當日任務分母，既有完成紀錄保留，不會自動改為完成。</p>
-  {unavailable?<p role="alert">資料暫時無法載入，暫不顯示統計或操作，避免誤判。</p>:!enabled?<p>請先在工作台開啟「每日任務」。</p>:!term?<p>請先建立並啟用學期。</p>:!school?<p>此日不是啟用學期的上課日，暫不開放任務。返校日與交暑假作業的專屬設定尚未移植；獨立出缺席仍可使用。</p>:<>
+  {unavailable?<p role="alert">資料暫時無法載入，暫不顯示統計或操作，避免誤判。</p>:!enabled?<p>請先在工作台開啟「每日任務」。</p>:!term?<p>一般任務請先建立並啟用學期；返校日使用專屬入口。</p>:!school?<p>此日不是啟用學期的上課日，暫不開放一般任務。{process.env.PILOT_RETURN_DAYS_ENABLED==="true"?"返校日與交暑假作業請使用上方專屬入口。":"返校日專屬任務尚未啟用。"}獨立出缺席仍可使用。</p>:<>
    <p>{term.name}｜{day}。未確認出缺席者暫按出席統計。</p>
    {routineTasks.map(task=>{const progress=routineProgress(students?.data??[],checks?.data??[],attendance?.data??[],task.id);const copied=task.id==="contact_book_copied";const contactReady=Boolean(contact?.data);return <section key={task.id} style={{border:"1px solid #cbd5e1",borderRadius:10,padding:16,marginTop:16}}>
     <h2>{task.name} {progress.completed}／{progress.total}</h2>
@@ -43,6 +44,6 @@ export default async function Routines({searchParams}:{searchParams:Promise<{day
     </form>)}</div>{!progress.roster.length&&<p>班級尚無使用中學生。</p>}
    </section>;})}
   </>}
-  <p>目前只提供老師記錄；大屏自助、金幣、XP 及返校日專屬任務尚未串接，本次不發扣獎勵。</p>
+  <p>目前只提供老師記錄；大屏自助、金幣與 XP 尚未串接，本次不發扣獎勵。</p>
  </main>;
 }
