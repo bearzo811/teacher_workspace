@@ -2,6 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import {defaultRewardRules} from "../lib/reward-rules";
 
 for (const management of [false, true]) test(`Google registration boundaries (roster management ${management ? "enabled" : "disabled"})`, async () => {
   const db = new PGlite();
@@ -529,5 +530,35 @@ for (const management of [false, true]) test(`Google registration boundaries (ro
     await db.exec("reset role; set role anon");
     await assert.rejects(db.query("select * from public.pilot_reward_ledger"),/permission denied/);
     await assert.rejects(db.query("select public.adjust_pilot_rewards($1,$2,gen_random_uuid(),1,0,'匿名')",[ca,aStudent]),/permission denied/);
+    await db.exec("reset role");
+    await db.exec(await readFile(new URL("../supabase/migrations/0015_reward_rules.sql",import.meta.url),"utf8"));
+    await login(a);
+    await db.query("select public.configure_pilot_modules($1,array[]::text[])",[ca]);
+    await assert.rejects(db.query("select public.save_pilot_reward_rules($1,$2::jsonb,0)",[ca,JSON.stringify(defaultRewardRules)]),/access denied/);
+    await db.query("select public.configure_pilot_modules($1,array['rewards'])",[ca]);
+    assert.equal((await db.query<{version:number}>("select public.save_pilot_reward_rules($1,$2::jsonb,0) as version",[ca,JSON.stringify(defaultRewardRules)])).rows[0].version,1);
+    assert.equal((await db.query<{version:number}>("select public.save_pilot_reward_rules($1,$2::jsonb,0) as version",[ca,JSON.stringify(defaultRewardRules)])).rows[0].version,1,"retry does not create another rule version");
+    for(const invalid of [null,[],{...defaultRewardRules,unknown:1},{...defaultRewardRules,routine_xp:1.5},{...defaultRewardRules,routine_xp:'2'},{...defaultRewardRules,level_base_xp:0},{...defaultRewardRules,passport_overdue_daily_coins:1},{...defaultRewardRules,passport_tuesday_coins:9}])await assert.rejects(db.query("select public.save_pilot_reward_rules($1,$2::jsonb,1)",[ca,JSON.stringify(invalid)]),/Invalid reward rules/);
+    const secondRules={...defaultRewardRules,reading_newspaper_coins:6};
+    await assert.rejects(db.query("select public.save_pilot_reward_rules($1,$2::jsonb,0)",[ca,JSON.stringify(secondRules)]),/version changed/);
+    await db.query("select public.save_pilot_reward_rules($1,$2::jsonb,1)",[ca,JSON.stringify(secondRules)]);
+    await assert.rejects(db.query("select public.save_pilot_reward_rules($1,$2::jsonb,1)",[ca,JSON.stringify(defaultRewardRules)]),/version changed/);
+    assert.equal((await db.query("select * from public.pilot_reward_rule_history")).rows.length,2);
+    assert.equal((await db.query("select * from public.pilot_reward_ledger")).rows.length,2,"saving rules does not award or backfill");
+    await assert.rejects(db.query("update public.pilot_reward_rules set version=4"),/permission denied/);
+    await assert.rejects(db.query("delete from public.pilot_reward_rule_history"),/permission denied/);
+    await db.query("select public.configure_pilot_modules($1,array[]::text[])",[ca]);
+    assert.equal((await db.query("select * from public.pilot_reward_rules")).rows.length,0);
+    await db.query("select public.configure_pilot_modules($1,array['rewards'])",[ca]);
+    assert.equal((await db.query("select * from public.pilot_reward_rule_history")).rows.length,2);
+    await login(c);
+    assert.equal((await db.query("select * from public.pilot_reward_rules")).rows.length,0);
+    assert.equal((await db.query("select * from public.pilot_reward_rule_history")).rows.length,0);
+    await assert.rejects(db.query("select public.save_pilot_reward_rules($1,$2::jsonb,2)",[ca,JSON.stringify(defaultRewardRules)]),/access denied/);
+    await login(b);
+    await assert.rejects(db.query("select public.save_pilot_reward_rules($1,$2::jsonb,0)",[cb,JSON.stringify(defaultRewardRules)]),/access denied/);
+    await db.exec("reset role; set role anon");
+    await assert.rejects(db.query("select * from public.pilot_reward_rules"),/permission denied/);
+    await assert.rejects(db.query("select public.save_pilot_reward_rules($1,$2::jsonb,0)",[ca,JSON.stringify(defaultRewardRules)]),/permission denied/);
   } finally { await db.close(); }
 });
