@@ -29,6 +29,6 @@ export default async function Reading({searchParams}:{searchParams:Promise<{noti
     {!months.length&&<p>此學期沒有需要追蹤的月份。</p>}{!roster.length&&<p>班級尚無使用中學生。</p>}
    </section>)}
   </>}
-  <p>本階段只提供老師端記錄，不發扣金幣，也未連動下課、商店或學生大屏；出缺席不自動改變閱讀狀態。到期明細可至<Link href="/workspace/debts">待完成總覽</Link>查看。</p>
+  <p>本階段只提供老師端記錄。{process.env.PILOT_READING_REWARDS_ENABLED==="true"?<>本班若<Link href="/workspace/rewards/reading-automation">另行確認啟用閱讀獎勵</Link>，新完成會給金幣、不給 XP，退回會回沖。</>:"目前不發扣金幣。"}尚未連動下課、商店或學生大屏；出缺席不自動改變閱讀狀態。到期明細可至<Link href="/workspace/debts">待完成總覽</Link>查看。</p>
  </main>;
 }
