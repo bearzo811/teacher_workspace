@@ -36,6 +36,6 @@ export default async function ReturnDays({searchParams}:{searchParams:Promise<{d
    </section>;})}
    <details><summary>已建立日期（{days?.data?.length??0}）</summary><ul>{days?.data?.map(item=><li key={item.day}><Link href={`/workspace/return-days?day=${item.day}`}>{item.day} {item.label}（{item.enabled?"啟用":"關閉"}）</Link></li>)}</ul></details>
   </>}
-  <p>此階段僅老師端記錄，不發扣金幣、XP，也不開放學生大屏操作。未確認出缺席者暫按出席，請假者原完成紀錄保留。</p>
+  <p>{process.env.PILOT_ROUTINE_REWARDS_ENABLED==="true"?"僅老師端記錄；本班若另行啟用生活任務自動獎勵，今天新完成會給金幣與 XP，取消會回沖，過去／未來紀錄不發新獎勵。尚不開放學生大屏操作。":"此階段僅老師端記錄，不發扣金幣、XP，也不開放學生大屏操作。"}未確認出缺席者暫按出席，請假者原完成紀錄保留。</p>
  </main>;
 }
