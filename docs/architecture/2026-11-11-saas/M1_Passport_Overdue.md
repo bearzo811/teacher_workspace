@@ -1,6 +1,6 @@
-# 護照每日逾期扣點（本機完成，雲端待授權）
+# 護照每日逾期扣點（雲端已啟用，待自然排程觀察）
 
-2026-11-19。僅新版 pilot；使用者已確認「請假當天免扣」。尚未執行 0020／0021，沒有雲端扣款或排程。
+2026-11-19。僅新版 pilot；使用者已確認「請假當天免扣」，並明確允許新增權限與每日雲端排程。0020／0021 已成功執行。
 
 ## 功能與界線
 
@@ -19,6 +19,14 @@
 
 本機 SQL 測試：預設不扣、規則未確認拒絕、無歷史追扣、當週不扣、逐日來源唯一、請假／週末／放假／補課、午夜前後狀態、負淨額不改 XP、第二項故障時整班回滾、失敗重試、停用與重新啟用不補扣、停用老師、匿名與跨班禁止。
 
-PGlite 不提供 pg_cron；0021 尚無真實排程驗收。不能把本機 worker 測試通過宣稱排程已上線，更不能宣稱已觀察自然觸發扣款。設定頁提供最近 30 日每班收據，不代替平台整體告警／備份監控。
+PGlite 不提供 pg_cron，本機不宣稱測試到真實排程。設定頁提供最近 30 日每班收據，不代替平台整體告警／備份監控。
+
+## 雲端啟用與驗收
+
+0020／0021 僅於新版 `yqogdgvkeghyuibydqhw` 執行成功。Cron job `teacher-pilot-passport-overdue-v1` 已啟用，schedule=`5 16 * * *`，cron_timezone=`GMT`，即台灣每日 00:05。匿名設定 RPC execute=false，authenticated 私有 worker execute=false。沒有新增 HTTP endpoint 或讀取 service-role key。
+
+旗標 `PILOT_PASSPORT_OVERDUE_ENABLED=true` 已設定，部署 `dpl_7hbYRzbyg7p6UUKoX2dRNxELQYqs` Ready。虛構 B 班由未啟用→啟用成功，起算日 2026-11-19；當日手動執行同一 worker 後扣款來源與收據均為 0，符合不追扣 11/18。最後恢復班級開關關閉，沒有新增任何雲端扣款。頁面保留起算日及確認保存結果。
+
+**尚未觀察排程於下一個 00:05 自然觸發，也未在雲端以改時鐘／回填起算日製造實扣。** 尚不能將「已排程」寫成「已自然扣款驗收」。舊站與舊資料庫不變。
 
 官方依據：[安裝](https://supabase.com/docs/guides/cron/install)、[排程與管理](https://supabase.com/docs/guides/cron/quickstart)。
