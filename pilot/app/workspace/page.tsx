@@ -56,6 +56,7 @@ export default async function Workspace({ searchParams }: { searchParams: Promis
       {process.env.PILOT_READING_REWARDS_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"rewards") && <p><Link href="/workspace/rewards/reading-automation">閱讀／讀報自動獎勵 →</Link></p>}
       {process.env.PILOT_PASSPORT_REWARDS_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"rewards") && <p><Link href="/workspace/rewards/passport-automation">護照完成自動獎勵 →</Link></p>}
       {process.env.PILOT_HOMEWORK_REWARDS_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"rewards") && <p><Link href="/workspace/rewards/homework-automation">作業完成自動獎勵 →</Link></p>}
+      {process.env.PILOT_PASSPORT_OVERDUE_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"rewards") && <p><Link href="/workspace/rewards/passport-overdue">護照每日逾期扣點 →</Link></p>}
       {process.env.PILOT_PASSPORTS_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"passport") && <p><Link href="/workspace/passports">護照 →</Link></p>}
       {process.env.PILOT_READING_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"reading") && <p><Link href="/workspace/reading">閱讀／讀報 →</Link></p>}
       {((process.env.PILOT_HOMEWORK_CHECKS_ENABLED === "true"&&moduleEnabled(classroom.enabled_modules,"homework"))||(process.env.PILOT_PASSPORTS_ENABLED === "true"&&moduleEnabled(classroom.enabled_modules,"passport"))||(process.env.PILOT_READING_ENABLED === "true"&&moduleEnabled(classroom.enabled_modules,"reading"))) && <p><Link href="/workspace/debts">待完成總覽 →</Link></p>}
