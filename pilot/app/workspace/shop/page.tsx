@@ -17,7 +17,8 @@ export default async function Shop({searchParams}:{searchParams:Promise<{notice?
  const unavailable=classes.error||products?.error||(products?.data?.length??0)>shopLimits.retained;
  const items=(products?.data??[]) as ShopItem[];
  return <main style={{maxWidth:1200,margin:"auto",padding:24,lineHeight:1.8}}><Link href="/workspace">← 返回工作台</Link><h1>商品管理</h1><p>{classroom?.name}</p>
- <p>僅老師端管理商品；尚未開放購買、扣款、背包或學生大屏。依等級由高到低，同等級價格由高到低排列。</p>
+ <p>僅老師端管理商品；尚未開放學生購買、扣款或學生大屏。依等級由高到低，同等級價格由高到低排列。</p>
+ {process.env.PILOT_BACKPACK_ENABLED==="true"&&<p><Link href="/workspace/backpacks">學生背包與老師贈送／核銷</Link></p>}
  {params.notice==="saved"&&<p role="status">商品設定已儲存。</p>}{params.error&&<p role="alert">未能儲存，請重新整理後確認名稱沒有重複、數值有效且版本未被其他分頁更新。</p>}
  {unavailable?<p role="alert">商品資料讀取失敗，不提供操作。</p>:!enabled?<p>請先在工作台開啟金幣與商店模組。</p>:<>
  <details><summary>新增商品</summary><p>每班最多保留 {shopLimits.retained} 項（含已移除）。重送同一新增表單不重複建立。</p><form action={saveShopItem}><input type="hidden" name="classId" value={classroom!.id}/><input type="hidden" name="requestId" value={randomUUID()}/><input type="hidden" name="version" value="0"/><ProductFields/><Submit>新增商品</Submit></form></details>
