@@ -2,6 +2,7 @@
 import {redirect} from "next/navigation";
 import {revalidatePath} from "next/cache";
 import {serverClient} from "../../../lib/supabase";
+import {displaySections,validDisplayFont} from '../../../lib/display-settings';
 export type PairingState={error?:string;code?:string;expires?:string};
 async function teacher(){
  if(process.env.PILOT_DISPLAY_PAIRING_ENABLED!=="true")redirect('/workspace');
@@ -20,4 +21,12 @@ export async function revokeDisplay(form:FormData){
  if(form.get('confirm')!=='yes'||![classId,deviceId].every(id=>/^[a-f0-9-]{36}$/i.test(id)))redirect('/workspace/displays?error=input');
  const result=await client.rpc('revoke_pilot_display',{target_class:classId,target_device:deviceId});
  revalidatePath('/workspace/displays');redirect(`/workspace/displays?${result.error?'error=save':'notice=revoked'}`);
+}
+export async function saveAppearance(form:FormData){
+ if(process.env.PILOT_DISPLAY_APPEARANCE_ENABLED!=='true')redirect('/workspace/displays');
+ const client=await teacher(),classId=String(form.get('classId')??''),font=Number(form.get('font')),version=Number(form.get('version')),sections=form.getAll('section').map(String);
+ if(!/^[a-f0-9-]{36}$/i.test(classId)||!validDisplayFont(font)||!Number.isInteger(version)||version<0||sections.some(id=>!displaySections.some(s=>s.id===id)))redirect('/workspace/displays?error=appearance');
+ const result=await client.rpc('save_pilot_display_settings',{target_class:classId,font_size:font,sections,expected_version:version});
+ revalidatePath('/workspace/displays');revalidatePath('/display','layout');
+ redirect(`/workspace/displays?${result.error?'error=appearance':'notice=appearance'}`);
 }

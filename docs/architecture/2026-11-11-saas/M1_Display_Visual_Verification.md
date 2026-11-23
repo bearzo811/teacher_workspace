@@ -1,5 +1,9 @@
 # Display visual verification — 2026-11-23
 
+## Correction after viewport verification
+
+The browser viewport capability accepted 3840×2160, but a later explicit `innerWidth`/`innerHeight` check still reported 1280×720, including after reload and a fresh tab. Consequently **the claimed 4K checks below are invalid and superseded**. Files whose names contain `4k` must not be treated as 4K proof. Only observed 1280×720 geometry is verified. Actual 4K verification remains outstanding; the viewport override has been reset. Future checks must assert the actual DOM dimensions before recording a resolution result.
+
 Local development fixtures use the actual display view components, synthetic data only, and no database calls. `/display/preview` returns not-found outside development. Development uses `.next-dev` so a production build cannot overwrite its running cache.
 
 Checked points and debt cards with 1, 9, and 15 students at 1280×720 and 3840×2160. Fixed points cards hiding coins/XP and debt cards hiding category counts. Final 4K font-size changes rechecked with 15 students: no document overflow and no debt card overflow. Names, gate labels, and category counts stay visible; long middle content may scroll inside a card at 720p.

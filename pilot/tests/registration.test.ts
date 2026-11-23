@@ -1398,5 +1398,22 @@ for (const management of [false, true]) test(`Google registration boundaries (ro
     assert.equal((await db.query<{version:number}>("select version from public.pilot_debt_preferences where student_id=$1",[es2])).rows[0].version,2);
     await db.query("select public.revoke_pilot_display($1,$2)",[ce,preferencePair.device_id]);
     await db.exec("reset role;set role anon");await assert.rejects(db.query("select public.get_pilot_display_debts($1)",[preferenceToken]),/access denied/);
+    await db.exec("reset role");await db.exec(await readFile(new URL("../supabase/migrations/0037_display_appearance.sql",import.meta.url),"utf8"));
+    await login(e);await db.query("select public.save_pilot_display_settings($1,32,array['contact','debts'],0)",[ce]);
+    assert.deepEqual((await db.query("select base_font,visible_sections,version from public.pilot_display_settings where class_id=$1",[ce])).rows[0],{base_font:32,visible_sections:['contact','debts'],version:1});
+    await assert.rejects(db.query("select public.save_pilot_display_settings($1,22,array['contact'],0)",[ce]),/changed/);
+    await assert.rejects(db.query("select public.save_pilot_display_settings($1,100,array['contact'],1)",[ce]),/Invalid display settings/);
+    await assert.rejects(db.query("select public.save_pilot_display_settings($1,22,array['admin'],1)",[ce]),/Invalid display settings/);
+    await assert.rejects(db.query("select public.save_pilot_display_settings($1,22,array['contact','contact'],1)",[ce]),/Invalid display settings/);
+    const appearancePair=(await db.query<{p:{code:string;device_id:string}}>("select public.create_pilot_display_pairing($1,'文字與分頁驗收') p",[ce])).rows[0].p;
+    await db.exec("reset role;set role anon");const appearanceToken=(await db.query<{p:{token:string}}>("select public.pair_pilot_display($1) p",[appearancePair.code])).rows[0].p.token;
+    assert.deepEqual((await db.query<{p:unknown}>("select public.get_pilot_display_settings($1) p",[appearanceToken])).rows[0].p,{base_font:32,visible_sections:['contact','debts'],version:1});
+    await assert.rejects(db.query("select public.save_pilot_display_settings($1,22,array['contact'],1)",[ce]),/permission denied/);
+    await login(a);assert.deepEqual((await db.query("select * from public.pilot_display_settings where class_id=$1",[ce])).rows,[]);
+    await assert.rejects(db.query("select public.save_pilot_display_settings($1,22,array['contact'],1)",[ce]),/access denied/);
+    await login(e);await db.query("select public.save_pilot_display_settings($1,22,array[]::text[],1)",[ce]);
+    await db.exec("reset role;set role anon");assert.deepEqual((await db.query<{p:{visible_sections:string[]}}>("select public.get_pilot_display_settings($1) p",[appearanceToken])).rows[0].p.visible_sections,[]);
+    await login(e);await db.query("select public.revoke_pilot_display($1,$2)",[ce,appearancePair.device_id]);
+    await db.exec("reset role;set role anon");await assert.rejects(db.query("select public.get_pilot_display_settings($1)",[appearanceToken]),/access denied/);
   } finally { await db.close(); }
 });
