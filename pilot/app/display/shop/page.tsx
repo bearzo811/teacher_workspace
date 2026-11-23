@@ -14,7 +14,7 @@ export default async function ShopPage({searchParams}:{searchParams:Promise<{stu
  const result=await displayClient().rpc('get_pilot_display_shop',{device_token:token,selected_student:student});
  if(result.error)return <main style={{padding:32}}><h1>商店暫時無法開啟</h1><p>請重新選擇學生；若裝置已被撤銷或到期，請老師重新配對。</p><Link href="/display/shop">重新選擇</Link> · <Link href="/display/pair">白板配對</Link></main>;
  const data=result.data as Shop,selected=data.students.find(s=>s.id===student),state=data.eligibility;
- return <main style={{height:'100dvh',display:'flex',flexDirection:'column',background:'#071020',color:'#eef5ff',padding:20,boxSizing:'border-box',fontSize:20,gap:12}}>
+ return <main style={{height:'100%',display:'flex',flexDirection:'column',background:'#071020',color:'#eef5ff',padding:20,boxSizing:'border-box',fontSize:20,gap:12}}>
  <header style={{flexShrink:0}}><Link href="/display" style={{color:'#a5d8ff'}}>← 白板</Link><h1 style={{margin:'8px 0'}}>班級商店</h1>{params.notice==='purchased'&&<p role="status" style={{color:'#6ee7b7'}}>購買成功，獎品已放入背包。</p>}{params.error&&<p role="alert" style={{color:'#fda4af'}}>未完成購買。請確認金幣、等級、待完成項目或商品價格／庫存，再試一次。</p>}
  {!data.enabled?<p>本班尚未開啟商店模組。</p>:<><form method="get"><label>我是 <select name="student" defaultValue={student??''} required style={{fontSize:'inherit'}}><option value="" disabled>選自己的座號</option>{data.students.map(s=><option key={s.id} value={s.id}>{s.seat} 號 {s.name}</option>)}</select></label> <button style={{fontSize:'inherit'}}>選擇</button></form>
  {selected&&state&&<><p>{selected.name} · Lv.{state.level??'—'} · {state.coins} 金幣</p><p>{!state.shop_open?'商店尚未開放':!state.learning_clear?`尚待完成：作業 ${state.homework}、護照 ${state.passports}、閱讀／讀報 ${state.reading}`:'點擊購買會立即扣金幣，獎品永久保存在背包。'}</p></>}</>}
