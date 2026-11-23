@@ -1376,5 +1376,27 @@ for (const management of [false, true]) test(`Google registration boundaries (ro
     await db.exec("reset role;set role anon");await assert.rejects(completeLearning(es2,'passport',ep,14,null,null),/access denied/);
     await login(e);await db.query("select public.revoke_pilot_display($1,$2)",[ce,completionPair.device_id]);
     await db.exec("reset role;set role anon");await assert.rejects(completeLearning(es2,'passport',ep,14,null,null),/access denied/);
+    await db.exec("reset role");await db.exec(await readFile(new URL("../supabase/migrations/0036_debt_preferences.sql",import.meta.url),"utf8"));
+    await login(e);await db.query("select public.configure_pilot_modules($1,array['homework','passport','reading','rewards'])",[ce]);
+    const preferenceKeys=[`${ep}:14`,newWork,'reflection:2026-11-01'];
+    await db.query("select public.save_pilot_debt_preference($1,$2,$3,$4,false,0)",[ce,es2,et,preferenceKeys]);
+    assert.deepEqual((await db.query("select ordered_keys,show_more,version from public.pilot_debt_preferences where student_id=$1",[es2])).rows[0],{ordered_keys:preferenceKeys,show_more:false,version:1});
+    await assert.rejects(db.query("select public.save_pilot_debt_preference($1,$2,$3,$4,true,0)",[ce,es2,et,preferenceKeys]),/changed/);
+    await assert.rejects(db.query("select public.save_pilot_debt_preference($1,$2,$3,$4,true,1)",[ce,aStudent,et,preferenceKeys]),/access denied/);
+    await assert.rejects(db.query("select public.save_pilot_debt_preference($1,$2,$3,$4,true,1)",[ce,es2,et,[newWork,newWork]]),/Invalid debt order/);
+    await assert.rejects(db.query("select public.save_pilot_debt_preference($1,$2,$3,$4,true,1)",[ce,es2,et,[eh]]),/Debt assignment access denied/);
+    await assert.rejects(db.query("select public.save_pilot_debt_preference($1,$2,$3,$4,true,1)",[ce,es2,et,['reflection:2027-03-01']]),/Debt reading access denied/);
+    const preferencePair=(await db.query<{p:{code:string;device_id:string}}>("select public.create_pilot_display_pairing($1,'個人排序白板') p",[ce])).rows[0].p;
+    await db.exec("reset role;set role anon");
+    const preferenceToken=(await db.query<{p:{token:string}}>("select public.pair_pilot_display($1) p",[preferencePair.code])).rows[0].p.token;
+    const devicePreferences=(await db.query<{p:{preferences:{student_id:string;ordered_keys:string[];show_more:boolean}[]}}>("select public.get_pilot_display_debts($1) p",[preferenceToken])).rows[0].p.preferences;
+    assert.deepEqual(devicePreferences.map(p=>({student_id:p.student_id,ordered_keys:p.ordered_keys,show_more:p.show_more})),[{student_id:es2,ordered_keys:preferenceKeys,show_more:false}]);
+    await assert.rejects(db.query("select public.save_pilot_debt_preference($1,$2,$3,$4,true,1)",[ce,es2,et,[]]),/permission denied/);
+    await login(a);assert.deepEqual((await db.query("select * from public.pilot_debt_preferences where class_id=$1",[ce])).rows,[]);
+    await assert.rejects(db.query("select public.save_pilot_debt_preference($1,$2,$3,$4,true,1)",[ce,es2,et,[]]),/access denied/);
+    await login(e);await db.query("select public.save_pilot_debt_preference($1,$2,$3,$4,true,1)",[ce,es2,et,[]]);
+    assert.equal((await db.query<{version:number}>("select version from public.pilot_debt_preferences where student_id=$1",[es2])).rows[0].version,2);
+    await db.query("select public.revoke_pilot_display($1,$2)",[ce,preferencePair.device_id]);
+    await db.exec("reset role;set role anon");await assert.rejects(db.query("select public.get_pilot_display_debts($1)",[preferenceToken]),/access denied/);
   } finally { await db.close(); }
 });

@@ -6,8 +6,10 @@ import {taipeiToday,validDate,type Term} from "../../../lib/calendar";
 import {studentWork,type DebtAssignment,type DebtCheck} from "../../../lib/debts";
 import {homeworkStatuses} from "../../../lib/homework";
 import {studentLearning,type PassportPlan,type PassportCheck,type ReadingCheck} from "../../../lib/learning-debts";
+import {OrderEditor} from './order-editor';
+import {orderDebt,type DebtPreference} from '../../../lib/debt-order';
 export const dynamic="force-dynamic";
-export default async function Debts({searchParams}:{searchParams:Promise<{term?:string;from?:string;day?:string}>}) {
+export default async function Debts({searchParams}:{searchParams:Promise<{term?:string;from?:string;day?:string;notice?:string;error?:string}>}) {
  if(![process.env.PILOT_HOMEWORK_CHECKS_ENABLED,process.env.PILOT_PASSPORTS_ENABLED,process.env.PILOT_READING_ENABLED].includes("true")) redirect("/workspace");
  const params=await searchParams;const today=taipeiToday();const cutoff=params.day&&validDate(params.day)?params.day:today;
  const client=await serverClient();const {data:{user},error}=await client.auth.getUser();
@@ -43,11 +45,14 @@ export default async function Debts({searchParams}:{searchParams:Promise<{term?:
  const passportRows:PassportCheck[]=[];let passportError=false;
  for(let offset=0;classroom&&studentIds.length&&offset<(plans?.data?.length??0);offset+=5){const results=await Promise.all((plans?.data??[]).slice(offset,offset+5).map(plan=>client.from("pilot_passport_checks").select("passport_id,student_id,week,completed").eq("class_id",classroom.id).eq("passport_id",plan.id).in("student_id",studentIds)));if(results.some(result=>result.error)){passportError=true;break;}passportRows.push(...results.flatMap(result=>result.data??[]));}
  const readingRows=readingEnabled&&term&&classroom&&studentIds.length?await client.from("pilot_reading_checks").select("student_id,kind,month,status").eq("class_id",classroom.id).eq("term_id",term.id).in("student_id",studentIds):null;
- const unavailable=classes.error||terms?.error||assignments?.error||students?.error||books?.error||checkError||plans?.error||passportError||readingRows?.error;
+ const preferencesReady=process.env.PILOT_DEBT_PREFERENCES_ENABLED==="true";
+ const preferences=preferencesReady&&classroom&&term?await client.from("pilot_debt_preferences").select("student_id,term_id,ordered_keys,show_more,version").eq("class_id",classroom.id).eq("term_id",term.id):null;
+ const unavailable=preferences?.error||classes.error||terms?.error||assignments?.error||students?.error||books?.error||checkError||plans?.error||passportError||readingRows?.error;
  const bookMap=new Map((books?.data??[]).map(book=>[book.id,`${book.subject}／${book.name}`]));
  const label=(item:DebtAssignment)=>`${bookMap.get(item.workbook_id)??"簿本"} ${item.content}`;
  return <main style={{maxWidth:1400,margin:"auto",padding:24,lineHeight:1.8}}>
   <Link href="/workspace">← 返回工作台</Link><h1>待完成作業總覽</h1><p>{classroom?.name}</p>
+  {params.notice==="ordered"&&<p role="status">個人顯示設定已儲存。</p>}{params.error==="order"&&<p role="alert">設定未能儲存；資料可能已更新，請重新載入後再試。</p>}
   {!enabled&&!unavailable&&<p>請先在工作台開啟「聯絡簿與作業」、「護照」或「閱讀／讀報」。</p>}
   {enabled&&<form method="get" style={{display:"flex",flexWrap:"wrap",gap:12,alignItems:"end"}}>
    <label>學期<br/><select name="term" defaultValue={term?.id} style={{padding:8,maxWidth:"100%"}}>{list.map(item=><option key={item.id} value={item.id}>{item.name}{item.active?"（啟用）":""}</option>)}</select></label>
@@ -55,15 +60,16 @@ export default async function Debts({searchParams}:{searchParams:Promise<{term?:
    <label>截至繳交日<br/><input type="date" name="day" defaultValue={cutoff} max={today} required style={{padding:8}}/></label><button>查看總覽</button>
   </form>}
   {unavailable?<p role="alert">資料載入失敗，暫不顯示名單或可下課判定，請重新整理。</p>:invalid?<p role="alert">開始日不能晚於截止日。</p>:cutoff>today?<p role="alert">請選今天或更早的截止日，尚未到期的作業不列為待完成。</p>:tooMany?<p role="alert">此範圍超過 1000 項作業，請縮短日期範圍；為避免漏列，暫不顯示學生判定。</p>:enabled&&!term?<p>請先建立學期。</p>:enabled&&term?<>
-   <p>範圍：{term.name}，作業繳交日 {from}～{cutoff}；護照列至截止日當週，閱讀／讀報僅列截止日前已結束的月份。待確認及未訂正完成已算交出，但尚未完成；下課／商店標籤目前僅依所選作業設定提示，尚未實際限制大屏或商店。</p>
+   <p>範圍：{term.name}，作業繳交日 {from}～{cutoff}；護照列至截止日當週，閱讀／讀報僅列截止日前已結束的月份。待確認及未訂正完成已算交出，但尚未完成；下課／商店標籤目前僅依所選作業設定提示，商店資格會另外依目前啟用學期的全部到期項目判斷。</p>
    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,320px),1fr))",gap:16,marginTop:20}}>
-    {(students?.data??[]).map(student=>{const work=studentWork(items,checkRows,student.id,cutoff);const learning=studentLearning(term,cutoff,student.id,(plans?.data??[]) as PassportPlan[],passportRows,(readingRows?.data??[]) as ReadingCheck[],Boolean(readingEnabled));return <article key={student.id} style={{border:"1px solid #cbd5e1",borderRadius:12,padding:16,overflowWrap:"anywhere"}}>
+    {(students?.data??[]).map(student=>{const work=studentWork(items,checkRows,student.id,cutoff);const learning=studentLearning(term,cutoff,student.id,(plans?.data??[]) as PassportPlan[],passportRows,(readingRows?.data??[]) as ReadingCheck[],Boolean(readingEnabled));const preference=(preferences?.data as DebtPreference[]|null)?.find(p=>p.student_id===student.id);const ordered=orderDebt([...work.unfinished.map(item=>({id:item.id,label:label(item)})),...learning.passports,...learning.reading],preference?.ordered_keys);return <article key={student.id} style={{border:"1px solid #cbd5e1",borderRadius:12,padding:16,overflowWrap:"anywhere"}}>
      <h2>{student.seat} 號 {student.name}</h2><p><Link href={`/workspace/debts/print?${new URLSearchParams({student:student.id,term:term.id,from,day:cutoff})}`}>列印個人待完成清單</Link></p>{homeworkEnabled&&<p><strong>{work.blocksBreak?"不能下課":"可以下課"}</strong> · <strong>{work.blocksShop?"商店暫停":"可以兌換"}</strong>（僅所選作業，不含下列護照／閱讀）</p>}
      {homeworkEnabled&&(work.unfinished.length?<><p>下一個先完成</p><div style={{fontSize:24,fontWeight:700}}>{label(work.unfinished[0])}</div><p>{homeworkStatuses.find(item=>item.id===work.unfinished[0].status)?.name} · 聯絡簿 {work.unfinished[0].contact_day}</p>
       {work.unfinished.slice(1,3).map(item=><p key={item.id} style={{opacity:0.75}}>{label(item)} · {homeworkStatuses.find(option=>option.id===item.status)?.name}</p>)}</>:<p>所選範圍的作業都已完成。</p>)}
      {homeworkEnabled&&<p>未交 {work.missing} 項 · 待確認 {work.pending} 項 · 未訂正完成 {work.correction} 項</p>}
      {passportEnabled&&<details open><summary>護照尚待完成 {learning.passports.length} 項</summary>{learning.passports.length?<ul>{learning.passports.map(item=><li key={item.id}>{item.label}</li>)}</ul>:<p>此範圍沒有需列出的護照未完成項目。</p>}{term.active?<Link href="/workspace/passports">前往護照</Link>:<p>歷史學期目前僅供查閱。</p>}</details>}
      {readingEnabled&&<details open><summary>閱讀／讀報到期未完成 {learning.reading.length} 項</summary>{learning.reading.length?<ul>{learning.reading.map(item=><li key={item.id}>{item.label} · {item.status}</li>)}</ul>:<p>已結束月份沒有未完成項目；尚未到期月份不列入。</p>}{term.active?<Link href="/workspace/reading">前往閱讀／讀報</Link>:<p>歷史學期目前僅供查閱。</p>}</details>}
+     {preferencesReady&&term.active&&<OrderEditor key={`${student.id}:${preference?.version??0}`} classroom={classroom.id} student={student.id} term={term.id} items={ordered} showMore={preference?.show_more??true} version={preference?.version??0}/>}
      {homeworkEnabled&&<details><summary>全部作業與狀態（{work.all.length}）</summary><ul>{work.all.map(item=><li key={item.id}>{label(item)} · {homeworkStatuses.find(option=>option.id===item.status)?.name}<br/>聯絡簿 {item.contact_day} · 繳交 {item.due_day} · <Link href={`/workspace/homework?day=${item.due_day}`}>前往檢核</Link></li>)}</ul></details>}
     </article>;})}
    </div>{!(students?.data?.length)&&<p>班級尚無使用中學生。</p>}

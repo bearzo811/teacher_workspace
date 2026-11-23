@@ -3,12 +3,14 @@ import {PointsView,type Points} from '../students/view';
 import {DebtsView,type Data} from '../debts/view';
 import {CalendarView,type Calendar} from '../calendar/view';
 import {LearningView,type Snapshot} from '../learning/view';
+import {OrderEditor} from '../../workspace/debts/order-editor';
 export const dynamic='force-dynamic';
 // Pure visual fixtures only. This route never reads or writes any database.
 export default async function Preview({searchParams}:{searchParams:Promise<{count?:string;view?:string;mode?:string}>}){
  if(process.env.NODE_ENV!=='development')notFound();
  const params=await searchParams,count=['1','9','15'].includes(params.count??'')?Number(params.count):9;
  const students=Array.from({length:count},(_,i)=>({id:`00000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`,seat:i+1,name:`虛構學生${String(i+1).padStart(2,'0')}`}));
+ if(params.view==='order')return <main style={{padding:24,background:'#fff',color:'#111827',height:'100%',overflow:'auto',boxSizing:'border-box'}}><h1>虛構學生個人排序預覽</h1><OrderEditor classroom="fixture" student="fixture" term="fixture" version={0} showMore={true} preview items={[{id:'math',label:'數學習作 p.35–38 · 待確認'},{id:'chinese',label:'國語第十課生字訂正 · 未訂正完成'},{id:'passport',label:'國語護照 W13 · 未完成'},{id:'reading',label:'閱讀心得 2026-10 · 未開始'}]}/></main>;
  if(params.view==='calendar'){
   const data:Calendar={today:'2026-11-23',month:'2026-11-01',term:{id:'fixture-term',name:'虛構學期',start_date:'2026-09-01',end_date:'2027-01-22',active:true},days:[],events:[{id:'today',title:'虛構校外教學活動',day:'2026-11-23',note:'僅供排版驗收'}],countdowns:Array.from({length:50},(_,i)=>({id:`event-${i}`,title:`虛構活動 ${i+1}`,day:'2027-01-08',note:'跨年活動倒數與獨立捲動驗收。'}))};
   return <CalendarView data={data}/>;
