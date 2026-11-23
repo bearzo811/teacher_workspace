@@ -16,7 +16,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{stu
  const unavailable=classes.error||settings?.error||students?.error||preview?.error;
  const state=preview?.data as {rules_confirmed:boolean;term_ready:boolean;learning_clear:boolean;homework:number;passports:number;reading:number;coins:number;level:number|null}|null;
  return <main style={{maxWidth:900,margin:"auto",padding:24,lineHeight:1.8}}><Link href="/workspace/shop">← 商品管理</Link><h1>商店開放與購買資格</h1><p>{room?.name}</p>
- <p>目前準備私有購買交易功能，尚未提供學生購買入口。每班預設關閉；購買成功時會直接扣金幣、扣庫存並放入永久背包，不需要老師核准購買。</p>
+ <p>{process.env.PILOT_DISPLAY_SHOP_ENABLED==='true'?'有效配對白板可從班級商店購買。':'目前準備私有購買交易功能，尚未提供學生購買入口。'}每班預設關閉；購買成功時會直接扣金幣、扣庫存並放入永久背包，不需要老師核准購買。</p>
  {params.notice&&<p role="status">商店設定已儲存。</p>}{params.error&&<p role="alert">未能儲存。請先確認獎勵規則，或重新整理後再試。</p>}
  {unavailable?<p role="alert">讀取失敗，暫不提供操作。</p>:<><h2>目前：{settings?.data?.is_open?'開放':'關閉'}</h2><form action={configureShop}><input type="hidden" name="classId" value={room!.id}/><input type="hidden" name="version" value={settings?.data?.version??0}/><input type="hidden" name="mode" value={settings?.data?.is_open?'close':'open'}/><p><label><input type="checkbox" name="confirm" value="yes" required/>確認{settings?.data?.is_open?'關閉':'開放'}本班商店交易設定。</label></p><Submit>儲存開放設定</Submit></form>
  <h2>學生資格預覽</h2><form method="get"><label>學生 <select name="student" defaultValue={selected?.id}>{students?.data?.map(s=><option key={s.id} value={s.id}>{s.seat} 號 {s.name}</option>)}</select></label> <button>查看</button></form>

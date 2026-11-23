@@ -17,7 +17,7 @@ export default async function Shop({searchParams}:{searchParams:Promise<{notice?
  const unavailable=classes.error||products?.error||(products?.data?.length??0)>shopLimits.retained;
  const items=(products?.data??[]) as ShopItem[];
  return <main style={{maxWidth:1200,margin:"auto",padding:24,lineHeight:1.8}}><Link href="/workspace">← 返回工作台</Link><h1>商品管理</h1><p>{classroom?.name}</p>
- <p>僅老師端管理商品；尚未開放學生購買、扣款或學生大屏。依等級由高到低，同等級價格由高到低排列。</p>
+ <p>{process.env.PILOT_DISPLAY_SHOP_ENABLED==='true'?'有效配對白板可購買並直接扣款入包；請到商店開放設定開啟本班商店。':'僅老師端管理商品；尚未開放學生購買、扣款或學生大屏。'}依等級由高到低，同等級價格由高到低排列。</p>
  {process.env.PILOT_BACKPACK_ENABLED==="true"&&<p><Link href="/workspace/backpacks">學生背包與老師贈送／核銷</Link></p>}
  {process.env.PILOT_PURCHASE_ENGINE_ENABLED==="true"&&<p><Link href="/workspace/shop/settings">商店開放與購買資格</Link> · <Link href="/workspace/shop/receipts">購買交易紀錄</Link></p>}
  {params.notice==="saved"&&<p role="status">商品設定已儲存。</p>}{params.error&&<p role="alert">未能儲存，請重新整理後確認名稱沒有重複、數值有效且版本未被其他分頁更新。</p>}
