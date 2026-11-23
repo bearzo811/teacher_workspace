@@ -27,4 +27,4 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
-export const config = { matcher: ["/login", "/workspace/:path*", "/auth/:path*"] };
+export const config = { matcher: ["/login", "/workspace/:path*", "/auth/:path*", "/display/:path*"] };

@@ -66,6 +66,7 @@ export default async function Workspace({ searchParams }: { searchParams: Promis
       {process.env.PILOT_CONTACT_BOOK_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"homework") && <p><Link href="/workspace/contact-book">聯絡簿 →</Link></p>}
       {process.env.PILOT_WORKBOOKS_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"homework") && <p><Link href="/workspace/workbooks">簿本管理 →</Link></p>}
       {process.env.PILOT_CALENDAR_ENABLED === "true" && <p><Link href="/workspace/calendar">學期與行事曆 →</Link></p>}
+      {process.env.PILOT_DISPLAY_PAIRING_ENABLED === "true" && <p><Link href="/workspace/displays">白板配對與撤銷授權 →</Link></p>}
       {moduleSelectionReady && <section aria-label="班級功能設定">
         <h2>{classroom.modules_configured_at ? "班級功能" : "先選擇你的班級需要哪些功能"}</h2>
         {classroom.modules_configured_at && <p>已選擇：{modules.filter(module => classroom.enabled_modules?.includes(module.id)).map(module => module.name).join("、") || "僅基本功能"}（選用模組尚在開發）</p>}
