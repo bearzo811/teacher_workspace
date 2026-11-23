@@ -10,5 +10,5 @@ export async function requestRewardUse(form:FormData){
  const student=String(form.get('student')??''),reward=String(form.get('reward')??''),request=String(form.get('request')??''),version=shopInteger(form.get('version'),1,1000000),page=shopInteger(form.get('page'),1,20);
  if(![student,reward,request].every(id=>/^[a-f0-9-]{36}$/i.test(id))||version===null||page===null)redirect('/display/backpack?error=input');
  const result=await displayClient().rpc('request_pilot_display_reward',{device_token:token,target_student:student,target_reward:reward,request_key:request,expected_version:version});
- revalidatePath('/display/backpack');redirect(`/display/backpack?student=${student}&page=${page}&${result.error?'error=request':'notice=requested'}`);
+ revalidatePath('/display/backpack');redirect(`/display/backpack?student=${student}&page=${page}&${result.error?'error=request':`notice=requested&reward=${reward}`}`);
 }
