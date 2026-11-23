@@ -1179,5 +1179,42 @@ for (const management of [false, true]) test(`Google registration boundaries (ro
     assert.deepEqual(noContact.assigned,[]);assert.deepEqual(noContact.due,[]);assert.deepEqual(noContact.routine_checks,[]);assert.equal(noContact.notes,'');
     await login(e);await db.query("select public.revoke_pilot_display($1,$2)",[ce,contactPair.device_id]);
     await db.exec("reset role;set role anon");await assert.rejects(db.query("select public.get_pilot_display_contact($1,null)",[contactToken]),/access denied/);
+    await db.exec("reset role");await db.exec(await readFile(new URL("../supabase/migrations/0031_display_homework_submit.sql",import.meta.url),"utf8"));
+    await login(e);await db.query("select public.configure_pilot_modules($1,array['homework','rewards'])",[ce]);
+    await db.query("select public.archive_pilot_assignment($1,$2,false)",[ce,eh]);await db.query("select public.set_pilot_homework_check($1,$2,$3,'missing')",[ce,eh,es]);
+    const submitPair=(await db.query<{p:{code:string;device_id:string}}>("select public.create_pilot_display_pairing($1,'繳交白板') p",[ce])).rows[0].p;
+    await db.exec("reset role;set role anon");
+    const submitToken=(await db.query<{p:{token:string}}>("select public.pair_pilot_display($1) p",[submitPair.code])).rows[0].p.token;
+    const submissionKey='70000000-0000-0000-0000-000000000001';
+    const submit=()=>db.query<{status:string}>("select public.submit_pilot_display_homework($1,$2,$3,$4) status",[submitToken,es,eh,submissionKey]);
+    assert.equal((await submit()).rows[0].status,'pending');assert.equal((await submit()).rows[0].status,'pending');
+    await assert.rejects(db.query("select public.submit_pilot_display_homework($1,$2,$3,$4)",[submitToken,es,newWork,submissionKey]),/request conflict/);
+    await assert.rejects(db.query("select public.submit_pilot_display_homework($1,$2,$3,gen_random_uuid())",[submitToken,es,newWork]),/Today due/);
+    await assert.rejects(db.query("select public.submit_pilot_display_homework($1,$2,$3,gen_random_uuid())",[submitToken,aStudent,eh]),/student access denied/);
+    await assert.rejects(db.query("select public.set_pilot_homework_check($1,$2,$3,'completed')",[ce,eh,es]),/permission denied/);
+    await assert.rejects(db.query("select * from public.pilot_display_submissions"),/permission denied/);
+    await login(e);
+    assert.equal((await db.query("select * from public.pilot_display_submissions where class_id=$1",[ce])).rows.length,1);
+    for(const teacherState of ['correction','completed']){
+     await db.query("select public.set_pilot_homework_check($1,$2,$3,$4)",[ce,eh,es,teacherState]);
+     await db.exec("reset role;set role anon");assert.equal((await db.query<{status:string}>("select public.submit_pilot_display_homework($1,$2,$3,gen_random_uuid()) status",[submitToken,es,eh])).rows[0].status,teacherState);
+     await login(e);assert.equal((await db.query<{status:string}>("select status from public.pilot_homework_checks where assignment_id=$1 and student_id=$2",[eh,es])).rows[0].status,teacherState,"student submission never overwrites teacher grading");
+    }
+    assert.equal((await db.query<{coin_net:number}>("select coin_net from public.pilot_reward_balances where student_id=$1",[es])).rows[0].coin_net,13,"self-submission does not grant completion coins");
+    await db.query("select public.set_pilot_homework_check($1,$2,$3,'missing')",[ce,eh,es]);
+    await db.exec("reset role;create function public.test_submission_failure() returns trigger language plpgsql as $$begin raise exception 'synthetic submission receipt failure';end;$$;create trigger test_submission_failure before insert on public.pilot_display_submissions for each row execute function public.test_submission_failure();set role anon");
+    await assert.rejects(db.query("select public.submit_pilot_display_homework($1,$2,$3,gen_random_uuid())",[submitToken,es,eh]),/synthetic submission receipt failure/);
+    await login(e);assert.equal((await db.query<{status:string}>("select status from public.pilot_homework_checks where assignment_id=$1 and student_id=$2",[eh,es])).rows[0].status,'missing',"receipt failure rolls back submission");
+    await db.exec("reset role;drop trigger test_submission_failure on public.pilot_display_submissions;drop function public.test_submission_failure()");
+    await db.query("insert into public.pilot_attendance(class_id,student_id,day,absent) values($1,$2,'2026-11-26',true)",[ce,es]);
+    await db.exec("set role anon");await assert.rejects(db.query("select public.submit_pilot_display_homework($1,$2,$3,gen_random_uuid())",[submitToken,es,eh]),/Student is absent/);
+    await db.exec("reset role");await db.query("update public.pilot_attendance set absent=false where class_id=$1 and student_id=$2 and day='2026-11-26'",[ce,es]);
+    await login(e);await db.query("select public.set_pilot_day($1,'2026-11-26',false,'放假')",[et]);
+    await db.exec("reset role;set role anon");await assert.rejects(db.query("select public.submit_pilot_display_homework($1,$2,$3,gen_random_uuid())",[submitToken,es,eh]),/Today due/);
+    await login(e);await db.query("select public.set_pilot_day($1,'2026-11-26',true,'補課')",[et]);
+    await db.query("select public.configure_pilot_modules($1,array['rewards'])",[ce]);
+    await db.exec("reset role;set role anon");await assert.rejects(db.query("select public.submit_pilot_display_homework($1,$2,$3,gen_random_uuid())",[submitToken,es,eh]),/access denied/);
+    await login(e);await db.query("select public.revoke_pilot_display($1,$2)",[ce,submitPair.device_id]);
+    await db.exec("reset role;set role anon");await assert.rejects(submit(),/access denied/);
   } finally { await db.close(); }
 });
