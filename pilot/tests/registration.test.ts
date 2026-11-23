@@ -1156,5 +1156,28 @@ for (const management of [false, true]) test(`Google registration boundaries (ro
     await assert.rejects(db.query("select public.request_pilot_display_reward($1,$2,$3,gen_random_uuid(),2)",[useToken,es,deviceGift]),/access denied/);
     await login(e);await db.query("select public.revoke_pilot_display($1,$2)",[ce,usePair.device_id]);
     await db.exec("reset role;set role anon");await assert.rejects(db.query("select public.get_pilot_display_backpack($1,$2,1)",[useToken,es]),/access denied/);
+    await db.exec("reset role");await db.exec(await readFile(new URL("../supabase/migrations/0030_display_contact_read.sql",import.meta.url),"utf8"));
+    await db.exec("create or replace function pilot_private.display_today() returns date language sql stable as $$select date '2026-11-26'$$");
+    await login(e);await db.query("select public.configure_pilot_modules($1,array['homework','routines','rewards'])",[ce]);
+    await db.query("select public.save_pilot_contact_notes($1,$2,'2026-11-26','明天帶剪刀')",[ce,et]);
+    const newWork=(await db.query<{id:string}>("select public.save_pilot_assignment($1,$2,'2026-11-26',null,$3,'明天才交',true,true) id",[ce,et,eb])).rows[0].id;
+    await db.query("select public.set_pilot_routine_check($1,$2,$3,'2026-11-26','morning_cleaning',true)",[ce,et,es]);
+    const contactPair=(await db.query<{p:{code:string;device_id:string}}>("select public.create_pilot_display_pairing($1,'聯絡簿白板') p",[ce])).rows[0].p;
+    await db.exec("reset role;set role anon");
+    const contactToken=(await db.query<{p:{token:string}}>("select public.pair_pilot_display($1) p",[contactPair.code])).rows[0].p.token;
+    const contactSnapshot=(await db.query<{p:{day:string;notes:string;week:number;school_day:boolean;assigned:{id:string}[];due:{id:string}[];homework_checks:{status:string}[];routine_checks:unknown[]}}>("select public.get_pilot_display_contact($1,$2) p",[contactToken,es])).rows[0].p;
+    assert.equal(contactSnapshot.day,'2026-11-26');assert.equal(contactSnapshot.week,13);assert.equal(contactSnapshot.school_day,true);assert.equal(contactSnapshot.notes,'明天帶剪刀');
+    assert.deepEqual(contactSnapshot.assigned.map(a=>a.id),[newWork]);assert.deepEqual(contactSnapshot.due.map(a=>a.id),[eh],"today's new assignment must not replace today's due work");
+    assert.equal(contactSnapshot.homework_checks[0].status,'correction');assert.equal(contactSnapshot.routine_checks.length,1);
+    await assert.rejects(db.query("select public.get_pilot_display_contact($1,$2)",[contactToken,aStudent]),/student access denied/);
+    await assert.rejects(db.query("select public.get_pilot_display_contact('invalid',null)"),/access denied/);
+    await login(e);await db.query("select public.archive_pilot_assignment($1,$2,true)",[ce,eh]);
+    await db.exec("reset role;set role anon");assert.equal((await db.query<{p:{due:unknown[]}}>("select public.get_pilot_display_contact($1,null) p",[contactToken])).rows[0].p.due.length,0);
+    await login(e);await db.query("select public.configure_pilot_modules($1,array['rewards'])",[ce]);
+    await db.exec("reset role;set role anon");
+    const noContact=(await db.query<{p:{assigned:unknown[];due:unknown[];routine_checks:unknown[];notes:string}}>("select public.get_pilot_display_contact($1,null) p",[contactToken])).rows[0].p;
+    assert.deepEqual(noContact.assigned,[]);assert.deepEqual(noContact.due,[]);assert.deepEqual(noContact.routine_checks,[]);assert.equal(noContact.notes,'');
+    await login(e);await db.query("select public.revoke_pilot_display($1,$2)",[ce,contactPair.device_id]);
+    await db.exec("reset role;set role anon");await assert.rejects(db.query("select public.get_pilot_display_contact($1,null)",[contactToken]),/access denied/);
   } finally { await db.close(); }
 });

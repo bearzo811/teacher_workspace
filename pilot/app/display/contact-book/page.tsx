@@ -1,0 +1,31 @@
+import Link from 'next/link';
+import {cookies} from 'next/headers';
+import {redirect} from 'next/navigation';
+import {displayClient,displayCookie} from '../../../lib/display';
+import {routineProgress,type RoutineCheck,type RoutineStudent} from '../../../lib/routines';
+import {isHandedIn,validHomeworkStatus} from '../../../lib/homework';
+export const dynamic='force-dynamic';
+type Snapshot={day:string;week:number|null;class_name:string;school_day:boolean;return_label:string|null;contact_exists:boolean;notes:string;homework_enabled:boolean;routines_enabled:boolean;students:RoutineStudent[];attendance:{student_id:string;absent:boolean}[];routine_checks:RoutineCheck[];return_checks:RoutineCheck[];assigned:{id:string;name:string;content:string;due_day:string}[];due:{id:string;name:string;content:string;contact_day:string}[];homework_checks:{assignment_id:string;student_id:string;status:string}[]};
+export default async function Contact({searchParams}:{searchParams:Promise<{student?:string}>}){
+ if(process.env.PILOT_DISPLAY_CONTACT_ENABLED!=='true')redirect('/display');
+ const params=await searchParams,token=(await cookies()).get(displayCookie)?.value;if(!token)redirect('/display/pair');
+ const student=params.student&&/^[a-f0-9-]{36}$/i.test(params.student)?params.student:null;
+ const response=await displayClient().rpc('get_pilot_display_contact',{device_token:token,selected_student:student});
+ if(response.error)return <main style={{padding:32}}><h1>聯絡簿暫時無法開啟</h1><p>請重新選擇學生，或請老師確認白板授權。</p><Link href="/display/contact-book">重新選擇</Link> · <Link href="/display/pair">白板配對</Link></main>;
+ const data=response.data as Snapshot,selected=data.students.find(s=>s.id===student),isReturn=!!data.return_label;
+ const tasks=isReturn?[{id:'morning_cleaning',name:'上午打掃'},{id:'summer_homework_submitted',name:'交暑假作業'}]:[{id:'morning_cleaning',name:'上午打掃'},{id:'contact_book_copied',name:'抄聯絡簿'}];
+ const checks=isReturn?data.return_checks:data.routine_checks;
+ const handed=(id:string,assignment:string)=>{const state=data.homework_checks.find(c=>c.student_id===id&&c.assignment_id===assignment)?.status??'missing';return validHomeworkStatus(state)&&isHandedIn(state);};
+ const missing=data.students.filter(s=>data.due.some(a=>!handed(s.id,a.id)));
+ const card={border:'1px solid #475569',borderRadius:12,padding:20,background:'#111e33',overflowWrap:'anywhere' as const};
+ return <main style={{height:'100dvh',boxSizing:'border-box',padding:20,display:'flex',flexDirection:'column',gap:16,background:'#071020',color:'#eef5ff',fontSize:22}}>
+ <section style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:16,flex:1,minHeight:0}}>
+ <article style={{...card,background:'#123f30',overflowY:'auto',border:'6px solid #80501f'}}><h1>{data.day} {data.week?`第 ${data.week} 週`:data.return_label??''}</h1>{!data.homework_enabled?<p>本班未使用聯絡簿。</p>:<>{!data.contact_exists&&!data.assigned.length&&<p>尚未填寫</p>}<ol>{data.assigned.map(a=><li key={a.id} style={{marginBottom:16}}>{a.name} {a.content}</li>)}</ol><p style={{whiteSpace:'pre-wrap'}}>{data.notes}</p></>}</article>
+ <section style={{minHeight:0,overflowY:'auto',display:'flex',flexDirection:'column',gap:16}}><h2 style={{margin:0}}>{selected?`${selected.seat} 號 ${selected.name} · 個人進度`:'今日進度'}</h2>
+ {data.routines_enabled&&(data.school_day||isReturn)&&tasks.map(task=>{const progress=routineProgress(data.students,checks,data.attendance,task.id),done=checks.some(c=>c.student_id===student&&c.task_key===task.id&&c.completed),unavailable=task.id==='contact_book_copied'&&!data.contact_exists;return <article key={task.id} style={card}><h3 style={{marginTop:0}}>{task.name} {selected?'':`${progress.completed}／${progress.total}`}</h3>{unavailable?<p>今日聯絡簿尚未建立。</p>:selected?<p>{data.attendance.some(a=>a.student_id===student&&a.absent)?'今天請假':done?'已完成':'尚未完成'}</p>:<p style={{whiteSpace:'normal'}}>{progress.missing.length?`未完成：${progress.missing.map(s=>s.name).join('、')}`:'全部完成'}</p>}</article>;})}
+ {data.routines_enabled&&!data.school_day&&!isReturn&&<p>今天沒有上課日或返校日任務。</p>}
+ {data.homework_enabled&&<article style={card}><h3 style={{marginTop:0}}>今日應繳作業 {selected?'':`${data.students.length-missing.length}／${data.students.length}`}</h3>{!data.due.length?<p>今天沒有應繳作業。</p>:selected?data.due.map(a=><p key={a.id}>{handed(selected.id,a.id)?'已交':'未交'} · {a.name} {a.content}</p>):<p>{missing.length?`未交：${missing.map(s=>s.name).join('、')}`:'全班已交'}</p>}</article>}
+ </section></section>
+ <footer style={{flexShrink:0,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}><Link href="/display" style={{color:'#a5d8ff'}}>白板首頁</Link>{data.students.map(s=><Link key={s.id} href={s.id===student?'/display/contact-book':`/display/contact-book?student=${s.id}`} style={{background:s.id===student?'#fbbf24':'#1e293b',color:s.id===student?'#111827':'#fff',padding:'12px 18px',borderRadius:10,textDecoration:'none',fontSize:24}}>{s.seat}</Link>)}</footer>
+ </main>;
+}
