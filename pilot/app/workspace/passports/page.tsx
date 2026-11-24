@@ -29,7 +29,7 @@ export default async function Passports({searchParams}:{searchParams:Promise<{no
   <Link href="/workspace">← 返回工作台</Link><h1>護照</h1><p>{classroom?.name}</p>
   {params.notice==="saved"&&<p role="status">護照已儲存。</p>}{params.error&&<p role="alert">未能儲存，請確認模組、啟用學期、名稱是否重複及週次範圍，再重試。</p>}
   {unavailable?<p role="alert">資料載入失敗，暫不顯示完成狀態與操作，避免誤判。</p>:!enabled?<p>請先在工作台開啟「護照」。</p>:!term?<p>請先建立並啟用學期。</p>:<>
-   <p>{term.name}｜{current?`目前第 ${current} 週`:"今天不在此學期期間"}。兩種狀態：未開始、已完成。可記錄提前完成的週次；尚不影響下課或商店。</p>
+   <p>{term.name}｜{current?`目前第 ${current} 週`:"今天不在此學期期間"}。兩種狀態：未開始、已完成。可記錄提前完成的週次；當週及過去未完成項目會列入下課／商店資格判定。</p>
    <details><summary>新增護照</summary><form action={createPassport} style={{display:"flex",flexWrap:"wrap",gap:12,alignItems:"end"}}>
     <input type="hidden" name="classId" value={classroom!.id}/><input type="hidden" name="termId" value={term.id}/>
     <label>名稱 <input name="name" required maxLength={60} placeholder="例如：國語護照"/></label><label>開始週 <input type="number" name="first" min={1} max={maxWeek} defaultValue={Math.min(3,maxWeek)} required style={{width:70}}/></label><label>結束週 <input type="number" name="last" min={1} max={maxWeek} defaultValue={Math.min(16,maxWeek)} required style={{width:70}}/></label><Submit>建立護照</Submit>
@@ -42,6 +42,6 @@ export default async function Passports({searchParams}:{searchParams:Promise<{no
     {!roster.length&&<p>班級尚無使用中學生。</p>}
    </section>;})}
   </>}
-  <p>此頁目前僅提供老師端記錄。{process.env.PILOT_PASSPORT_REWARDS_ENABLED==="true"?<>本班若<Link href="/workspace/rewards/passport-automation">另行確認啟用護照完成獎勵</Link>，新完成會按實際完成日給金幣，取消會回沖；沒有 XP 或每日逾期扣點。</>:<>本階段尚未啟用護照自動獎勵。</>}學生大屏、下課／商店限制尚未串接。出缺席不會自動變更護照狀態。未完成明細可至<Link href="/workspace/debts">待完成總覽</Link>查看。</p>
+  <p>此頁可由老師確認或取消完成；已開放的配對白板僅能登記完成。{process.env.PILOT_PASSPORT_REWARDS_ENABLED==="true"?<>本班若<Link href="/workspace/rewards/passport-automation">另行確認啟用護照完成獎勵</Link>，新完成會按實際完成日給金幣，取消會回沖；不給 XP；每日逾期扣點另行設定。</>:<>本階段尚未啟用護照自動獎勵。</>}下課／商店資格依目前啟用學期的待完成項目判斷。出缺席不會自動變更護照狀態。未完成明細可至<Link href="/workspace/debts">待完成總覽</Link>查看。</p>
  </main>;
 }

@@ -44,6 +44,6 @@ export default async function Routines({searchParams}:{searchParams:Promise<{day
     </form>)}</div>{!progress.roster.length&&<p>班級尚無使用中學生。</p>}
    </section>;})}
   </>}
-  <p>{process.env.PILOT_ROUTINE_REWARDS_ENABLED==="true"?"目前只提供老師記錄；本班若另行啟用生活任務自動獎勵，今天新完成會依已確認規則給金幣與 XP，取消會回沖。過去／未來紀錄不發新獎勵，大屏尚未串接。":"目前只提供老師記錄；大屏自助、金幣與 XP 尚未串接，本次不發扣獎勵。"}</p>
+  <p>{process.env.PILOT_ROUTINE_REWARDS_ENABLED==="true"?"老師與已開放的配對白板可登記生活任務；本班若另行啟用自動獎勵，今天新完成會依已確認規則給金幣與 XP，老師取消會回沖。過去／未來紀錄不發新獎勵。":"目前未開啟生活任務自動獎勵，登記不發扣金幣或 XP。"}</p>
  </main>;
 }

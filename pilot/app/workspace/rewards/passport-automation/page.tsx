@@ -19,7 +19,7 @@ export default async function PassportAutomation({searchParams}:{searchParams:Pr
  {params.notice==="saved"&&<p role="status">本班護照獎勵設定已儲存。</p>}{params.error&&<p role="alert">未能儲存。請檢查本班模組、已確認規則及確認勾選。</p>}
  {unavailable?<p role="alert">資料讀取失敗，不提供操作。</p>:!enabled?<p>請先開啟金幣與商店模組。</p>:<>
  <h2>目前：{settings?.data?.enabled?"已啟用":"未啟用"}</h2><p>須先<Link href="/workspace/rewards/rules">確認本班獎勵規則</Link>。只有金幣，不給 XP。</p>
- <ul><li>提早於該週完成，採週一獎勵；當週按實際星期一至五的規則計獎，週末及逾期完成不發完成獎勵。</li><li>以台灣今天為完成日，學期首末週依實際起訖日。不追補原本已完成的紀錄。</li><li>取消會回沖。重新完成依新的實際完成日、原規則版本計算，不可藉取消重領較高金額。</li><li>關閉後不發新獎勵，取消先前獎勵仍回沖。每本護照、每個週次各自計獎。</li><li>本階段尚未啟用每日逾期扣點，也尚未串接學生大屏及下課／商店限制。</li></ul>
+ <ul><li>提早於該週完成，採週一獎勵；當週按實際星期一至五的規則計獎，週末及逾期完成不發完成獎勵。</li><li>以台灣今天為完成日，學期首末週依實際起訖日。不追補原本已完成的紀錄。</li><li>取消會回沖。重新完成依新的實際完成日、原規則版本計算，不可藉取消重領較高金額。</li><li>關閉後不發新獎勵，取消先前獎勵仍回沖。每本護照、每個週次各自計獎。</li><li>每日逾期扣點需另外啟用。已開放的配對白板完成登記共用此獎勵規則；下課／商店資格另依待完成項目判斷。</li></ul>
  {!passport&&<p>護照模組未開啟，目前只能關閉自動獎勵。</p>}{!rules?.data&&<p>尚未確認班級規則，不可啟用。</p>}
  <form action={configurePassportRewards}><input type="hidden" name="classId" value={classroom!.id}/><p><label><input type="checkbox" name="enabled" value="yes" defaultChecked={Boolean(settings?.data?.enabled&&passport)} disabled={!passport||!rules?.data}/>啟用本班護照完成金幣</label></p><p><label><input type="checkbox" name="confirm" value="yes" required/>我了解以上規則並確認這次設定。</label></p><Submit>確認儲存啟用狀態</Submit></form><p><Link href="/workspace/rewards">查看金幣與 XP 帳本</Link> · <Link href="/workspace/passports">管理護照</Link></p>
  </>}

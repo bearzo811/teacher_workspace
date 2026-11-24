@@ -42,7 +42,7 @@ export default async function Homework({searchParams}:{searchParams:Promise<{day
      <label>調整狀態 <select name="status" defaultValue={status(item.id,student.id)} style={{padding:8,maxWidth:"100%"}}>{homeworkStatuses.map(option=><option key={option.id} value={option.id}>{option.name}</option>)}</select></label> <Submit>儲存</Submit>
     </form>)}</div>
    </section>;})}
-   <p>目前為老師端檢核；可從工作台查看待完成總覽。{process.env.PILOT_HOMEWORK_REWARDS_ENABLED==="true"?<>本班若<Link href="/workspace/rewards/homework-automation">另行確認啟用作業完成獎勵</Link>，新改為已完成會給金幣，退回會回沖；待確認與未訂正完成不給完成獎勵。</>:<>本階段尚未啟用作業自動獎勵。</>}學生大屏自助及未交扣點尚未串接。</p>
+   <p>目前為老師端檢核；可從工作台查看待完成總覽。{process.env.PILOT_HOMEWORK_REWARDS_ENABLED==="true"?<>本班若<Link href="/workspace/rewards/homework-automation">另行確認啟用作業完成獎勵</Link>，新改為已完成會給金幣，退回會回沖；待確認與未訂正完成不給完成獎勵。</>:<>本階段尚未啟用作業自動獎勵。</>}已開放的配對白板僅能把今天應繳作業登記為待確認；未交扣點排程尚未開放。</p>
   </>}
  </main>;
 }

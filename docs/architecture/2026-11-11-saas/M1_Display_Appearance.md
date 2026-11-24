@@ -7,3 +7,5 @@ Text sizes use a shared CSS scale variable; page dimensions and touch padding ar
 Local SQL tests cover bounds, unknown/duplicate section IDs, stale versions, empty navigation, cross-class/anonymous mutation denial and revoked-device reads. 31 tests and production build pass. 720p browser checks cover large-text points cards; 4K remains unverified because the viewport tool did not change the actual DOM dimensions.
 
 Cloud application of 0037 was rejected by automatic review because its new database permissions were not covered by the earlier 0031–0036 confirmation. The batch was replaced and clipboard-compared against exactly 0031–0036 before execution; those six migrations succeeded. 0037 and `PILOT_DISPLAY_APPEARANCE_ENABLED` remain pending separate action-time confirmation.
+
+2026-11-24 update: the user supplied that confirmation. Migration 0037 applied successfully to the pilot project, and the production appearance flag was added. Deployment and teacher/device settings verification follow; the earlier rejection was not bypassed.
