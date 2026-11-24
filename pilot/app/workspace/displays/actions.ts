@@ -14,7 +14,9 @@ export async function createPairing(_state:PairingState,form:FormData):Promise<P
  if(!name||name.length>60||!/^[a-f0-9-]{36}$/i.test(classId))return {error:'請填寫有效的白板名稱。'};
  const result=await client.rpc('create_pilot_display_pairing',{target_class:classId,device_name:name});
  if(result.error||!/^[a-f0-9]{32}$/.test(result.data?.code??''))return {error:'未能建立配對碼，請確認未超過 5 台有效裝置或 200 筆歷史紀錄。'};
- revalidatePath('/workspace/displays');return {code:result.data.code,expires:result.data.expires_at};
+ // Preserve the one-time code in local action state; an immediate route refresh
+ // can remount the form before the teacher has copied it. The page is dynamic.
+ return {code:result.data.code,expires:result.data.expires_at};
 }
 export async function revokeDisplay(form:FormData){
  const client=await teacher(),classId=String(form.get('classId')??''),deviceId=String(form.get('deviceId')??'');
