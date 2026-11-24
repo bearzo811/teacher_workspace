@@ -5,6 +5,8 @@ import {DebtsView,type Data} from '../debts/view';
 import {CalendarView,type Calendar} from '../calendar/view';
 import {LearningView,type Snapshot} from '../learning/view';
 import {OrderEditor} from '../../workspace/debts/order-editor';
+import {DutyPlanner} from '../../workspace/duty/planner';
+import {nineStudentDutyTemplate} from '../../../lib/duty';
 export const dynamic='force-dynamic';
 // Pure visual fixtures only. This route never reads or writes any database.
 export default async function Preview({searchParams}:{searchParams:Promise<{count?:string;view?:string;mode?:string;font?:string}>}){
@@ -13,6 +15,7 @@ export default async function Preview({searchParams}:{searchParams:Promise<{coun
  const font=['16','22','32'].includes(params.font??'')?Number(params.font):22;
  const wrap=(node:ReactNode)=><div style={{height:'100%','--pilot-display-scale':font/22} as CSSProperties}>{node}</div>;
  const students=Array.from({length:count},(_,i)=>({id:`00000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`,seat:i+1,name:`虛構學生${String(i+1).padStart(2,'0')}`}));
+ if(params.view==='duty')return <main style={{padding:24,background:'#fff',color:'#111827',height:'100%',overflow:'auto',boxSizing:'border-box'}}><h1>虛構班值日輪排預覽</h1><DutyPlanner classroom="fixture" request="fixture" preview context={{term:{id:'fixture',name:'虛構學期',start_date:'2026-09-01',end_date:'2027-01-22',active:true},revision:0,jobs:nineStudentDutyTemplate,starts_on:'2026-09-01',students,overrides:[{day:'2026-09-04',is_school_day:false,note:'虛構放假'},{day:'2026-09-05',is_school_day:true,note:'虛構補課'}],history:[]}}/></main>;
  if(params.view==='order')return <main style={{padding:24,background:'#fff',color:'#111827',height:'100%',overflow:'auto',boxSizing:'border-box'}}><h1>虛構學生個人排序預覽</h1><OrderEditor classroom="fixture" student="fixture" term="fixture" version={0} showMore={true} preview items={[{id:'math',label:'數學習作 p.35–38 · 待確認'},{id:'chinese',label:'國語第十課生字訂正 · 未訂正完成'},{id:'passport',label:'國語護照 W13 · 未完成'},{id:'reading',label:'閱讀心得 2026-10 · 未開始'}]}/></main>;
  if(params.view==='calendar'){
   const data:Calendar={today:'2026-11-23',month:'2026-11-01',term:{id:'fixture-term',name:'虛構學期',start_date:'2026-09-01',end_date:'2027-01-22',active:true},days:[],events:[{id:'today',title:'虛構校外教學活動',day:'2026-11-23',note:'僅供排版驗收'}],countdowns:Array.from({length:50},(_,i)=>({id:`event-${i}`,title:`虛構活動 ${i+1}`,day:'2027-01-08',note:'跨年活動倒數與獨立捲動驗收。'}))};

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {defaultRewardRules} from "../lib/reward-rules";
+import {planDuty,nineStudentDutyTemplate,type DutyStudent} from '../lib/duty';
 
 for (const management of [false, true]) test(`Google registration boundaries (roster management ${management ? "enabled" : "disabled"})`, async () => {
   const db = new PGlite();
@@ -1415,5 +1416,46 @@ for (const management of [false, true]) test(`Google registration boundaries (ro
     await db.exec("reset role;set role anon");assert.deepEqual((await db.query<{p:{visible_sections:string[]}}>("select public.get_pilot_display_settings($1) p",[appearanceToken])).rows[0].p.visible_sections,[]);
     await login(e);await db.query("select public.revoke_pilot_display($1,$2)",[ce,appearancePair.device_id]);
     await db.exec("reset role;set role anon");await assert.rejects(db.query("select public.get_pilot_display_settings($1)",[appearanceToken]),/access denied/);
+    await db.exec("reset role");await db.exec(await readFile(new URL("../supabase/migrations/0038_duty_plans.sql",import.meta.url),"utf8"));
+    const f='00000000-0000-0000-0000-000000000006';await db.query("insert into auth.users values($1,now())",[f]);await db.query("insert into auth.identities values($1,'google')",[f]);
+    await login(f);await register();const cf=(await db.query<{id:string}>("select public.create_pilot_class_with_modules('值日驗收F',array['duty']) id")).rows[0].id;
+    const dutyStudents:DutyStudent[]=[];for(let seat=1;seat<=9;seat++){const id=(await db.query<{id:string}>("select public.add_pilot_student($1,$2,$3) id",[cf,seat,`F學生${seat}`])).rows[0].id;dutyStudents.push({id,seat,name:`F學生${seat}`});}
+    const ft=(await db.query<{id:string}>("select public.create_pilot_term($1,'F學期','2026-11-23','2026-12-04') id",[cf])).rows[0].id;
+    await db.query("select public.set_pilot_day($1,'2026-11-27',false,'放假')",[ft]);await db.query("select public.set_pilot_day($1,'2026-11-28',true,'補課')",[ft]);
+    const dutyTerm={id:ft,name:'F學期',start_date:'2026-11-23',end_date:'2026-12-04',active:true};
+    const dutyOverrides=[{day:'2026-11-27',is_school_day:false,note:'放假'},{day:'2026-11-28',is_school_day:true,note:'補課'}];
+    const dutyPreview=planDuty(dutyTerm,dutyOverrides,dutyStudents,nineStudentDutyTemplate);assert.deepEqual(dutyPreview.issues,[]);
+    const dutyKey='a0000000-0000-0000-0000-000000000001';
+    const publishDuty=(rows=dutyPreview.assignments,key=dutyKey,revision=0,first='2026-11-23',snapshot=dutyStudents)=>db.query<{id:string}>("select public.publish_pilot_duty_plan($1,$2,$3,$4,$5,$6,$7,$8) id",[cf,ft,first,JSON.stringify(nineStudentDutyTemplate),JSON.stringify(rows),JSON.stringify(snapshot),revision,key]);
+    await assert.rejects(publishDuty(dutyPreview.assignments.slice(1)),/Incomplete duty coverage/);
+    await assert.rejects(publishDuty(dutyPreview.assignments.map((row,i)=>i===0?{...row,student_id:aStudent}:row)),/Duty assignment access denied/);
+    await assert.rejects(publishDuty(dutyPreview.assignments.map((row,i)=>i===1?{...row,student_id:dutyPreview.assignments[0].student_id}:row)),/Exclusive duty conflict/);
+    await assert.rejects(publishDuty(dutyPreview.assignments,dutyKey,0,'2026-11-23',[...dutyStudents].reverse()),/roster changed/);
+    const addedDutyStudent=(await db.query<{id:string}>("select public.add_pilot_student($1,10,'新名冊學生') id",[cf])).rows[0].id;
+    await assert.rejects(publishDuty(),/roster changed/);await db.query("select public.archive_pilot_student($1)",[addedDutyStudent]);
+    await db.query("select public.set_pilot_day($1,'2026-11-26',false,'預覽後改放假')",[ft]);
+    await assert.rejects(publishDuty(),/Incomplete duty coverage/);
+    await db.query("select public.set_pilot_day($1,'2026-11-26',null,'')",[ft]);
+    assert.equal((await db.query("select * from public.pilot_duty_plans where class_id=$1",[cf])).rows.length,0,'invalid publication leaves no partial plan');
+    const published=(await publishDuty()).rows[0].id;assert.equal((await publishDuty()).rows[0].id,published,'same publication request returns original plan');
+    await assert.rejects(publishDuty(dutyPreview.assignments.slice(1)),/request conflict/);
+    await assert.rejects(publishDuty(dutyPreview.assignments,'a0000000-0000-0000-0000-000000000002'),/changed/);
+    const november=(await db.query<{p:{days:string[];assignments:{day:string;student_name:string}[]}}>("select public.get_pilot_duty_month($1,$2,'2026-11-01') p",[cf,ft])).rows[0].p;
+    assert.ok(november.days.includes('2026-11-28'));assert.ok(!november.days.includes('2026-11-27'));assert.ok(november.assignments.every(row=>row.student_name.startsWith('F學生')));
+    const planning=(await db.query<{p:{revision:number;history:unknown[]}}>("select public.get_pilot_duty_planning($1,$2,'2026-11-30') p",[cf,ft])).rows[0].p;
+    assert.equal(planning.revision,1);assert.ok(planning.history.length>0);
+    const futurePlan=planDuty({...dutyTerm,start_date:'2026-11-30'},dutyOverrides,dutyStudents,nineStudentDutyTemplate);
+    await assert.rejects(publishDuty(futurePlan.assignments,'a0000000-0000-0000-0000-000000000002',1,'2026-11-28'),/after today/);
+    await publishDuty(futurePlan.assignments,'a0000000-0000-0000-0000-000000000002',1,'2026-11-30');
+    await assert.rejects(db.query("update public.pilot_duty_plans set revision=99 where id=$1",[published]),/permission denied/);
+    const december=(await db.query<{p:{assignments:unknown[]}}>("select public.get_pilot_duty_month($1,$2,'2026-12-01') p",[cf,ft])).rows[0].p;
+    assert.equal(december.assignments.length,4*17,'latest revision replaces future days without duplicate roles');
+    await login(a);assert.deepEqual((await db.query("select * from public.pilot_duty_plans where class_id=$1",[cf])).rows,[]);
+    await assert.rejects(db.query("select public.get_pilot_duty_month($1,$2,'2026-11-01')",[cf,ft]),/access denied/);
+    await assert.rejects(publishDuty(),/access denied/);
+    await db.exec("reset role;set role anon");await assert.rejects(db.query("select public.get_pilot_duty_month($1,$2,'2026-11-01')",[cf,ft]),/permission denied/);
+    await login(f);await db.query("select public.configure_pilot_modules($1,array[]::text[])",[cf]);
+    assert.deepEqual((await db.query("select * from public.pilot_duty_assignments where class_id=$1",[cf])).rows,[]);
+    await assert.rejects(db.query("select public.get_pilot_duty_planning($1,$2,'2026-11-30')",[cf,ft]),/access denied/);
   } finally { await db.close(); }
 });

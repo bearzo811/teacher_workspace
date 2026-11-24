@@ -6,5 +6,6 @@ const config: NextConfig = {
   poweredByHeader: false,
   distDir: process.env.NODE_ENV === "development" ? ".next-dev" : ".next",
   outputFileTracingRoot: path.resolve(__dirname),
+  experimental: {serverActions: {bodySizeLimit: "4mb"}},
 };
 export default config;
