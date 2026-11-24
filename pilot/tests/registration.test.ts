@@ -1457,5 +1457,28 @@ for (const management of [false, true]) test(`Google registration boundaries (ro
     await login(f);await db.query("select public.configure_pilot_modules($1,array[]::text[])",[cf]);
     assert.deepEqual((await db.query("select * from public.pilot_duty_assignments where class_id=$1",[cf])).rows,[]);
     await assert.rejects(db.query("select public.get_pilot_duty_planning($1,$2,'2026-11-30')",[cf,ft]),/access denied/);
+    await db.exec("reset role");await db.exec(await readFile(new URL("../supabase/migrations/0039_display_lunch_read.sql",import.meta.url),"utf8"));
+    await login(f);await db.query("select public.configure_pilot_modules($1,array['duty','routines'])",[cf]);
+    await db.query("select public.set_pilot_attendance($1,$2,'2026-11-28',true)",[cf,dutyStudents[0].id]);
+    await db.query("select public.set_pilot_routine_check($1,$2,$3,'2026-11-28','lunch_brushing',true)",[cf,ft,dutyStudents[1].id]);
+    const lunchPair=(await db.query<{p:{code:string;device_id:string}}>("select public.create_pilot_display_pairing($1,'午餐白板') p",[cf])).rows[0].p;
+    await db.exec("reset role;set role anon");const lunchToken=(await db.query<{p:{token:string}}>("select public.pair_pilot_display($1) p",[lunchPair.code])).rows[0].p.token;
+    const lunch=(await db.query<{p:{school_day:boolean;students:unknown[];jobs:{student_id:string|null}[];checks:{task_key:string;completed:boolean}[];attendance:{absent:boolean}[]}}>("select public.get_pilot_display_lunch($1) p",[lunchToken])).rows[0].p;
+    assert.equal(lunch.school_day,true);assert.equal(lunch.students.length,9);assert.equal(lunch.jobs.length,17);assert.ok(lunch.checks.some(c=>c.task_key==='lunch_brushing'&&c.completed));assert.ok(lunch.attendance.some(a=>a.absent));
+    await assert.rejects(db.query("select * from public.pilot_duty_assignments"),/permission denied/);
+    await login(f);await db.query("select public.archive_pilot_student($1)",[dutyStudents[8].id]);
+    await db.exec("reset role;set role anon");const archivedLunch=(await db.query<{p:{students:unknown[];jobs:{student_id:string|null}[]}}>("select public.get_pilot_display_lunch($1) p",[lunchToken])).rows[0].p;
+    assert.equal(archivedLunch.students.length,8);assert.ok(archivedLunch.jobs.some(j=>j.student_id===null));assert.ok(!JSON.stringify(archivedLunch).includes('F學生9'));
+    await db.exec("reset role;create or replace function pilot_private.display_today() returns date language sql stable as $$select date '2026-11-27'$$;set role anon");
+    const holidayLunch=(await db.query<{p:{school_day:boolean;jobs:unknown[];checks:unknown[]}}>("select public.get_pilot_display_lunch($1) p",[lunchToken])).rows[0].p;
+    assert.equal(holidayLunch.school_day,false);assert.deepEqual(holidayLunch.jobs,[]);assert.deepEqual(holidayLunch.checks,[]);
+    await db.exec("reset role;create or replace function pilot_private.display_today() returns date language sql stable as $$select date '2026-11-28'$$");
+    await login(f);await db.query("select public.configure_pilot_modules($1,array['routines'])",[cf]);
+    await db.exec("reset role;set role anon");assert.deepEqual((await db.query<{p:{jobs:unknown[]}}>("select public.get_pilot_display_lunch($1) p",[lunchToken])).rows[0].p.jobs,[]);
+    await login(f);await db.query("select public.configure_pilot_modules($1,array[]::text[])",[cf]);
+    await db.exec("reset role;set role anon");const hiddenLunch=(await db.query<{p:{students:unknown[];attendance:unknown[];checks:unknown[]}}>("select public.get_pilot_display_lunch($1) p",[lunchToken])).rows[0].p;
+    assert.deepEqual(hiddenLunch.students,[]);assert.deepEqual(hiddenLunch.attendance,[]);assert.deepEqual(hiddenLunch.checks,[]);
+    await login(f);await db.query("select public.revoke_pilot_display($1,$2)",[cf,lunchPair.device_id]);
+    await db.exec("reset role;set role anon");await assert.rejects(db.query("select public.get_pilot_display_lunch($1)",[lunchToken]),/access denied/);
   } finally { await db.close(); }
 });

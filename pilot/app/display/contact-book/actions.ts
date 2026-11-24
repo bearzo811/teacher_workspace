@@ -14,9 +14,12 @@ export async function submitHomework(form:FormData){
 }
 export async function completeRoutine(form:FormData){
  if(process.env.PILOT_DISPLAY_ROUTINES_ENABLED!=='true')redirect('/display/contact-book');
+ const surface=form.get('surface')==='lunch'?'/display/lunch':'/display/contact-book';
+ if(surface==='/display/lunch'&&process.env.PILOT_DISPLAY_LUNCH_ENABLED!=='true')redirect('/display');
  const token=(await cookies()).get(displayCookie)?.value;if(!token)redirect('/display/pair');
  const student=String(form.get('student')??''),task=String(form.get('task')??''),request=String(form.get('request')??'');
- if(![student,request].every(id=>/^[a-f0-9-]{36}$/i.test(id))||(!validRoutine(task)&&task!=='summer_homework_submitted'))redirect('/display/contact-book?error=input');
+ if(surface==='/display/lunch'&&!['lunch_brushing','noon_cleaning'].includes(task))redirect('/display/lunch?error=input');
+ if(![student,request].every(id=>/^[a-f0-9-]{36}$/i.test(id))||(!validRoutine(task)&&task!=='summer_homework_submitted'))redirect(`${surface}?error=input`);
  const result=await displayClient().rpc('complete_pilot_display_routine',{device_token:token,target_student:student,routine_key:task,request_key:request});
- revalidatePath('/display/contact-book');redirect(`/display/contact-book?student=${student}&${result.error?'error=routine':`notice=routine&task=${task}`}`);
+ revalidatePath('/display/contact-book');revalidatePath('/display/lunch');redirect(`${surface}?student=${student}&${result.error?'error=routine':`notice=routine&task=${task}`}`);
 }

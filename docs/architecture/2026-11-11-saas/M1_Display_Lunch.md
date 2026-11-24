@@ -1,0 +1,11 @@
+# Paired lunch display
+
+Migration 0039 is read-only: valid device token determines the class and Taiwan date. It returns that class's active roster, attendance, today's applicable immutable duty revision and two lunch routine states. No class/date/student parameter is accepted. Disabled modules suppress related arrays; holidays return no jobs/checks; archived student names are not exposed, and their still-assigned jobs are represented without a student ID so the UI asks the teacher to arrange coverage. Revocation/expiry remain enforced by `require_display`.
+
+The lunch page uses two columns when no media is present: left, equally allocated student job cards with names and role labels only; right, class progress and a direct task matrix anchored at the bottom. More than nine students split the matrix into two batches. No seat-selection or identity-confirmation step is added. Student completion reuses the approved one-way routine RPC, existing class reward opt-in and retry receipts; the server action has a fixed lunch return path and permits only brushing/noon-cleaning on that surface. Teacher cancellation remains separate.
+
+Brushing fills the top half of a job card green; noon cleaning fills the bottom half. Both produce a full green card with light text. Absent students cannot submit and are excluded from progress denominators, without erasing their existing records. Pending buttons disable and show feedback; success text is checked against returned saved state.
+
+Local tests cover actual/makeup school day, holiday, own-class role revision, attendance, routine state, archived names, module-off arrays, direct anonymous table denial and revoked devices. Full suite 36 tests passes. 720p browser geometry: nine students' task area begins at y≈469; fifteen students at reference font 32 have task area y≈295–614, no document overflow and all 15 work cards. Evidence: `/private/tmp/teacher-pilot-lunch-nine-layout.png`, `/private/tmp/teacher-pilot-lunch-fifteen-font32.png`.
+
+0039 cloud activation and `PILOT_DISPLAY_LUNCH_ENABLED` remain pending specific permission. This stage has no YouTube playback or substitute claims. Actual 4K/physical touch readability remains unverified.
