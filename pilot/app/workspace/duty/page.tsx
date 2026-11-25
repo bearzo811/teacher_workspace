@@ -24,7 +24,7 @@ export default async function Duty({searchParams}:{searchParams:Promise<{term?:s
  const planning=canPlan&&room?await client.rpc('get_pilot_duty_planning',{target_class:room.id,target_term:term!.id,starts_on:first}):null;
  const unavailable=rooms.error||terms?.error||latest?.error||calendar?.error||planning?.error;
  const data=calendar?.data as Month|null,missing=data?.days.filter(day=>!data.assignments.some(a=>a.day===day))??[];
- return <main style={{maxWidth:1400,margin:'auto',padding:24,lineHeight:1.8}}><Link href="/workspace">← 返回工作台</Link><h1>值日表</h1><p>{room?.name}</p>
+ return <main style={{maxWidth:1400,margin:'auto',padding:24,lineHeight:1.8}}><Link href="/workspace">← 返回工作台</Link><h1>值日表</h1><p>{room?.name}</p>{process.env.PILOT_DUTY_SUBSTITUTES_ENABLED==='true'&&<p><Link href="/workspace/duty/covers">自願代班確認與紀錄</Link></p>}
  {params.notice==='published'&&<p role="status">值日表已發布，原先排程與歷史仍保留。</p>}{params.error&&<p role="alert">{params.error==='changed'?'名冊或排程已更新，請重新載入並確認預覽後再發布。':'未能發布，請確認人力、行事曆與排程預覽後重試。'}</p>}
  {!enabled&&!unavailable?<p>請先在工作台開啟「值日工作」模組。</p>:unavailable?<p role="alert">值日資料無法完整讀取，暫不提供發布，請重新整理。</p>:!term?<p>請先建立學期。</p>:<><form method="get" style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'end'}}><label>學期 <select name="term" defaultValue={term.id}>{list.map(t=><option key={t.id} value={t.id}>{t.name}{t.active?'（啟用）':''}</option>)}</select></label><label>顯示月份 <input type="month" name="month" defaultValue={month} required/></label><button>查看月份</button></form>
  <h2>{month} 值日工作</h2>{missing.length>0&&<p role="alert">有 {missing.length} 個上課日尚無排程；若最近改了上課日，請檢查並重新預覽未來值日表。</p>}

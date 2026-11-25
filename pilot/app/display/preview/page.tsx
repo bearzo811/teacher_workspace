@@ -8,6 +8,7 @@ import {OrderEditor} from '../../workspace/debts/order-editor';
 import {DutyPlanner} from '../../workspace/duty/planner';
 import {nineStudentDutyTemplate,planDuty} from '../../../lib/duty';
 import {LunchView} from '../lunch/view';
+import {SubstitutePanel} from '../contact-book/substitutes';
 export const dynamic='force-dynamic';
 // Pure visual fixtures only. This route never reads or writes any database.
 export default async function Preview({searchParams}:{searchParams:Promise<{count?:string;view?:string;mode?:string;font?:string}>}){
@@ -16,6 +17,7 @@ export default async function Preview({searchParams}:{searchParams:Promise<{coun
  const font=['16','22','32'].includes(params.font??'')?Number(params.font):22;
  const wrap=(node:ReactNode)=><div style={{height:'100%','--pilot-display-scale':font/22} as CSSProperties}>{node}</div>;
  const students=Array.from({length:count},(_,i)=>({id:`00000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`,seat:i+1,name:`虛構學生${String(i+1).padStart(2,'0')}`}));
+ if(params.view==='covers')return wrap(<main style={{height:'100%',padding:20,boxSizing:'border-box',background:'#071020',color:'#eef5ff',display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}><section style={{display:'flex',flexDirection:'column',gap:12,minHeight:0,overflowY:'auto'}}><article style={{flex:1,padding:24,border:'6px solid #80501f',background:'#123f30',borderRadius:12}}><h1>聯絡簿（虛構預覽）</h1><p>1. 數學習作 p.35–38</p></article><SubstitutePanel preview student={students[0].id} absent={false} data={{rule_version:1,ready:true,opportunities:[{student_id:'absent',name:'虛構請假同學',jobs:['餐桶（二）','掃前'],cover_id:null,status:null,helper_name:null,coins:3,basis_changed:false}]}}/></section><section><h2>今日進度</h2><p>代班區固定在聯絡簿下方；接班後由老師確認完成。</p></section></main>);
  if(params.view==='lunch'){
   const jobs=count>=9?nineStudentDutyTemplate:[nineStudentDutyTemplate[0]],duties=planDuty({id:'fixture',name:'虛構',start_date:'2026-11-23',end_date:'2026-11-23',active:true},[],students,jobs);
   return wrap(<LunchView preview data={{day:'2026-11-23',school_day:true,duty_enabled:true,routines_enabled:true,students,jobs:duties.assignments.map(a=>({id:`${a.job_id}:${a.slot}`,student_id:a.student_id,job_name:jobs.find(j=>j.id===a.job_id)!.name,group:jobs.find(j=>j.id===a.job_id)!.group})),checks:students.flatMap((s,i)=>[{student_id:s.id,task_key:'lunch_brushing',completed:i%3===0},{student_id:s.id,task_key:'noon_cleaning',completed:i%4===0}]),attendance:[]}}/>);
