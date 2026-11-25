@@ -31,7 +31,7 @@ export function LunchMediaSurface({initial,fallback,preview=false}:{initial:Lunc
  useEffect(()=>{
   if(preview)return;
   let disposed=false;const controller=new AbortController();
-  const poll=async()=>{if(document.hidden)return;try{const response=await fetch('/display/lunch/media',{cache:'no-store',signal:controller.signal});if(!response.ok)throw new Error();const next:unknown=await response.json();if(!validLunchMedia(next))throw new Error();if(!disposed&&shouldReplaceMedia(currentMedia.current,next)){currentMedia.current=next;setMedia(next);setMessage('');setRetry(null);router.refresh();}}catch{if(!disposed)setMessage('影音狀態暫時無法同步，請檢查連線。');}};
+  const poll=async()=>{if(document.hidden)return;try{const response=await fetch('/display/lunch/media',{cache:'no-store',signal:controller.signal});if(response.status===401||response.status===403){if(!disposed){setMedia({...currentMedia.current,video_id:null,title:''});router.replace('/display/pair');}return;}if(!response.ok)throw new Error();const next:unknown=await response.json();if(!validLunchMedia(next))throw new Error();if(!disposed&&shouldReplaceMedia(currentMedia.current,next)){currentMedia.current=next;setMedia(next);setMessage('');setRetry(null);router.refresh();}}catch{if(!disposed)setMessage('影音狀態暫時無法同步，請檢查連線。');}};
   const timer=setInterval(()=>void poll(),10000);document.addEventListener('visibilitychange',poll);
   return()=>{disposed=true;controller.abort();clearInterval(timer);document.removeEventListener('visibilitychange',poll);};
  },[router,preview]);
