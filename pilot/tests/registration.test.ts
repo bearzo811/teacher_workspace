@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {defaultRewardRules} from "../lib/reward-rules";
 import {planDuty,nineStudentDutyTemplate,type DutyStudent} from '../lib/duty';
+import {createHash} from 'node:crypto';
+import {validClassExport} from '../lib/class-export';
 
 for (const management of [false, true]) test(`Google registration boundaries (roster management ${management ? "enabled" : "disabled"})`, async () => {
   const db = new PGlite();
@@ -1576,5 +1578,28 @@ for (const management of [false, true]) test(`Google registration boundaries (ro
     await setMedia(null,'',3,'a0410000-0000-4000-8000-000000000003');
     await db.query('select public.revoke_pilot_display($1,$2)',[cf,mediaPair.device_id]);
     await db.exec('reset role;set role anon');await assert.rejects(readMedia(),/access denied/);await assert.rejects(ended(4),/access denied/);
+    await db.exec('reset role');await db.exec(await readFile(new URL('../supabase/migrations/0042_class_exports.sql',import.meta.url),'utf8'));
+    await db.exec('set role anon');await assert.rejects(db.query('select public.export_pilot_class($1)',[cf]),/permission denied/);
+    await login(a);await assert.rejects(db.query('select public.export_pilot_class($1)',[cf]),/access denied/);
+    assert.deepEqual((await db.query('select * from public.pilot_class_exports where class_id=$1',[cf])).rows,[]);
+    await login(f);
+    const exported=(await db.query<{p:{id:string;payload:string;sha256:string;bytes:number;counts:Record<string,number>}}>('select public.export_pilot_class($1) p',[cf])).rows[0].p;
+    assert.equal(validClassExport(exported,cf),true);
+    assert.equal(exported.bytes,Buffer.byteLength(exported.payload));assert.equal(exported.sha256,createHash('sha256').update(exported.payload).digest('hex'));
+    const snapshot=JSON.parse(exported.payload) as {format:string;schema_revision:number;class:Record<string,unknown>;tables:Record<string,Record<string,unknown>[]>};
+    assert.equal(snapshot.format,'teacher-pilot-class-export/1');assert.equal(snapshot.schema_revision,41);assert.equal(snapshot.class.id,cf);assert.equal(snapshot.class.owner_id,undefined);
+    assert.equal(snapshot.tables.pilot_students.length,10,'export includes recoverable archived students');
+    assert.equal(snapshot.tables.pilot_day_overrides.length,2,'term-scoped overrides stay within own class');
+    assert.equal(snapshot.tables.pilot_reward_ledger.length,2);assert.equal(snapshot.tables.pilot_reward_ledger.reduce((n,row)=>n+Number(row.coin_delta),0),0);
+    assert.ok(!exported.payload.includes(aStudent));assert.ok(!exported.payload.includes('token_hash'));assert.ok(!exported.payload.includes('code_hash'));
+    for(const [name,rows] of Object.entries(snapshot.tables))assert.equal(exported.counts[name],rows.length);
+    await assert.rejects(db.query('select public.export_pilot_class($1)',[cf]),/Wait 30 seconds/);
+    await db.exec('reset role');const publicTables=(await db.query<{tablename:string}>("select tablename from pg_tables where schemaname='public' and tablename like 'pilot_%'")).rows.map(r=>r.tablename);
+    assert.deepEqual(Object.keys(snapshot.tables).sort(),publicTables.filter(name=>!['pilot_teachers','pilot_classes','pilot_display_devices','pilot_class_exports'].includes(name)).sort(),'every business table is deliberately included or explicitly excluded');
+    await login(f);assert.equal((await db.query('select * from public.pilot_class_exports where class_id=$1',[cf])).rows.length,1,'failed or throttled export leaves no success receipt');
+    await db.exec('reset role');await db.query("update public.pilot_class_exports set created_at=now()-interval '31 seconds' where class_id=$1",[cf]);
+    await db.query("insert into public.pilot_contact_days(class_id,term_id,day,notes) select $1,$2,date '2025-01-01'+n,repeat('測',3000) from generate_series(0,359) n",[cf,ft]);
+    await login(f);await assert.rejects(db.query('select public.export_pilot_class($1)',[cf]),/exceeds 3 MB/);
+    assert.equal((await db.query('select * from public.pilot_class_exports where class_id=$1',[cf])).rows.length,1,'oversize export is rejected atomically without a false generated receipt');
   } finally { await db.close(); }
 });

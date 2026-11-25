@@ -51,6 +51,7 @@ export default async function Workspace({ searchParams }: { searchParams: Promis
       {process.env.PILOT_ROUTINES_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"routines") && <p><Link href="/workspace/routines">每日任務 →</Link></p>}
       {process.env.PILOT_DUTY_PLANNER_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"duty") && <p><Link href="/workspace/duty">值日工作與公平輪排 →</Link></p>}
       {process.env.PILOT_LUNCH_MEDIA_ENABLED === "true" && (moduleEnabled(classroom.enabled_modules,"duty")||moduleEnabled(classroom.enabled_modules,"routines")) && <p><Link href="/workspace/lunch-media">午餐點歌／影音 →</Link></p>}
+      {process.env.PILOT_CLASS_EXPORTS_ENABLED === "true" && <p><Link href="/workspace/exports">開學前檢查／資料匯出 →</Link></p>}
       {process.env.PILOT_RETURN_DAYS_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"routines") && <p><Link href="/workspace/return-days">返校日 →</Link></p>}
       {process.env.PILOT_REWARD_LEDGER_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"rewards") && <p><Link href="/workspace/rewards">金幣與 XP 帳本 →</Link></p>}
       {process.env.PILOT_REWARD_RULES_ENABLED === "true" && moduleEnabled(classroom.enabled_modules,"rewards") && <p><Link href="/workspace/rewards/rules">班級獎勵規則 →</Link></p>}
