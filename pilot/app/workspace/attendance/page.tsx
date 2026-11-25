@@ -31,7 +31,7 @@ export default async function Attendance({searchParams}:{searchParams:Promise<{d
     <input type="hidden" name="classId" value={classroom?.id}/><input type="hidden" name="studentId" value={student.id}/><input type="hidden" name="day" value={day}/>
     <label>出缺席 <select name="state" defaultValue={records.get(student.id)?"absent":"present"} style={{padding:8}}><option value="present">出席</option><option value="absent">請假</option></select></label> <Submit>儲存</Submit>
    </form>)}</div>{!roster.length&&<p>尚無使用中學生。</p>}
-   <p>目前只保存出缺席，不會自動免除作業、改動任務、產生代班或發扣金幣；後續串接前會個別驗收。</p>
+   <p>{process.env.PILOT_DUTY_SUBSTITUTES_ENABLED==='true'?'請假同學今天有已發布的值日工作時，大屏會顯示自願代班；不會自動指定代班者，老師確認完成後才發代班金幣。':'目前只保存出缺席，不會自動產生代班。'}出缺席不會自動免除作業；已接下的代班也不會因補登出席而消失，請到值日表的代班紀錄確認或取消。</p>
   </>}
  </main>;
 }
