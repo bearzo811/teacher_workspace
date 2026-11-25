@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {validClassExport,exportFormat,maxExportBytes} from '../lib/class-export';
+import {validClassExport,inspectClassExport,exportFormat,maxExportBytes} from '../lib/class-export';
 const classId='a0420000-0000-4000-8000-000000000001',exportId='a0420000-0000-4000-8000-000000000002';
 function envelope(change:Record<string,unknown>={}){
  const payload=JSON.stringify({format:exportFormat,schema_revision:41,export_id:exportId,class:{id:classId,name:'虛構班級'},tables:{pilot_students:[{name:'虛構同學🙂'}]},...change});
@@ -24,4 +24,15 @@ test('export envelopes reject malformed, oversized and truncated data before dow
  const data=envelope();
  for(const value of [null,[],{...data,payload:'{'},{...data,sha256:'not-a-hash'},{...data,bytes:maxExportBytes+1},{...data,counts:[]},{...data,counts:{pilot_students:1,unexpected:0}},envelope({tables:null}),envelope({schema_revision:42})])assert.equal(validClassExport(value,classId),false);
  const many=envelope({tables:{pilot_students:Array(50001).fill(null)}});assert.equal(validClassExport({...many,counts:{pilot_students:50001}},classId),false);
+});
+test('offline saved-file inspection catches foreign students, unbalanced ledgers and duplicate balances',()=>{
+ const student='a0420000-0000-4000-8000-000000000003';
+ const tables={pilot_students:[{id:student,class_id:classId,name:'虛構同學'}],pilot_reward_ledger:[{class_id:classId,student_id:student,coin_delta:3,xp_delta:0},{class_id:classId,student_id:student,coin_delta:-3,xp_delta:0}],pilot_reward_balances:[{class_id:classId,student_id:student,coin_net:0,xp_total:0}]};
+ const make=(data:Record<string,unknown[]>)=>({...envelope({tables:data}),counts:Object.fromEntries(Object.entries(data).map(([key,rows])=>[key,rows.length]))});
+ const correct=inspectClassExport(make(tables),classId);assert.deepEqual(correct.problems,[]);assert.equal(correct.students,1);assert.equal(correct.rows,4);
+ assert.ok(inspectClassExport(make({...tables,pilot_reward_balances:[{...tables.pilot_reward_balances[0],coin_net:3}]}),classId).problems.some(p=>p.includes('不一致')));
+ assert.ok(inspectClassExport(make({...tables,pilot_reward_balances:[]}),classId).problems.some(p=>p.includes('缺少對應餘額')));
+ assert.ok(inspectClassExport(make({...tables,pilot_students:[]}),classId).problems.some(p=>p.includes('缺少對應名冊')));
+ assert.ok(inspectClassExport(make({...tables,pilot_reward_balances:[tables.pilot_reward_balances[0],tables.pilot_reward_balances[0]]}),classId).problems.some(p=>p.includes('重複')));
+ assert.ok(inspectClassExport(make({...tables,pilot_students:[{...tables.pilot_students[0],class_id:student}]}),classId).problems.some(p=>p.includes('其他班級')));
 });

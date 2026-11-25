@@ -1,6 +1,6 @@
 # Class readiness and manual business export
 
-2026-11-25: implemented locally behind `PILOT_CLASS_EXPORTS_ENABLED=false`; 0042 cloud access requested, not yet applied. 46 tests and production build passed. This is a manual export foundation, not automated backup or a completed restore workflow.
+2026-11-25: 0042 was explicitly approved and applied to the isolated pilot; `PILOT_CLASS_EXPORTS_ENABLED=true` configured, deployment pending. 47 tests passed; targeted export/SQL tests and production build also passed after final numeric-bound hardening. This is a manual export foundation, not automated backup or a completed restore workflow.
 
 `/workspace/exports` reads current own-class roster, active term, workbooks, confirmed reward rules, applicable published duty plans and valid paired-device count. These are configuration checks; they do not prove physical screen legibility, touch/audio, student transactions or complete duty coverage. Read errors hide the results and download controls. Recent export receipts mean generated, not successfully saved on a user's disk.
 
@@ -11,3 +11,7 @@ All business rows are collected by one SQL statement for a single MVCC snapshot.
 The POST download endpoint checks same-origin and teacher authentication. It returns an attachment with private/no-store and nosniff headers. No anonymous/paired-device export is granted. Cloud stores only generation metadata: actor/class, timestamp, counts, byte length and SHA-256, not the exported payload. Downloaded files contain student information; teacher UI explains local safekeeping, limits, and that actual saving/restore is not certified by a generation receipt.
 
 Tests cover anonymous/cross-class denial, module-off historical export, archived rows, day-override ownership, all public business tables explicitly accounted for, no device credential keys, ledger sum consistency, Unicode byte lengths/hash, stale or malformed envelopes, mismatched class/counts, rate limit and atomic oversize failure. Still pending: cloud download and byte verification, actual saved-file recovery/isolated restore, retention and encrypted automatic backups, alerts and release-gate review.
+
+Offline file inspection was added: the teacher selects a saved file; browser-only code compares it with the latest five own-class generation receipts, verifies SHA-256 and counts, checks top-level student/class references and coin/XP ledger-to-balance totals. No file content is uploaded and no database write/restore occurs. This is deliberately limited inspection, not full FK or restore certification. Synthetic local file `/private/tmp/teacher-pilot-export-fixture.json` is available for a manual check through development preview `view=export&count=9`.
+
+Browser selection automation stalled/expired before any selected-file result was observed. Native Codex-app fallback was denied by the tool's safety restriction; it was not bypassed. Unit/SQL checks pass, but actual file-input and saved-file browser inspection remain unverified until a supported path or manual acceptance is available.

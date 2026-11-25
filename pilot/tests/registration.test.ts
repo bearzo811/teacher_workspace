@@ -5,7 +5,7 @@ import { test } from "node:test";
 import {defaultRewardRules} from "../lib/reward-rules";
 import {planDuty,nineStudentDutyTemplate,type DutyStudent} from '../lib/duty';
 import {createHash} from 'node:crypto';
-import {validClassExport} from '../lib/class-export';
+import {validClassExport,inspectClassExport} from '../lib/class-export';
 
 for (const management of [false, true]) test(`Google registration boundaries (roster management ${management ? "enabled" : "disabled"})`, async () => {
   const db = new PGlite();
@@ -1585,6 +1585,7 @@ for (const management of [false, true]) test(`Google registration boundaries (ro
     await login(f);
     const exported=(await db.query<{p:{id:string;payload:string;sha256:string;bytes:number;counts:Record<string,number>}}>('select public.export_pilot_class($1) p',[cf])).rows[0].p;
     assert.equal(validClassExport(exported,cf),true);
+    assert.deepEqual(inspectClassExport(exported,cf).problems,[]);
     assert.equal(exported.bytes,Buffer.byteLength(exported.payload));assert.equal(exported.sha256,createHash('sha256').update(exported.payload).digest('hex'));
     const snapshot=JSON.parse(exported.payload) as {format:string;schema_revision:number;class:Record<string,unknown>;tables:Record<string,Record<string,unknown>[]>};
     assert.equal(snapshot.format,'teacher-pilot-class-export/1');assert.equal(snapshot.schema_revision,41);assert.equal(snapshot.class.id,cf);assert.equal(snapshot.class.owner_id,undefined);

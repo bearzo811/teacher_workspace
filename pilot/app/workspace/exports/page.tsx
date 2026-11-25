@@ -4,6 +4,7 @@ import {serverClient} from '../../../lib/supabase';
 import {taipeiToday} from '../../../lib/calendar';
 import {taipeiTimestamp} from '../../../lib/time';
 import {DownloadForm} from './download-form';
+import {FileCheck} from './file-check';
 export const dynamic='force-dynamic';
 export default async function Exports(){
  if(process.env.PILOT_CLASS_EXPORTS_ENABLED!=='true')redirect('/workspace');
@@ -30,6 +31,6 @@ export default async function Exports(){
   {name:'已配對教室白板',ok:!!devices?.count,detail:`${devices?.count??0} 台有效白板`,href:'/workspace/displays'},
  ];
  return <main style={{maxWidth:1000,margin:'auto',padding:24,lineHeight:1.8}}><Link href="/workspace">← 工作台</Link><h1>開學前檢查／資料匯出</h1><p>{room?.name} · {today}</p>
- {unavailable?<p role="alert">資料暫時無法完整讀取，暫不顯示檢查結果或下載按鈕，請重新整理。</p>:<><h2>設定檢查</h2><p>這裡檢查目前設定。還需要在實際電子白板測試字級、觸控、聲音、學生任務與商店操作。</p><ul>{checks.map(check=><li key={check.name}><strong>{check.ok?'✓':'待確認'} · {check.name}</strong>：{check.detail} <Link href={check.href}>前往設定</Link></li>)}</ul><h2>下載班級資料</h2><p>包含所有學期、已移除學生、作業與學習紀錄、出缺席、值日與代班、金幣帳本、商品背包及班級設定。也包含目前關閉模組的既有紀錄；不包含登入資料、白板配對憑證或系統私密設定。</p><p>檔案含學生資料，請保存在你能控制的裝置。這是手動資料匯出，目前尚未提供自動備份與匯入還原；檔案會先通過完整性檢查，超過 3 MB 或 50,000 筆時會停止匯出，避免產生不完整檔案。</p><DownloadForm classId={room!.id}/><h2>最近產生的匯出</h2><p>以下記錄代表伺服器產生過檔案，請另外確認檔案確實已下載保存。</p>{!history?.data?.length?<p>尚未產生匯出。</p>:<ul>{history.data.map(record=><li key={record.id} style={{marginBottom:12}}>{taipeiTimestamp(record.created_at)} · {(record.bytes/1024).toFixed(1)} KB · {Object.values(record.counts as Record<string,number>).reduce((n,v)=>n+v,0)} 筆<details><summary>查看檔案指紋</summary><code style={{overflowWrap:'anywhere'}}>{record.sha256}</code></details></li>)}</ul>}</>}
+ {unavailable?<p role="alert">資料暫時無法完整讀取，暫不顯示檢查結果或下載按鈕，請重新整理。</p>:<><h2>設定檢查</h2><p>這裡檢查目前設定。還需要在實際電子白板測試字級、觸控、聲音、學生任務與商店操作。</p><ul>{checks.map(check=><li key={check.name}><strong>{check.ok?'✓':'待確認'} · {check.name}</strong>：{check.detail} <Link href={check.href}>前往設定</Link></li>)}</ul><h2>下載班級資料</h2><p>包含所有學期、已移除學生、作業與學習紀錄、出缺席、值日與代班、金幣帳本、商品背包及班級設定。也包含目前關閉模組的既有紀錄；不包含登入資料、白板配對憑證或系統私密設定。</p><p>檔案含學生資料，請保存在你能控制的裝置。這是手動資料匯出，目前尚未提供自動備份與匯入還原；檔案會先通過完整性檢查，超過 3 MB 或 50,000 筆時會停止匯出，避免產生不完整檔案。</p><DownloadForm classId={room!.id}/><FileCheck classId={room!.id} receipts={(history?.data??[]).map(row=>({id:row.id,bytes:row.bytes,sha256:row.sha256,counts:row.counts as Record<string,number>}))}/><h2>最近產生的匯出</h2><p>以下記錄代表伺服器產生過檔案，請另外確認檔案確實已下載保存。</p>{!history?.data?.length?<p>尚未產生匯出。</p>:<ul>{history.data.map(record=><li key={record.id} style={{marginBottom:12}}>{taipeiTimestamp(record.created_at)} · {(record.bytes/1024).toFixed(1)} KB · {Object.values(record.counts as Record<string,number>).reduce((n,v)=>n+v,0)} 筆<details><summary>查看檔案指紋</summary><code style={{overflowWrap:'anywhere'}}>{record.sha256}</code></details></li>)}</ul>}</>}
  </main>;
 }
