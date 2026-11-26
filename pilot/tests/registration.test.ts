@@ -8,6 +8,7 @@ import {planDuty,nineStudentDutyTemplate,type DutyStudent} from '../lib/duty';
 import {createHash} from 'node:crypto';
 import {validClassExport,inspectClassExport} from '../lib/class-export';
 import {verifyIsolatedExport} from '../scripts/isolated-export-verifier';
+import {swapDutyDraft} from '../lib/duty-swap';
 
 for (const management of [false, true]) test(`Google registration boundaries (roster management ${management ? "enabled" : "disabled"})`, async () => {
   const db = new PGlite();
@@ -1450,7 +1451,10 @@ for (const management of [false, true]) test(`Google registration boundaries (ro
     assert.equal(planning.revision,1);assert.ok(planning.history.length>0);
     const futurePlan=planDuty({...dutyTerm,start_date:'2026-11-30'},dutyOverrides,dutyStudents,nineStudentDutyTemplate);
     await assert.rejects(publishDuty(futurePlan.assignments,'a0000000-0000-0000-0000-000000000002',1,'2026-11-28'),/after today/);
-    await publishDuty(futurePlan.assignments,'a0000000-0000-0000-0000-000000000002',1,'2026-11-30');
+    const swappedFuture=swapDutyDraft(futurePlan.assignments,nineStudentDutyTemplate,1,2);assert.ok(swappedFuture.assignments);
+    await publishDuty(swappedFuture.assignments!,'a0000000-0000-0000-0000-000000000002',1,'2026-11-30');
+    const swappedMonth=(await db.query<{p:{assignments:{day:string;job_id:string;slot:number;student_id:string}[]}}>("select public.get_pilot_duty_month($1,$2,'2026-11-01') p",[cf,ft])).rows[0].p;
+    for(const index of [1,2]){const row=swappedFuture.assignments![index];assert.equal(swappedMonth.assignments.find(a=>a.day===row.day&&a.job_id===row.job_id&&a.slot===row.slot)?.student_id,row.student_id,'teacher-approved draft swaps survive publication and month reads');}
     await assert.rejects(db.query("update public.pilot_duty_plans set revision=99 where id=$1",[published]),/permission denied/);
     const december=(await db.query<{p:{assignments:unknown[]}}>("select public.get_pilot_duty_month($1,$2,'2026-12-01') p",[cf,ft])).rows[0].p;
     assert.equal(december.assignments.length,4*17,'latest revision replaces future days without duplicate roles');
