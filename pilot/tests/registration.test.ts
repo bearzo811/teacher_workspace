@@ -1590,6 +1590,7 @@ for (const management of [false, true]) test(`Google registration boundaries (ro
     assert.deepEqual(inspectClassExport(exported,cf).problems,[]);
     const restoredDuty=await verifyIsolatedExport(exported,cf);
     assert.equal(restoredDuty.tables,53);assert.equal(restoredDuty.businessDataMatches,true);assert.equal(restoredDuty.restoresLoginAccess,false);assert.ok(restoredDuty.revokedDevicePlaceholders>0);
+    assert.equal(restoredDuty.unboundAccessBlocked,true);assert.equal(restoredDuty.teacherRosterAndReexportPassed,true);
     const brokenSnapshot=JSON.parse(exported.payload);brokenSnapshot.tables.pilot_duty_cover_jobs[0].assignment_id='a0990000-0000-4000-8000-000000000001';
     const brokenPayload=JSON.stringify(brokenSnapshot);
     await assert.rejects(verifyIsolatedExport({...exported,payload:brokenPayload,bytes:Buffer.byteLength(brokenPayload),sha256:createHash('sha256').update(brokenPayload).digest('hex')},cf),/foreign key/,'matching counts and checksum are not sufficient when a referenced assignment is missing');

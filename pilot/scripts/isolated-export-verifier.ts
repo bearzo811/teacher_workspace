@@ -14,8 +14,8 @@ export async function verifyIsolatedExport(envelope:ClassExport,classId:string){
   await db.exec(`create role anon;create role authenticated;create schema auth;
    create table auth.users(id uuid primary key,email_confirmed_at timestamptz);
    create table auth.identities(user_id uuid,provider text);
-   create function auth.uid() returns uuid language sql as 'select null::uuid';
-   create function auth.jwt() returns jsonb language sql as 'select ''{}''::jsonb';
+   create function auth.uid() returns uuid language sql as 'select (nullif(current_setting(''request.jwt.claims'',true),'''')::jsonb->>''sub'')::uuid';
+   create function auth.jwt() returns jsonb language sql as 'select coalesce(nullif(current_setting(''request.jwt.claims'',true),''''),''{}'')::jsonb';
    grant usage on schema auth to authenticated;`);
   const migrations=new URL('../supabase/migrations/',import.meta.url);
   for(const file of (await readdir(migrations)).filter(name=>/^\d{4}_.*\.sql$/.test(name)&&name.slice(0,4)<='0042'&&!name.startsWith('0021_')).sort())await db.exec(await readFile(new URL(file,migrations),'utf8'));
@@ -60,9 +60,32 @@ export async function verifyIsolatedExport(envelope:ClassExport,classId:string){
   const sequences=(await db.query<{table_name:string;column_name:string}>("select table_name,column_name from information_schema.columns where table_schema='public' and is_identity='YES'")).rows;
   for(const s of sequences){const seq=(await db.query<{seq:string}>('select pg_get_serial_sequence($1,$2) seq',['public.'+s.table_name,s.column_name])).rows[0].seq;await db.query(`select setval($1::regclass,coalesce((select max(${identifier(s.column_name)}) from public.${identifier(s.table_name)}),1),exists(select 1 from public.${identifier(s.table_name)}))`,[seq]);}
   await db.exec('commit');
+  // Restore normal triggers before exercising access; every temporary identity change rolls back.
+  for(const table of actualTables)await db.exec(`alter table public.${identifier(table)} enable trigger user`);
+  for(const role of ['anon','authenticated']){
+   await db.exec(`set role ${role}`);
+   try{
+    for(const table of actualTables){
+     try{if((await db.query<{n:number}>(`select count(*)::integer n from public.${identifier(table)}`)).rows[0].n!==0)throw new Error('Restored data exposed without an authorized teacher');}
+     catch(error){if((error as {code?:string}).code!=='42501')throw error;}
+    }
+   }finally{await db.exec('reset role');}
+  }
+  await db.exec('begin');
+  try{
+   await db.query('update public.pilot_teachers set active=true where id=$1',[owner]);
+   await db.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({sub:owner,app_metadata:{provider:'google'}})]);
+   await db.exec('set local role authenticated');
+   const visible=(await db.query<{n:number}>('select count(*)::integer n from public.pilot_students')).rows[0].n;
+   if(visible!==snapshot.tables.pilot_students.length)throw new Error('Restored roster read differs');
+   const reexport=(await db.query<{result:ClassExport}>('select public.export_pilot_class($1) result',[classId])).rows[0].result;
+   if(!validClassExport(reexport,classId)||createHash('sha256').update(reexport.payload).digest('hex')!==reexport.sha256)throw new Error('Restored class cannot produce a valid export');
+   const equal=(await db.query<{same:boolean}>("select ($1::jsonb)->'tables'=($2::jsonb)->'tables' same",[envelope.payload,reexport.payload])).rows[0].same;
+   if(!equal)throw new Error('Restored export business data differs');
+  }finally{await db.exec('rollback');}
   const unsafe=(await db.query<{n:number}>('select count(*)::integer n from public.pilot_display_devices where token_hash is not null or code_hash is not null or revoked_at is null')).rows[0].n;
   const active=(await db.query<{n:number}>('select count(*)::integer n from public.pilot_teachers where active')).rows[0].n;
   if(unsafe||active)throw new Error('Isolated verification unexpectedly restored access');
-  return {kind:'local-ephemeral-verification' as const,tables:tables.length,rows:inspection.rows,students:inspection.students,foreignKeys:foreignKeys.length,inactiveActors:actors.size,revokedDevicePlaceholders:devices.size,businessDataMatches:true,restoresLoginAccess:false};
+  return {kind:'local-ephemeral-verification' as const,tables:tables.length,rows:inspection.rows,students:inspection.students,foreignKeys:foreignKeys.length,inactiveActors:actors.size,revokedDevicePlaceholders:devices.size,businessDataMatches:true,unboundAccessBlocked:true,teacherRosterAndReexportPassed:true,restoresLoginAccess:false};
  }finally{await db.close();}
 }
