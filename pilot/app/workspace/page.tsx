@@ -35,6 +35,7 @@ export default async function Workspace({ searchParams }: { searchParams: Promis
     <h1>{allowed ? classroom?.name ?? "建立你的班級" : unavailable ? "註冊服務尚未就緒" : "目前無法使用此帳號"}</h1>
     <p>目前登入：{user.email}</p>
     <p><Link href="/guide">第一次使用導覽</Link> · <Link href="/demo">虛構班級試玩</Link></p>
+    {allowed&&process.env.PILOT_CLASS_PAUSE_ENABLED==='true'&&<p><Link href="/workspace/class-state">班級暫停與復原</Link></p>}
     {params.notice === "modules" && <p role="status">功能選擇已儲存。</p>}
     {params.error === "modules" && <p role="alert">功能選擇未能儲存，請稍後重試。</p>}
     {!allowed && <p>{unavailable ? "新版資料庫尚未完成設定或連線失敗，請稍後重試。" : "請使用 Google 帳號；若帳號已被停用，請聯絡管理者。"}</p>}

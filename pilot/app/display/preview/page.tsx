@@ -12,6 +12,7 @@ import {SubstitutePanel} from '../contact-book/substitutes';
 import {LunchMediaSurface} from '../lunch/media-player';
 import {FileCheck} from '../../workspace/exports/file-check';
 import {exportFixture} from './export-fixture';
+import {ClassStateView} from '../../workspace/class-state/view';
 export const dynamic='force-dynamic';
 // Pure visual fixtures only. This route never reads or writes any database.
 export default async function Preview({searchParams}:{searchParams:Promise<{count?:string;view?:string;mode?:string;font?:string}>}){
@@ -19,6 +20,7 @@ export default async function Preview({searchParams}:{searchParams:Promise<{coun
  const params=await searchParams,count=['1','9','15'].includes(params.count??'')?Number(params.count):9;
  const font=['16','22','32'].includes(params.font??'')?Number(params.font):22;
  const wrap=(node:ReactNode)=><div style={{height:'100%','--pilot-display-scale':font/22} as CSSProperties}>{node}</div>;
+ if(params.view==='class-state')return <div style={{height:'100%',overflow:'auto',background:'#fff',color:'#111827'}}><ClassStateView preview room={params.mode==='paused'?undefined:{id:'00000000-0000-4000-8000-000000000001',name:'示範使用中班級'}} records={[{id:'00000000-0000-4000-8000-000000000002',name:'示範已暫停班級',paused_at:'2026-11-26T05:00:00Z'}]}/></div>;
  const students=Array.from({length:count},(_,i)=>({id:`00000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`,seat:i+1,name:`虛構學生${String(i+1).padStart(2,'0')}`}));
  if(params.view==='export'){const fixture=exportFixture(count);return <main style={{height:'100%',overflow:'auto',padding:24,boxSizing:'border-box',background:'#fff',color:'#111827',lineHeight:1.8}}><h1>匯出檔檢查（虛構預覽）</h1><p>此頁不讀寫資料庫。</p><FileCheck classId={fixture.classId} receipts={[fixture.envelope]}/></main>;}
  if(params.view==='media')return wrap(<LunchMediaSurface preview initial={{video_id:params.mode==='short'?'jNQXAC9IVRw':'M7lc1UVf-VE',title:'午餐播放器驗收',version:1}} fallback={<div style={{height:'100%',padding:24,background:'#071020',color:'#fff',boxSizing:'border-box'}}><h1>午餐工作與任務（虛構預覽）</h1><p>影片結束後恢復此區。本預覽不讀寫資料庫。</p></div>}/>);
