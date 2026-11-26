@@ -14,6 +14,7 @@ export default function Page() {
       </ul>
       <p>原有單班正式站維持運作，不需要搬移或重設。</p>
       <p><Link href="/demo">先用虛構資料試玩，不需登入</Link></p>
+      <p><Link href="/guide">第一次使用導覽</Link></p>
       <Link href="/login">前往導師登入／註冊</Link>
     </main>
   );
