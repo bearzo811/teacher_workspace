@@ -7,6 +7,7 @@ create table pilot_private.class_lifecycle_events(
  note text not null check(char_length(btrim(note)) between 1 and 200),created_at timestamptz not null default now(),
  unique(actor_id,request_id)
 );
+alter table pilot_private.class_lifecycle_events enable row level security;
 revoke all on pilot_private.class_lifecycle_events from public,anon,authenticated;
 
 create function public.list_pilot_paused_classes() returns jsonb
