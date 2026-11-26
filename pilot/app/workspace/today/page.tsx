@@ -16,6 +16,10 @@ export default async function Today({searchParams}:{searchParams:Promise<{day?:s
  const routines=classroom&&moduleEnabled(classroom.enabled_modules,"routines")&&process.env.PILOT_ROUTINES_ENABLED==="true";
  const passports=classroom&&moduleEnabled(classroom.enabled_modules,"passport")&&process.env.PILOT_PASSPORTS_ENABLED==="true";
  const reading=classroom&&moduleEnabled(classroom.enabled_modules,"reading")&&process.env.PILOT_READING_ENABLED==="true";
+ const duty=classroom&&moduleEnabled(classroom.enabled_modules,"duty")&&process.env.PILOT_DUTY_PLANNER_ENABLED==="true";
+ const rewards=classroom&&moduleEnabled(classroom.enabled_modules,"rewards");
+ const shop=rewards&&process.env.PILOT_PURCHASE_ENGINE_ENABLED==="true";
+ const backpack=rewards&&process.env.PILOT_BACKPACK_ENABLED==="true";
  const [students,terms,attendance,assignments]=classroom?await Promise.all([
   client.from("pilot_students").select("id,seat,name").eq("class_id",classroom.id).is("deleted_at",null).order("seat"),
   client.from("pilot_terms").select("*").eq("class_id",classroom.id).eq("active",true).maybeSingle(),
@@ -23,7 +27,11 @@ export default async function Today({searchParams}:{searchParams:Promise<{day?:s
   homework?client.from("pilot_assignments").select("id,content,workbook_id",{count:"exact"}).eq("class_id",classroom.id).eq("due_day",day).eq("archived",false).order("id").range(0,999):Promise.resolve(null),
  ]):[null,null,null,null];
  const roster=students?.data??[];const term=terms?.data as Term|null;const week=term?termWeek(day,term):null;
- const [overrides,routineRows,plans,books,contact,returnDay,returnRows]=classroom?await Promise.all([
+ const [dutyMonth,coverCount,shopSettings,rewardCount,overrides,routineRows,plans,books,contact,returnDay,returnRows]=classroom?await Promise.all([
+  duty&&term?client.rpc('get_pilot_duty_month',{target_class:classroom.id,target_term:term.id,target_month:day.slice(0,7)+'-01'}):null,
+  duty&&process.env.PILOT_DUTY_SUBSTITUTES_ENABLED==='true'?client.from('pilot_duty_covers').select('id',{count:'exact',head:true}).eq('class_id',classroom.id).eq('status','claimed'):null,
+  shop?client.from('pilot_shop_settings').select('is_open').eq('class_id',classroom.id).maybeSingle():null,
+  backpack?client.from('pilot_student_rewards').select('id',{count:'exact',head:true}).eq('class_id',classroom.id).eq('status','requested'):null,
   term?client.from("pilot_day_overrides").select("day,is_school_day,note").eq("term_id",term.id).eq("day",day):Promise.resolve(null),
   routines&&term?client.from("pilot_routine_checks").select("student_id,task_key,completed").eq("class_id",classroom.id).eq("term_id",term.id).eq("day",day):Promise.resolve(null),
   passports&&term&&week?client.from("pilot_passports").select("id,name").eq("class_id",classroom.id).eq("term_id",term.id).eq("archived",false).lte("first_week",week).gte("last_week",week):Promise.resolve(null),
@@ -31,7 +39,8 @@ export default async function Today({searchParams}:{searchParams:Promise<{day?:s
   routines&&term&&moduleEnabled(classroom.enabled_modules,"homework")?client.from("pilot_contact_days").select("day").eq("class_id",classroom.id).eq("term_id",term.id).eq("day",day).maybeSingle():Promise.resolve(null),
   routines&&process.env.PILOT_RETURN_DAYS_ENABLED==="true"?client.from("pilot_return_days").select("label,enabled").eq("class_id",classroom.id).eq("day",day).maybeSingle():Promise.resolve(null),
   routines&&process.env.PILOT_RETURN_DAYS_ENABLED==="true"?client.from("pilot_return_checks").select("student_id,task_key,completed").eq("class_id",classroom.id).eq("day",day):Promise.resolve(null),
- ]):[null,null,null,null,null,null,null];
+ ]):[null,null,null,null,null,null,null,null,null,null,null];
+ const duties=(dutyMonth?.data as {days:string[];assignments:{id:string;day:string;student_id:string;student_name:string;job_name:string}[]}|null)?.assignments.filter(row=>row.day===day)??[];
  const homeworkRows:{assignment_id:string;student_id:string;status:string}[]=[];let homeworkError=false;const items=assignments?.data??[];
  if(homework&&classroom&&roster.length&&(assignments?.count??0)<=1000){
   for(let offset=0;offset<items.length;offset+=250){const batches=await Promise.all(Array.from({length:Math.ceil(Math.min(250,items.length-offset)/50)},(_,i)=>client.from("pilot_homework_checks").select("assignment_id,student_id,status").eq("class_id",classroom.id).in("assignment_id",items.slice(offset+i*50,offset+i*50+50).map(item=>item.id)).in("student_id",roster.map(student=>student.id))));if(batches.some(batch=>batch.error)){homeworkError=true;break;}homeworkRows.push(...batches.flatMap(batch=>batch.data??[]));}
@@ -52,7 +61,9 @@ export default async function Today({searchParams}:{searchParams:Promise<{day?:s
    {homework&&<section style={section}><h2>應繳作業</h2><p>依繳交日 {day} 查詢，不是這天聯絡簿新指派的作業。待確認、未訂正完成與已完成都算已交。</p>{assignments?.error||books?.error||homeworkError||(assignments?.count??0)>1000?<p role="alert">作業資料無法完整載入，暫不顯示名單。</p>:<>{!items.length&&<p>此日沒有應繳作業。</p>}{items.map(item=>{const missing=roster.filter(student=>{const status=statusMap.get(`${item.id}:${student.id}`)??"missing";return !validHomeworkStatus(status)||!isHandedIn(status);});return <div key={item.id}><strong>{bookMap.get(item.workbook_id)} {item.content} · 已交 {roster.length-missing.length}／{roster.length}</strong><p>{missing.length?`未交：${missing.map(student=>student.name).join("、")}`:"全班已交。"}</p></div>;})}</>}<Link href={`/workspace/homework?day=${day}`}>管理應繳作業</Link></section>}
    {passports&&<section style={section}><h2>本週護照</h2>{terms?.error||plans?.error||passportRows?.error?<p role="alert">護照資料載入失敗，暫不顯示名單。</p>:!week?<p>此日不在啟用學期內。</p>:<>{!(plans?.data?.length)&&<p>本週沒有使用中的護照項目。</p>}{plans?.data?.map(plan=>{const complete=new Set((passportRows?.data??[]).filter(row=>row.passport_id===plan.id&&row.completed).map(row=>row.student_id));const missing=roster.filter(student=>!complete.has(student.id));return <div key={plan.id}><strong>{plan.name} W{week} · 已完成 {roster.length-missing.length}／{roster.length}</strong><p>{missing.length?`未完成：${missing.map(student=>student.name).join("、")}`:"全班已完成。"}</p></div>;})}</>}<Link href="/workspace/passports">管理護照</Link></section>}
    {reading&&<section style={section}><h2>閱讀／讀報</h2>{terms?.error||readingRows?.error?<p role="alert">閱讀紀錄載入失敗，暫不顯示名單。</p>:!term?<p>尚無啟用學期。</p>:<>{readingKinds.map(kind=>{const cutoff=day<taipeiToday()?day:taipeiToday();const summary=readingSummary(roster,readingRows?.data??[],readingMonths(term.start_date,term.end_date),kind.id,cutoff);const current=summary.months.find(item=>item.month===`${day.slice(0,7)}-01`);return <div key={kind.id}><h3>{kind.name}</h3>{current?<p>{day.slice(0,7)} 已完成 {current.completed}／{current.total}（{current.overdue?"月份已結束":"尚未到期"}）</p>:<p>所選月份不在此學期閱讀範圍。</p>}<p>已結束月份尚未完成：{summary.overdueCount} 項（不含尚未到期月份）</p>{summary.overdueCount>0&&<details><summary>查看名單</summary>{summary.overdue.filter(item=>item.missing.length).map(item=><p key={item.month}>{item.month.slice(0,7)}：{item.missing.map(student=>student.name).join("、")}</p>)}</details>}</div>;})}<p>到期摘要最多計算至今天，不因預覽未來日期提前判逾期；目前不連動下課、商店或扣點。</p></>}<Link href="/workspace/reading">管理閱讀／讀報</Link></section>}
-   <p>此頁只讀取已啟用功能，不修改紀錄或發扣獎勵；值日與商店摘要將隨模組移植補上。</p>
+   {duty&&<section style={section}><h2>當日值日工作</h2>{terms?.error||dutyMonth?.error?<p role="alert">值日資料讀取失敗，暫不顯示分配。</p>:!term?<p>尚無啟用學期。</p>:!duties.length?<p>此日沒有已發布的工作。若為上課日，請檢查是否已完成輪排發布。</p>:<>{Array.from(new Set(duties.map(row=>row.student_id))).map(id=>{const jobs=duties.filter(row=>row.student_id===id);return <p key={id}><strong>{jobs[0].student_name}{absent.has(id)?'（請假）':''}</strong>：{jobs.map(row=>row.job_name).join('、')}</p>;})}<p>列出原始分配；代班後的實際承接人請查看代班紀錄。</p></>}{coverCount&&(coverCount.error?<p role="alert">待確認代班數讀取失敗。</p>:<p>待確認代班：{coverCount.count??0} 筆（所有日期） · <Link href="/workspace/duty/covers">處理代班</Link></p>)}<Link href={`/workspace/duty?month=${day.slice(0,7)}`}>管理值日表</Link></section>}
+   {(shop||backpack)&&<section style={section}><h2>商店與背包</h2><p>以下為目前狀態，不隨上方日期回溯。</p>{shop&&(shopSettings?.error?<p role="alert">商店開放狀態讀取失敗。</p>:<p>班級商店：{shopSettings?.data?.is_open?'開放':'關閉'} · <Link href="/workspace/shop/settings">管理開放設定</Link></p>)}{backpack&&(rewardCount?.error?<p role="alert">待核銷獎品數讀取失敗。</p>:<p>待核銷獎品：{rewardCount?.count??0} 件 · <Link href="/workspace/backpacks">處理背包申請</Link></p>)}</section>}
+   <p>此頁只讀取已啟用功能，不修改紀錄或發扣獎勵。</p>
   </>}
  </main>;
 }
