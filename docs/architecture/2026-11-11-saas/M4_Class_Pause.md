@@ -13,3 +13,5 @@
 本機 SQL 驗證：跨班／匿名拒絕、名冊與業務讀取停止、白板及未用配對碼失效、模組已關閉仍可安全關商店、排程跳過、復原衝突與過期時間拒絕、重送冪等、復原後舊裝置仍拒絕、帳本不變。50 項全套測試及 build 通過。尚待雲端操作、並行壓力及整合驗收。
 
 純虛構預覽驗證使用中與無使用中班級兩種畫面、原因與確認欄位、復原衝突說明。預覽表單停用，沒有連資料庫或變更任何班級。證據 `/private/tmp/teacher-pilot-class-pause-preview.png`、`/private/tmp/teacher-pilot-class-resume-preview.png`。
+
+程式隨 c0d79a2 部署 dpl_5JaxxBcjGpwaGnyyw4KRqQSh9LzF Ready；0043 雲端仍未執行，開關未啟用。瀏覽器直接前往 /workspace/class-state 會回工作台，沒有管理表單或入口，不代表功能已啟用。當次權限問題仍待使用者回覆。

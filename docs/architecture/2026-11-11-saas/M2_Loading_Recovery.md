@@ -5,3 +5,5 @@
 重試只重新載入畫面，不重送先前表單或自動勾選完成。提示使用者核對剛送出的紀錄，不把成功讀取與成功寫入混為一談。既有查詢錯誤若已由頁面正常處理，仍顯示原來的局部錯誤，不會被強迫替換。
 
 大屏使用既有底部分頁佈局內的可用高度，字級隨可視寬度限制，重試按鈕至少 64 px 高；本機虛構 loading 畫面已驗證。證據 `/private/tmp/teacher-pilot-display-loading.png`。沒有宣稱網路或資料庫 P95 因此變快，實體白板及故障注入仍待驗收。
+
+c0d79a2 部署 dpl_5JaxxBcjGpwaGnyyw4KRqQSh9LzF Ready，canonical pilot alias 已確認。雲端實際觀察到「正在讀取班級資料…」，完成後正常回工作台，證據 `/private/tmp/teacher-pilot-workspace-loading-cloud.png`。沒有在雲端刻意製造真實班級的例外或重送業務操作。
