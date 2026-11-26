@@ -42,11 +42,14 @@ export default async function Today({searchParams}:{searchParams:Promise<{day?:s
  ]):[null,null,null,null,null,null,null,null,null,null,null];
  const duties=(dutyMonth?.data as {days:string[];assignments:{id:string;day:string;student_id:string;student_name:string;job_name:string}[]}|null)?.assignments.filter(row=>row.day===day)??[];
  const homeworkRows:{assignment_id:string;student_id:string;status:string}[]=[];let homeworkError=false;const items=assignments?.data??[];
- if(homework&&classroom&&roster.length&&(assignments?.count??0)<=1000){
+ const homeworkLoading=(async()=>{if(homework&&classroom&&roster.length&&(assignments?.count??0)<=1000){
   for(let offset=0;offset<items.length;offset+=250){const batches=await Promise.all(Array.from({length:Math.ceil(Math.min(250,items.length-offset)/50)},(_,i)=>client.from("pilot_homework_checks").select("assignment_id,student_id,status").eq("class_id",classroom.id).in("assignment_id",items.slice(offset+i*50,offset+i*50+50).map(item=>item.id)).in("student_id",roster.map(student=>student.id))));if(batches.some(batch=>batch.error)){homeworkError=true;break;}homeworkRows.push(...batches.flatMap(batch=>batch.data??[]));}
- }
- const passportRows=passports&&classroom&&week&&plans?.data?.length&&roster.length?await client.from("pilot_passport_checks").select("passport_id,student_id,completed").eq("class_id",classroom.id).eq("week",week).in("passport_id",plans.data.map(plan=>plan.id)).in("student_id",roster.map(student=>student.id)):null;
- const readingRows=reading&&classroom&&term&&roster.length?await client.from("pilot_reading_checks").select("student_id,kind,month,status").eq("class_id",classroom.id).eq("term_id",term.id).in("student_id",roster.map(student=>student.id)):null;
+ }})();
+ const [passportRows,readingRows]=await Promise.all([
+  passports&&classroom&&week&&plans?.data?.length&&roster.length?client.from("pilot_passport_checks").select("passport_id,student_id,completed").eq("class_id",classroom.id).eq("week",week).in("passport_id",plans.data.map(plan=>plan.id)).in("student_id",roster.map(student=>student.id)):null,
+  reading&&classroom&&term&&roster.length?client.from("pilot_reading_checks").select("student_id,kind,month,status").eq("class_id",classroom.id).eq("term_id",term.id).in("student_id",roster.map(student=>student.id)):null,
+  homeworkLoading,
+ ]);
  const coreError=classes.error||students?.error;const absent=new Set((attendance?.data??[]).filter(row=>row.absent).map(row=>row.student_id));const known=new Set((attendance?.data??[]).map(row=>row.student_id));
  const statusMap=new Map(homeworkRows.map(row=>[`${row.assignment_id}:${row.student_id}`,row.status]));const bookMap=new Map((books?.data??[]).map(book=>[book.id,`${book.subject}／${book.name}`]));
  const isSchool=term&&schoolDay(day,term,overrides?.data??[]);const isReturn=Boolean(returnDay?.data?.enabled&&!isSchool);
