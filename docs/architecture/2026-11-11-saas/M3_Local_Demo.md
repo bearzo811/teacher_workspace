@@ -7,3 +7,5 @@
 本機瀏覽器已走完未交→待確認→已完成（20→22 金幣）→購買（22→12，庫存 4→3）→申請使用→老師確認，未再扣幣。證據 `/private/tmp/teacher-pilot-demo-flow.png`。首頁過時「沒有排程或購買操作」文案同步移除。
 
 新增 `/guide` 六步導覽，首頁、登入與工作台可進入，說明建班、學期／補課、選用模組、獎勵需另開、配對與當日流程、核銷及匯出。登入頁過時的「其他教室功能尚未開放」已更新。導覽是靜態說明與現有頁面連結，不會替老師自動開啟獎勵或寫入班級設定；尚非影片導覽或 3～5 位新老師實際完成驗收。
+
+fbc0533 部署 dpl_DnUJ4bbxejySVuAhF68WiE8SiAeu Ready，canonical pilot alias 已確認。雲端 /demo 實際點擊繳交即改待確認、20 金幣不變；/guide 六步及連結正確。證據 `/private/tmp/teacher-pilot-demo-cloud.png`、`/private/tmp/teacher-pilot-guide-cloud.png`。本輪全套 50 項測試通過，最終 build 通過。
