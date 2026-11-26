@@ -1,0 +1,1 @@
+export default function Loading(){return <main aria-busy="true" style={{maxWidth:1100,margin:'auto',padding:24,lineHeight:1.8}}><p role="status" aria-live="polite">正在讀取班級資料…</p><div aria-hidden="true" style={{display:'grid',gap:16}}>{[120,180,120].map((height,i)=><div key={i} style={{height,borderRadius:12,background:'#f1f5f9',border:'1px solid #e2e8f0'}}/>)}</div></main>;}

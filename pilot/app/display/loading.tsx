@@ -1,0 +1,1 @@
+export default function Loading(){return <section aria-busy="true" style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center',padding:24,boxSizing:'border-box',background:'#020617',color:'#e2e8f0'}}><p role="status" aria-live="polite" style={{fontSize:'clamp(22px,3vw,40px)'}}>正在讀取班級畫面…</p></section>;}
