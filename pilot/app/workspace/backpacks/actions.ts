@@ -20,5 +20,9 @@ export async function manageReward(form:FormData){
  const page=backpackPage(String(form.get("page")??"1"));
  if(!Object.hasOwn(rewardActions,action)||!/^\d{1,7}$/.test(versionText)||Number(versionText)<1||Number(versionText)>1000000||page===null)redirect("/workspace/backpacks?error=input");
  const result=await client.rpc("manage_pilot_reward",{target_class:id(form.get("classId")),target_student:student,target_reward:id(form.get("rewardId")),request_key:id(form.get("requestId")),expected_version:Number(versionText),reward_action:action,action_note:note(form)});
+ if(form.get('returnTo')==='requests'){
+  revalidatePath('/workspace/backpacks');revalidatePath('/workspace/backpacks/requests');revalidatePath('/workspace/today');
+  redirect(`/workspace/backpacks/requests?${result.error?'error=save':'notice=saved'}`);
+ }
  finish(result.error,student,page);
 }

@@ -23,7 +23,7 @@ export default async function Backpacks({searchParams}:{searchParams:Promise<{st
  const unavailable=classes.error||students?.error||items?.error||rewards?.error||selected?.error||history?.error||(items?.data?.length??0)>200||Boolean(rewards&&rewards.count===null)||Boolean(rewards?.data?.some(row=>!Object.hasOwn(rewardStates,row.status)));
  const total=rewards?.count??0,validPage=page!==null&&(page===1||(page-1)*50<total);
  const base=student?`/workspace/backpacks?student=${student.id}`:"/workspace/backpacks";
- return <main style={{maxWidth:1200,margin:"auto",padding:24,lineHeight:1.8}}><Link href="/workspace">← 返回工作台</Link><h1>學生背包與核銷</h1><p>{classroom?.name}</p>
+ return <main style={{maxWidth:1200,margin:"auto",padding:24,lineHeight:1.8}}><Link href="/workspace">← 返回工作台</Link><h1>學生背包與核銷</h1><p><Link href="/workspace/backpacks/requests">查看全班待核銷申請</Link></p><p>{classroom?.name}</p>
  <p>獎品永久持有，不設定到期日。每一份獎品獨立記錄；商品改名或移除不會改寫背包快照。{process.env.PILOT_DISPLAY_SHOP_ENABLED==='true'?'支援配對白板購買入包，以及老師贈送與代辦使用流程。':'目前只有老師端贈送與代辦使用流程，尚無購買或學生大屏。'}這裡的核銷是確認獎品已使用，不是購買核准。</p>
  {params.notice==="saved"&&<p role="status">操作已儲存，同一請求重送不會重複執行。</p>}{params.error&&<p role="alert">未能儲存。請重新整理，確認學生、商品、狀態及版本仍有效，並填寫原因與確認。</p>}
  {unavailable?<p role="alert">背包資料讀取失敗，不提供操作。</p>:!enabled?<p>請先開啟金幣與商店模組。</p>:<>
